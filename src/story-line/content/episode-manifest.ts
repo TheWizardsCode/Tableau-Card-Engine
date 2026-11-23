@@ -34,7 +34,8 @@
  * @module
  */
 
-import type { ContentCard } from './types';
+import { compileContentOptions, optionSuccessorIds } from './csv';
+import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
 
 /**
  * Canonical repository-relative path of the episode-manifest JSON schema.
@@ -589,7 +590,7 @@ function unknownReferenceFindings(
   return findings;
 }
 
-/** The rule families implemented at this commit; later children append here. */
+/** The manifest-only rule families implemented at this commit; later children append here. */
 const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
   'duplicate-act',
   'duplicate-scene',
@@ -597,6 +598,32 @@ const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
   'unknown-act',
   'unknown-scene',
 ];
+
+/**
+ * The card-resolution rules, which need the bound content as a second input.
+ *
+ * They are reported as run only when content is bound: without a card list
+ * there is nothing to resolve against, and a caller must be able to tell a
+ * pass apart from a rule that could not run.
+ */
+const CONTENT_RULES: readonly EpisodeManifestRule[] = [
+  'unknown-card',
+  'unassigned-card',
+  'dangling-chain',
+  'ending-successor',
+];
+
+/**
+ * The adapter the validator uses when the caller binds no game adapter.
+ *
+ * Content files hold templates, so the identity function is the correct
+ * base-id rule; a game carrying instance serials passes its own adapter.
+ */
+const IDENTITY_CONTENT_ADAPTER: ContentAdapter = {
+  gameId: '',
+  columns: [],
+  fields: { id: 'id', name: 'name' },
+};
 
 /** Orders findings by `path`, then `code` — the report's stable total order. */
 function compareFindings(left: EpisodeManifestFinding, right: EpisodeManifestFinding): number {
@@ -632,7 +659,276 @@ function collectFindings(
 }
 
 /**
- * Validates an episode manifest's identity and scope (GDD §2.4).
+ * The content-derived inputs every card-resolution rule reads.
+ *
+ * Built once per validation so each rule is a predicate over the same map:
+ * `unknown-card` needs the resolvable id set, `unassigned-card` needs the
+ * assigned set plus the episode's storylines, and both chaining rules need the
+ * compiled successor lists.
+ */
+interface ContentResolutionIndex {
+  /** Content cards by id (templates only; a base-id alias is added when it differs). */
+  readonly cardsById: ReadonlyMap<string, ContentCard>;
+  /** Successor ids per card id, compiled through the shared option seam. */
+  readonly successorsById: ReadonlyMap<string, readonly string[]>;
+  /** Every `beats[].cardId`, the episode's assigned beat set. */
+  readonly assignedBeatIds: ReadonlySet<string>;
+  /** Every `endings[]` entry, the episode's ending set. */
+  readonly endingIds: ReadonlySet<string>;
+  /** Storyline ids the episode's beats and endings belong to (unassigned-card scope). */
+  readonly storylineIds: ReadonlySet<string>;
+}
+
+/** Reads a card's id, or `undefined` when the value is not a card-shaped object. */
+function cardIdOf(value: unknown): string | undefined {
+  const id = recordOf(value)?.id;
+  return typeof id === 'string' ? id : undefined;
+}
+
+/** Reads a card's raw `options` cell, or `undefined` when not a string. */
+function cardOptionsOf(value: unknown): string | undefined {
+  const options = recordOf(value)?.options;
+  return typeof options === 'string' ? options : undefined;
+}
+
+/**
+ * Compiles a content card's successors through the shared content seam.
+ *
+ * Malformed encodings contribute no successors: the content validator reports
+ * the malformation, and this validator must stay total.
+ */
+function compiledSuccessors(
+  card: ContentCard,
+  adapter: ContentAdapter,
+): readonly string[] {
+  const options = cardOptionsOf(card);
+  if (options === undefined || options.trim() === '') return [];
+  try {
+    return compileContentOptions(card).flatMap((option) => optionSuccessorIds(option, adapter));
+  } catch {
+    return [];
+  }
+}
+
+/** Builds the card-resolution index once per validation. */
+function buildContentResolutionIndex(
+  manifest: unknown,
+  traversal: EpisodeManifestTraversal,
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): ContentResolutionIndex {
+  const cardsById = new Map<string, ContentCard>();
+  const successorsById = new Map<string, readonly string[]>();
+  for (const card of cards) {
+    const id = cardIdOf(card);
+    if (id === undefined) continue;
+    cardsById.set(id, card);
+    const base = baseIdOf(adapter, id);
+    if (!cardsById.has(base)) cardsById.set(base, card);
+    const successors = compiledSuccessors(card, adapter);
+    for (const key of new Set([id, base])) successorsById.set(key, successors);
+  }
+
+  const assignedBeatIds = new Set<string>();
+  for (const beat of traversal.beats) {
+    const id = stringMember(beat.value, 'cardId');
+    if (id !== undefined) assignedBeatIds.add(id);
+  }
+  const endingIds = new Set<string>();
+  for (const id of endingIdsOf(manifest)) endingIds.add(id);
+
+  const storylineIds = new Set<string>();
+  for (const id of [...assignedBeatIds, ...endingIds]) {
+    const storylineId = cardsById.get(id)?.storylineId;
+    if (typeof storylineId === 'string') storylineIds.add(storylineId);
+  }
+
+  return { cardsById, successorsById, assignedBeatIds, endingIds, storylineIds };
+}
+
+/** The `endings[]` string entries, in declaration order. */
+function endingIdsOf(manifest: unknown): string[] {
+  return arrayOf(recordOf(manifest)?.endings).filter(
+    (value): value is string => typeof value === 'string',
+  );
+}
+
+/** The `endings[]` entries paired with the manifest path that addresses each. */
+function endingEntries(manifest: unknown): { path: string; id: string }[] {
+  return arrayOf(recordOf(manifest)?.endings).flatMap((value, index) =>
+    typeof value === 'string' ? [{ path: `endings[${index}]`, id: value }] : [],
+  );
+}
+
+/**
+ * `unknown-card`: every card reference resolves in the bound content file.
+ *
+ * Covers `beats[].cardId`, `start.beat`, `endings[]`, `{kind:'ending'}` route
+ * `cardId` and `{kind:'beat'}` route `beat` (GDD §2.4). The finding's `path`
+ * points at the offending field, so a reviewer edits the manifest reference
+ * rather than searching for the id.
+ */
+function unknownCardFindings(
+  manifest: unknown,
+  traversal: EpisodeManifestTraversal,
+  index: ContentResolutionIndex,
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  const report = (path: string, cardId: string, where: string): void => {
+    findings.push({
+      code: 'unknown-card',
+      path,
+      message: `${where} names card id "${cardId}", which is not in the bound content file.`,
+    });
+  };
+
+  for (const beat of traversal.beats) {
+    const cardId = stringMember(beat.value, 'cardId');
+    if (cardId !== undefined && !index.cardsById.has(cardId)) {
+      report(`${beat.path}.cardId`, cardId, 'This beat');
+    }
+  }
+
+  const startBeat = stringMember(recordOf(manifest)?.start, 'beat');
+  if (startBeat !== undefined && !index.cardsById.has(startBeat)) {
+    report('start.beat', startBeat, 'start.beat');
+  }
+
+  for (const entry of endingEntries(manifest)) {
+    if (!index.cardsById.has(entry.id)) report(entry.path, entry.id, 'This ending');
+  }
+
+  for (const scene of traversal.scenes) {
+    for (const route of scene.routes) {
+      const to = recordOf(recordOf(route.value)?.to);
+      const kind = stringMember(to, 'kind');
+      const member = kind === 'ending' ? 'cardId' : kind === 'beat' ? 'beat' : undefined;
+      if (member === undefined) continue;
+      const cardId = stringMember(to, member);
+      if (cardId !== undefined && !index.cardsById.has(cardId)) {
+        report(`${route.path}.to.${member}`, cardId, 'This route target');
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * `unassigned-card`: no choice card of the episode's storyline is orphaned.
+ *
+ * The scope is the storyline the episode's beats and endings belong to (the
+ * same `storylineId` grouping the guard and `storylineEntryCards` use), so a
+ * shared content file carrying another storyline's cards never produces noise.
+ * The finding names the orphan card through the manifest's content binding
+ * (`content.<cardId>`) because the defect is a missing assignment, not a
+ * malformed manifest field.
+ */
+function unassignedCardFindings(
+  cards: readonly ContentCard[],
+  index: ContentResolutionIndex,
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  if (index.storylineIds.size === 0) return findings;
+  for (const card of cards) {
+    const id = cardIdOf(card);
+    const options = cardOptionsOf(card);
+    if (id === undefined || options === undefined || options.trim() === '') continue;
+    const storylineId = recordOf(card)?.storylineId;
+    if (typeof storylineId !== 'string' || !index.storylineIds.has(storylineId)) continue;
+    if (index.assignedBeatIds.has(id) || index.endingIds.has(id)) continue;
+    findings.push({
+      code: 'unassigned-card',
+      path: `content.${id}`,
+      message:
+        `Choice card "${id}" of storyline "${storylineId}" is neither a beat nor an ending ` +
+        'of this episode, so no play path can reach it.',
+    });
+  }
+  return findings;
+}
+
+/** True when a successor id resolves to an assigned beat or an ending. */
+function isAssignedTarget(target: string, index: ContentResolutionIndex): boolean {
+  return index.assignedBeatIds.has(target) || index.endingIds.has(target);
+}
+
+/** The distinct successors of a card that resolve to neither a beat nor an ending. */
+function danglingSuccessors(
+  cardId: string,
+  index: ContentResolutionIndex,
+): readonly string[] {
+  const successors = index.successorsById.get(cardId) ?? [];
+  return [...new Set(successors)].filter((target) => !isAssignedTarget(target, index));
+}
+
+/**
+ * `dangling-chain`: a scene with a chain route has only resolvable successors.
+ *
+ * Every beat of such a scene is checked, because the chain route continues from
+ * whichever beat the scene closes on; a successor that is neither an assigned
+ * beat nor an ending would leave the route with nothing to target.
+ */
+function danglingChainFindings(
+  traversal: EpisodeManifestTraversal,
+  index: ContentResolutionIndex,
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    const chainRoute = scene.routes.find(
+      (route) => stringMember(recordOf(recordOf(route.value)?.to), 'kind') === 'chain',
+    );
+    if (chainRoute === undefined) continue;
+    const sceneId = stringMember(scene.value, 'id') ?? scene.path;
+    for (const beat of scene.beats) {
+      const cardId = stringMember(beat.value, 'cardId');
+      // An unresolved beat is `unknown-card`'s finding; it has no successors to read.
+      if (cardId === undefined || !index.cardsById.has(cardId)) continue;
+      const dangling = danglingSuccessors(cardId, index);
+      if (dangling.length === 0) continue;
+      findings.push({
+        code: 'dangling-chain',
+        path: `${beat.path}.cardId`,
+        message:
+          `Scene "${sceneId}" opens a chain route (${chainRoute.path}), but beat "${cardId}" ` +
+          `can reach ${listed(dangling)}, which resolves to neither a beat nor an ending of ` +
+          'this episode.',
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * `ending-successor`: an ending's successors, if any, feed the reset loop.
+ *
+ * A successor must resolve to an assigned beat (the loop back into the
+ * episode) or another ending; an ending with no successors is terminal and
+ * silent by design.
+ */
+function endingSuccessorFindings(
+  manifest: unknown,
+  index: ContentResolutionIndex,
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  for (const entry of endingEntries(manifest)) {
+    // An unresolved ending is `unknown-card`'s finding; it has no successors to read.
+    if (!index.cardsById.has(entry.id)) continue;
+    const dangling = danglingSuccessors(entry.id, index);
+    if (dangling.length === 0) continue;
+    findings.push({
+      code: 'ending-successor',
+      path: entry.path,
+      message:
+        `Ending "${entry.id}" declares successor(s) ${listed(dangling)}, which resolve to ` +
+        'neither a beat nor another ending, so the reset loop cannot continue.',
+    });
+  }
+  return findings;
+}
+
+/**
+ * Validates an episode manifest's identity, scope and card resolution (GDD §2.4).
  *
  * Pure and total: the document is inspected, never mutated, and any value —
  * including a malformed manifest — yields findings rather than an exception.
@@ -640,33 +936,56 @@ function collectFindings(
  * sorted by `path` then `code`, so the text and JSON reports are byte-identical
  * across runs.
  *
- * @param manifest          The (possibly unvalidated) manifest document.
- * @param _contentCards     Bound content cards — the input the card-resolution
- *                          rules read (CG-0MWSJYGEG007WOIU); unused by the
- *                          identity rules, which need only the manifest.
+ * The card-resolution rules run only when content is bound (`contentCards` is
+ * not `undefined`). An absent binding means "no content to resolve against", so
+ * those rules are neither run nor reported; an explicitly empty list is a bound
+ * content file with no cards, and every reference is then `unknown-card`.
+ *
+ * @param manifest           The (possibly unvalidated) manifest document.
+ * @param contentCards       Bound content cards — the input the card-resolution
+ *                           rules read (CG-0MWSJYGEG007WOIU). Omit it to run the
+ *                           manifest-only rules.
  * @param _declaredResources Declared resource keys — the input the resource
- *                          rules read (CG-0MWSJYLZ3005C2V1); unused by the
- *                          identity rules.
+ *                           rules read (CG-0MWSJYLZ3005C2V1); unused by the
+ *                           identity and card-resolution rules.
+ * @param adapter            The game content adapter (its `baseId` rule); defaults
+ *                           to the identity rule, which is right for template-only
+ *                           content files.
  * @returns The findings, the rules that ran and the traversal counts.
  */
 export function validateEpisodeManifest(
   manifest: unknown,
-  _contentCards: readonly ContentCard[] = [],
+  contentCards?: readonly ContentCard[],
   _declaredResources: readonly string[] = [],
+  adapter: ContentAdapter = IDENTITY_CONTENT_ADAPTER,
 ): EpisodeManifestValidationResult {
   const traversal = walkEpisodeManifest(manifest);
   const manifestId = stringMember(manifest, 'id') ?? '';
+  const contentIndex =
+    contentCards === undefined
+      ? undefined
+      : buildContentResolutionIndex(manifest, traversal, contentCards, adapter);
+  const contentRuleFindings =
+    contentIndex === undefined
+      ? []
+      : [
+          ...unknownCardFindings(manifest, traversal, contentIndex),
+          ...unassignedCardFindings(contentCards ?? [], contentIndex),
+          ...danglingChainFindings(traversal, contentIndex),
+          ...endingSuccessorFindings(manifest, contentIndex),
+        ];
   const findings = collectFindings(manifestId, [
     ...duplicateActFindings(traversal),
     ...duplicateSceneFindings(traversal),
     ...duplicateBeatFindings(traversal),
     ...unknownReferenceFindings(manifest, traversal),
+    ...contentRuleFindings,
   ]);
 
   return {
     manifestId,
     findings,
-    rules: IMPLEMENTED_RULES,
+    rules: contentIndex === undefined ? IMPLEMENTED_RULES : [...IMPLEMENTED_RULES, ...CONTENT_RULES],
     counts: {
       acts: traversal.acts.length,
       scenes: traversal.scenes.length,
