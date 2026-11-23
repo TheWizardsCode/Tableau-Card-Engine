@@ -1282,8 +1282,11 @@ walks the graph and fails on any `phaser` specifier).
 |---|---|---|
 | `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
 | `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `enterBeat()` / `getBudgetExhausted()`. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `enterBeat()` / `resolveChoice()` / `getBudgetExhausted()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
+| `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
+| `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
+| `PushedCardCase` | type | The §2.3 step B.5 case: `'in-scene-beat'`, `'out-of-scene-beat'`, `'ending'` or `'none'`. |
 | `BeatEntry` | type | One beat-entry outcome: the `presented` or `refused` variant (see "Beat entry"). |
 | `PresentedBeatEntry` | type | A beat the clock paid for: charged cost, prose and gated options. |
 | `RefusedBeatEntry` | type | A beat the clock could not pay for: no charge, no options, `budget-exhausted`. |
@@ -1306,6 +1309,7 @@ const runner = createEpisodeRunner({
 runner.getState();       // EpisodeRunState — frozen snapshot
 runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
 runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
+runner.resolveChoice(option, gameState);  // ChoiceResolution — next / case / pendingChain
 ```
 
 Construction consumes no RNG and applies no resource delta. A requested run
@@ -1356,6 +1360,55 @@ current scene does not assign throws an actionable error naming the scene
 (a content defect, not a modelling gap). `budgetExhausted` is close-path
 bookkeeping: it is **not** part of the frozen `EpisodeRunState` snapshot and is
 reset when the run enters the next scene (step 12).
+
+### Choice resolution and the scene boundary
+
+GDD §2.3 steps B.4–B.5. `resolveChoice(option, state)` takes the player's
+choice from the presented beat and does exactly two things:
+
+1. **B.4 — delegate.** The option resolves through the run's one choice model,
+   `storyline.resolveStorylineOption(state, card, option)`: effect policy, cost
+   payment, extra effect, the successor push, outcome prose, journal and log
+   are all `@story-line`'s work. The runner adds no second resolution path, does
+   not re-read the card's `options` cell and does not re-implement successor
+   precedence. The returned record carries that same resolution object by
+   reference, so nothing is recomputed.
+2. **B.5 — classify the pushed card.** The pushed card is compared against the
+   validated manifest's assigned-card index (beat card id → the scene that
+   assigns it) and its `endings` list:
+
+| `case` | `cardId` | `next` | `pendingChain` | Meaning |
+|---|---|---|---|---|
+| `in-scene-beat` | a beat of the current scene | `'continue'` | `null` | continue the scene at that beat (the caller's next step is `enterBeat`) |
+| `out-of-scene-beat` | a beat assigned to another scene | `'close'` | the same base id | close the scene; the chain route opens that beat |
+| `ending` | a card in `manifest.endings` | `'close'` | the same base id | close the scene; the chain route opens the ending |
+| `none` | `null` | `'close'` | `null` | close the scene with no chain to route |
+
+```ts
+const resolved = runner.resolveChoice(option, gameState);
+if (resolved.next === 'continue') {
+  runner.enterBeat(resolved.cardId!, gameState); // still the same scene
+} else {
+  closeScene();                    // reads resolved.pendingChain for the chain route
+}
+```
+
+`ChoiceResolution` is the **one** shape the scene close and the tests read: it
+names the case, carries `next`, the classified `cardId` and `pendingChain`, and
+exposes the pushed card and the underlying `StorylineResolution`. The record is
+frozen. `pushedCard` is the card `@story-line` pushed (an instance, e.g.
+`le-i-log-0`); `cardId` and `pendingChain` are its **base** id (the adapter's
+`getBaseTypeId`, e.g. `le-i-log`), because the manifest, `enterBeat`, the route
+targets and the scene close all speak template ids. The two close cases record
+`pendingChain` on the run state (`getState().pendingChain`) for the scene close
+to route; the continuing case changes no run state at all — the scene id, act,
+clock and current beat stay where the beat entry left them.
+
+Classification consumes no RNG and applies no resource delta: everything the
+resolution changed, the engine seam changed. A pushed card that is neither an
+assigned beat nor a declared ending is a content defect (`validateEpisodeManifest`
+reports it as `unassigned-card`), so the runner throws an actionable error
+naming the card and the episode instead of silently classifying it.
 
 ### Run state
 
@@ -1459,6 +1512,10 @@ follows.
   — the runner's shipped surface (run state, frozen snapshots, no Phaser import,
   the nine `scene-exit` fields) and beat entry (A.1–A.3: manifest cost, exact-cost
   affordability, refusal with `budget-exhausted`, gated options, no RNG).
+- `tests/story-line/episode-runner-choice.test.ts` — choice resolution (B.4–B.5):
+  delegation to `resolveStorylineOption` proved with a spy, and one test per
+  `pushedCard` case (in-scene beat continues, out-of-scene beat and ending close
+  with `pendingChain`, no push closes with `null`).
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle, and carrying the

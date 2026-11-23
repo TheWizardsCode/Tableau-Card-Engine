@@ -18,7 +18,10 @@
  *   constructed shape;
  * - beat entry (GDD §2.3 steps A.1–A.3): charge the manifest's `clockCost` and
  *   present the beat, or refuse it for want of clock and report the
- *   `budget-exhausted` close trigger.
+ *   `budget-exhausted` close trigger;
+ * - choice resolution (GDD §2.3 steps B.4–B.5): delegate the chosen option to
+ *   the run's one `@story-line` choice model, then classify the card it pushed
+ *   as continuing the scene or closing it with a pending chain.
  *
  * The single-choice model (compilation, resolution, resource projection and
  * RNG), the game's state and the activity log all stay with the supplied
@@ -33,10 +36,13 @@ import type { EpisodeManifest, Scene } from './content/episode-manifest';
 import type { StorylineResourceKey, StorylineResources } from './resources';
 import type {
   BeatEntry,
+  ChoiceNext,
+  ChoiceResolution,
   EpisodeRunState,
   EpisodeRunner,
   EpisodeRunnerConfig,
   LossLedgerEntry,
+  PushedCardCase,
   SceneExitRecord,
   StorylineCard,
   StorylineOption,
@@ -75,6 +81,82 @@ function findScene(manifest: EpisodeManifest, sceneId: string): Scene | undefine
     if (scene !== undefined) return scene;
   }
   return undefined;
+}
+
+/**
+ * The manifest's assigned-card index: beat card id → the scene assigning it.
+ *
+ * A beat id is unique across the episode (validated by `duplicate-beat`), so
+ * one map answers "is this card a beat, and of which scene?" without walking
+ * the acts on every resolution.
+ */
+type AssignedCardIndex = ReadonlyMap<string, string>;
+
+/** Builds the assigned-card index once, at construction, from the manifest. */
+function buildAssignedCardIndex(manifest: EpisodeManifest): AssignedCardIndex {
+  const index = new Map<string, string>();
+  for (const act of manifest.acts) {
+    for (const scene of act.scenes) {
+      for (const beat of scene.beats) {
+        index.set(beat.cardId, scene.id);
+      }
+    }
+  }
+  return index;
+}
+
+/** The §2.3 step B.5 classification, before the run state is touched. */
+interface PushedCardClassification {
+  readonly next: ChoiceNext;
+  readonly case: PushedCardCase;
+  readonly pendingChain: string | null;
+}
+
+/**
+ * Classifies the card a resolved choice pushed (GDD §2.3 step B.5).
+ *
+ * Pure: reads the manifest's assigned-card index and `endings` list, mutates
+ * nothing and consumes no RNG. The classified id is the **base** id (the
+ * adapter's `getBaseTypeId`), because `@story-line` pushes an **instance** card
+ * with a deterministic serial suffix (`le-i-log-0`); the manifest, the scene
+ * close and the route targets all speak template ids. A pushed card is a beat
+ * of the **current** scene (continue), a beat of another scene, an ending card,
+ * or absent. The two closing cases set the pending chain to the base id; the
+ * continuing case and the empty case leave it null.
+ *
+ * A card that is neither an assigned beat nor a declared ending is a content
+ * defect the validators already reject (`unassigned-card` / `unknown-card`),
+ * so it is reported loudly rather than silently classified.
+ *
+ * @throws Error when the pushed card is neither an assigned beat nor a
+ *         declared ending of the manifest.
+ */
+function classifyPushedCard(
+  manifest: EpisodeManifest,
+  assignedCards: AssignedCardIndex,
+  currentSceneId: string,
+  pushedBaseId: string | null,
+): PushedCardClassification {
+  if (pushedBaseId === null) {
+    return { next: 'close', case: 'none', pendingChain: null };
+  }
+
+  const assigningScene = assignedCards.get(pushedBaseId);
+  if (assigningScene !== undefined) {
+    return assigningScene === currentSceneId
+      ? { next: 'continue', case: 'in-scene-beat', pendingChain: null }
+      : { next: 'close', case: 'out-of-scene-beat', pendingChain: pushedBaseId };
+  }
+  if (manifest.endings.includes(pushedBaseId)) {
+    return { next: 'close', case: 'ending', pendingChain: pushedBaseId };
+  }
+
+  throw new Error(
+    `Episode runner: the resolved choice pushed "${pushedBaseId}", which is neither a beat ` +
+      `assigned to any scene nor a declared ending of episode "${manifest.id}". A choice ` +
+      'successor must be an assigned beat or an ending; fix the content (validateEpisodeManifest ' +
+      'reports unassigned-card for an orphan choice card).',
+  );
 }
 
 /**
@@ -144,6 +226,8 @@ export function createEpisodeRunner<
         'Fix start.scene (validateEpisodeManifest reports unknown-scene).',
     );
   }
+
+  const assignedCards = buildAssignedCardIndex(manifest);
 
   const runState: MutableEpisodeRunState = {
     seed,
@@ -244,6 +328,61 @@ export function createEpisodeRunner<
     });
   };
 
+  /**
+   * Resolves a chosen option through the one choice model and classifies the
+   * card it pushed (GDD §2.3 steps B.4–B.5).
+   *
+   * B.4 is a delegation and nothing else: the resolution (effect, cost, extra
+   * effect, successor push, outcome prose, journal and log) is the supplied
+   * `@story-line` system's work, and the record carries its result by
+   * reference. B.5 classifies that result's `pushedCard` against the manifest
+   * and records the pending chain on the close cases for the scene close to
+   * route.
+   */
+  const resolveChoice = (
+    option: StorylineOption<TState>,
+    state: TState,
+  ): ChoiceResolution<TCard> => {
+    const card = content.get(runState.currentBeatId);
+    if (card === undefined) {
+      throw new Error(
+        `Episode runner: current beat "${runState.currentBeatId}" has no content card in the ` +
+          "run's card map. Load the manifest's content file before resolving a choice.",
+      );
+    }
+
+    const resolution = storyline.resolveStorylineOption(state, card, option);
+    // `@story-line` pushes an instance card (`le-i-log-0`); the manifest, the
+    // scene close and the route targets all speak base ids, so classification
+    // compares — and the pending chain records — the adapter's base id.
+    const pushedBaseId =
+      resolution.pushedCard === null
+        ? null
+        : storyline.engine.getBaseTypeId(resolution.pushedCard.id);
+    const classification = classifyPushedCard(
+      manifest,
+      assignedCards,
+      runState.currentSceneId,
+      pushedBaseId,
+    );
+
+    // The close cases hand the pending chain to the scene close; a continuing
+    // scene leaves the run's pending chain untouched (it is already null, and
+    // only the scene close and scene entry own it).
+    if (classification.next === 'close') {
+      runState.pendingChain = classification.pendingChain;
+    }
+
+    return Object.freeze({
+      next: classification.next,
+      case: classification.case,
+      cardId: pushedBaseId,
+      pendingChain: classification.pendingChain,
+      pushedCard: resolution.pushedCard,
+      resolution,
+    });
+  };
+
   return {
     manifest,
     storyline,
@@ -252,6 +391,7 @@ export function createEpisodeRunner<
     getSceneExits: () =>
       Object.freeze(runState.sceneExits.map((record) => Object.freeze({ ...record }))),
     enterBeat,
+    resolveChoice,
     getBudgetExhausted: () => runState.budgetExhausted,
   };
 }

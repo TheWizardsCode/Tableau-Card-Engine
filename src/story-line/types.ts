@@ -721,6 +721,71 @@ export interface RefusedBeatEntry {
  */
 export type BeatEntry<TState = unknown> = PresentedBeatEntry<TState> | RefusedBeatEntry;
 
+// ── Choice resolution (GDD §2.3 steps B.4–B.5) ──────────────
+
+/**
+ * The §2.3 step B.5 classification of the card a resolved choice pushed.
+ *
+ * - `in-scene-beat` — a beat of the current scene: continue the scene at it
+ *   (the caller's next step is `enterBeat` with that card);
+ * - `out-of-scene-beat` — a beat assigned to another scene: close the scene
+ *   and route the chain door to it;
+ * - `ending` — a card in the manifest's `endings`: close the scene and route
+ *   the chain door to it (the ending is played by the close path);
+ * - `none` — the resolution pushed nothing (a terminal option or chain end):
+ *   close the scene with no pending chain.
+ */
+export type PushedCardCase =
+  | 'in-scene-beat'
+  | 'out-of-scene-beat'
+  | 'ending'
+  | 'none';
+
+/**
+ * Where a resolved choice sends the run: continue at the pushed beat, or
+ * close the current scene (whose outcome and route the close path owns).
+ */
+export type ChoiceNext = 'continue' | 'close';
+
+/**
+ * The classification record a resolved choice returns.
+ *
+ * This is the **one** shape the scene close and the tests read: the case the
+ * pushed card fell into, where the run goes next, and the pending chain the
+ * scene close routes with. `pendingChain` is a card id only on the two close
+ * cases that push a card; it is `null` for a continuing scene and for a
+ * resolution that pushed nothing.
+ */
+export interface ChoiceResolution<TCard extends StorylineCard = StorylineCard> {
+  /** Whether the run continues at the pushed beat or closes the scene. */
+  readonly next: ChoiceNext;
+  /** Which §2.3 step B.5 case the pushed card fell into. */
+  readonly case: PushedCardCase;
+  /**
+   * The classified card's **base** id — the manifest beat or ending id (the
+   * adapter's `getBaseTypeId`, so `le-i-log-0` reads as `le-i-log`) — or
+   * `null` when the resolution pushed nothing. This is the id `enterBeat`
+   * accepts when the run continues.
+   */
+  readonly cardId: string | null;
+  /**
+   * The card id the scene close routes the chain door to, or `null` when
+   * there is nothing to route (a continuing scene, or a resolution that
+   * pushed nothing). Equal to {@link cardId} on the two close cases that push
+   * a card.
+   */
+  readonly pendingChain: string | null;
+  /** The card the resolution pushed, exactly as `@story-line` returned it. */
+  readonly pushedCard: TCard | null;
+  /**
+   * The underlying `@story-line` resolution, unchanged: the effect, cost,
+   * extra effect, successor push and outcome prose all stay the one choice
+   * model's work. The runner never re-resolves and never re-derives any part
+   * of it.
+   */
+  readonly resolution: StorylineResolution<TCard>;
+}
+
 /**
  * The episode runner: the beat-sheet layer constructed around a
  * {@link StorylineSystem}.
@@ -768,6 +833,33 @@ export interface EpisodeRunner<
    * @throws Error when `cardId` is not a beat assigned to the current scene.
    */
   enterBeat(cardId: string, state: TState): BeatEntry<TState>;
+  /**
+   * Resolves the player's chosen option through `@story-line` and classifies
+   * the card it pushes (GDD §2.3 steps B.4–B.5).
+   *
+   * B.4: the option resolves through the run's one choice model
+   * ({@link StorylineSystem.resolveStorylineOption}) unchanged — effect, cost
+   * payment, extra effect, `pushedCard`, outcome prose, journal and log all
+   * stay that model's work. The runner adds no second resolution path and
+   * never re-reads the card's `options` cell.
+   *
+   * B.5: the pushed card is classified against the validated manifest. An
+   * in-scene beat continues the scene (`next: 'continue'`, run state left in
+   * the same scene); an out-of-scene beat or an ending card closes it with
+   * `pendingChain` set to that card id; a resolution that pushes nothing
+   * closes it with `pendingChain = null`. The close cases record the pending
+   * chain on the run state for the scene close to route; the continuing case
+   * records nothing.
+   *
+   * @param option The player's choice, normally one of the presented beat's
+   *               options (read from `enterBeat`).
+   * @param state  The game state resolution and its engine seam mutate.
+   * @returns The frozen {@link ChoiceResolution} classification record.
+   * @throws Error when the current beat has no content card in the run's card
+   *         map, or when the pushed card is neither an assigned beat nor a
+   *         declared ending (a content defect, not a modelling gap).
+   */
+  resolveChoice(option: StorylineOption<TState>, state: TState): ChoiceResolution<TCard>;
   /**
    * Whether the current scene's last beat entry was refused for want of clock.
    *
