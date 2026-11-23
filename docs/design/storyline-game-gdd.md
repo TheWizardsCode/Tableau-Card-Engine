@@ -351,8 +351,8 @@ responsibility.** The table below is the audit of that sentence.
 | Intra-scene successor selection and its precedence | **`@story-line`** | `resolveStorylineOption` | the beat sheet reads `StorylineResolution.pushedCard`; it never resolves a successor itself |
 | Cross-scene routing | **Beat sheet** | `scene.routes` | the only authority on which scene opens next |
 | Determinism | **both, disjointly** | seeded `rng()` in `@story-line` | a scene close consumes no RNG; every draw is a `@story-line` candidate draw |
-| Content validation and the route-space guard | **`@story-line` content** | `storylines:validate`, `storylines:guard` | the manifest is validated by the new `validateEpisodeManifest` (gap [G2](#g2)), not by a second content validator |
-| Manifest validation | **Beat sheet** | [G2](#g2) (proposed) | the backlog entry; rules listed in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) |
+| Content validation and the route-space guard | **`@story-line` content** | `storylines:validate`, `storylines:guard` | the manifest is validated by `validateEpisodeManifest` (gap [G2](#g2), delivered), not by a second content validator |
+| Manifest validation | **Beat sheet** | `storylines:manifest` ([G2](#g2), delivered) | the rules are listed in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) |
 
 **What moves out of the CSV.** Two columns in the spike's content file are
 beat-sheet data written in the wrong place, and v1 retires them:
@@ -759,7 +759,7 @@ the gap this design creates:
 |---|---|---|
 | Content validator | well-formedness of the CSV: ids, options encoding, unknown successors, prose budgets, declared resource keys | `npm run storylines:validate` |
 | Route-space guard | playability of the chain: every gated branch survivable, every ending reachable, every consequential choice meets the minimum rejoin distance | `npm run storylines:guard` |
-| Manifest validator *(gap [G2](#g2), build epic)* | totality and consistency of the beat sheet (below) | `npm run storylines:manifest` *(proposed)* |
+| Manifest validator *(delivered — [G2](#g2))* | totality and consistency of the beat sheet (below) | `npm run storylines:manifest` |
 
 The rejoin-distance *number* is pacing design, not structure: the evidence
 recommends **3** for choices marked consequential (the current committed guard
@@ -1613,8 +1613,9 @@ consequential, or cut it.
 
 - **No scene authoring here.** Objectives, budgets, outcome tables and routes are
   the manifest's job ([§2.2](#22-the-scene-beat-sheet-data-model)–[§2.3](#23-how-a-scene-outcome-selects-the-next-beat)),
-  and the manifest has no validator at this commit (engine gap [G2](#g2),
-  `CG-0MWR0BFMW003856N`). A writer cannot yet create a scene from CSV, and this
+  and the manifest validator ships as the `storylines:manifest` CLI (engine gap
+  [G2](#g2), delivered — `CG-0MWSJYV86000ZHM4`). A writer cannot yet create a
+  scene from CSV, and this
   section does not describe one.
 - **No scene-space guarantee.** The route-space guard models declared resources
   only; the pressure clock is not one, so a clock-expiry failure is outside it
@@ -2740,8 +2741,8 @@ profiles; the commands below verify *this document* and the model it specifies.
 
 | Gap | Command the build epic must provide | Why it is not here | Backlog |
 |---|---|---|---|
-| Manifest validator | `npm run storylines:manifest -- --manifest <file> --json` | no beat-sheet layer exists yet; the rules are the table in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | [G2](#g2) |
-| Manifest JSON schema | `schemas/episode-manifest.schema.json` validated with ajv in the unit suite | same | [G2](#g2) |
+| Manifest validator | `npm run storylines:manifest -- --manifest <file> --json` | **delivered** — the rules are the table in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) (`CG-0MWSJYV86000ZHM4`) | [G2](#g2) (delivered) |
+| Manifest JSON schema | `schemas/episode-manifest.schema.json` validated with ajv in the unit suite | **delivered** — `CG-0MWSJYAXE001KMRU` | [G2](#g2) (delivered) |
 | Scene-space guard | a `storylines:guard --manifest <file>` mode that enumerates scene exits and refusals | the current guard enumerates the chain only; the clock is not a declared resource, which is why the model adds scene bookkeeping | [G3](#g3) |
 | Deterministic replay | a transcript replay test asserting identical scene-exit records and score at the same seed | depends on the runner | [G13](#g13) |
 
@@ -2846,7 +2847,7 @@ invisible.
 | Entry | Capability | Unlocks in this GDD | Why the engine cannot do it at this commit | Effort band (nearest precedent) | Type | Disposition |
 |---|---|---|---|---|---|---|
 | [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | `src/story-line/compile.ts` compiles one card's options; `src/story-line/resolve.ts` resolves one choice; neither knows a scene, objective, budget or route | large — `src/story-line/` itself | epic | Filed — `CG-0MWR0BAT30015DPQ` |
-| [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `schemas/` has only `story-line-manifest.schema.json`; `src/story-line/content/manifest.ts` builds a graph view model, `src/story-line/content/validate.ts` validates CSV only; no `storylines:manifest` script | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | Filed — `CG-0MWR0BFMW003856N` |
+| [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** across the build epic — the schema (ajv-pinned), the pure validator and the `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | **Delivered** — epic `CG-0MWR0BFMW003856N` |
 | [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
 | [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | `createResourceProjection(...).applyResourceDelta` in `src/story-line/resources.ts` forwards every finite delta unbounded; no bounds type, no spill/clamp report | small–medium — `src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) | feature | Filed — `CG-0MWR0BGVG004UE7X` |
 | [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | `resources.irreversible` is read only by a *proposed* manifest rule; `selectDeclaredDelta` filters undeclared keys, so `#extra=hull:1` is legal content | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | Filed — `CG-0MWR0BHH9002OQUZ` |
@@ -2910,9 +2911,9 @@ item 2).
 `src/story-line/content/manifest.ts` builds that graph deterministically;
 `src/story-line/content/validate.ts` validates CSV content only — ids, options
 encoding, successors, prose budgets, declared keys. Neither knows an act, a
-scene, a beat, an objective, a budget or a route. `package.json` exposes
-`storylines:validate|guard|graph|author|editor`; `storylines:manifest` does not
-exist.
+scene, a beat, an objective, a budget or a route. The manifest CLI landed with
+the epic (`CG-0MWSJYV86000ZHM4`): `package.json` now exposes
+`storylines:manifest` alongside `storylines:validate|guard|graph|author|editor`.
 
 **Nearest precedent and effort band.** **Medium**: the
 `src/story-line/content/manifest.ts` + `src/story-line/content/validate.ts`
@@ -2920,8 +2921,9 @@ pair — a deterministic artefact builder and a pure validator with row/column
 diagnostics, both already unit-tested. The rule count is bounded (14 named
 rules), the validator is pure, and no runtime layer is required.
 
-**Disposition.** **Filed** — `CG-0MWR0BFMW003856N` (`feature`, high, effort
-`M`). Blocked by the GDD epic.
+**Disposition.** **Delivered** by the build epic `CG-0MWR0BFMW003856N`
+(schema, pure validator and the `storylines:manifest` CLI —
+`CG-0MWSJYV86000ZHM4`).
 
 #### <a id="g3"></a>G3 — Scene-space guard
 

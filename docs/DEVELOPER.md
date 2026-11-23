@@ -1555,6 +1555,9 @@ npm run storylines:guard                        # guard every configured route-s
 npm run storylines:guard -- --csv path.csv --game gym --initial coins=3 --json
 npm run storylines:ip-scan                      # scan the guarded set for prohibited third-party terms
 npm run storylines:ip-scan -- path.csv          # ad-hoc scan of one candidate file
+npm run storylines:manifest                     # validate the committed Appendix A episode manifest
+npm run storylines:manifest -- --manifest path/to/episode.json --json
+npm run storylines:manifest -- --manifest m.json --content other.csv
 npm run storylines:graph                        # rewrite every shipped content artefact
 npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
@@ -1567,7 +1570,9 @@ npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags
 ```
 
-Every CLI supports `--help` and `--game <adapter-id>` (default `gym`). With no
+Every CLI supports `--help`; the content CLIs also support `--game <adapter-id>`
+(default `gym`), while `storylines:manifest` reads the adapter from the
+manifest's own `content.adapter`. With no
 `--csv`, `storylines:validate` and `storylines:graph` walk the shipped content
 registry (`DEFAULT_CONTENT_FILES` in `src/story-line/content/adapters.ts`) and
 process **every** file through the adapter it declares — each content file owns
@@ -1588,7 +1593,20 @@ its fixtures, plus the shipped content and generated artefacts) with the term
 list in `tests/fixtures/story-line/ip-prohibited-terms.json`; it exits `1` on a
 prohibited term (named with its file, line and term), an unreadable target or a
 malformed term list. Naming paths on the command line scans exactly those files
-(an ad-hoc pre-commit check). The author API validates before
+(an ad-hoc pre-commit check). `storylines:manifest` validates one **episode
+manifest** (the beat sheet, GDD §2.2) against its content file: it resolves the
+manifest's `content.adapter` through the shipped adapter registry, binds
+`content.file` (or `--content <path>`) plus the content file's declared resource
+key set, runs the GDD §2.4 validator and prints the exact finding path. `--json`
+emits a stable report (`valid`, `manifestId`, `manifest`, `content`, `adapter`,
+`counts`, `rules`, `findings`) with a fixed key order and no timestamp, so two
+runs over the same input are byte-identical. With no `--manifest` it validates
+the committed Appendix A manifest
+(`example-games/gym/content/long-erasure-episode.json`), so a bare invocation is
+a real check; an unreadable manifest or content file, a malformed manifest and
+an unknown `content.adapter` are reported on stderr with exit `1` rather than
+thrown. `storylines:manifest -- --help` names the default manifest. The author
+API validates before
 writing and writes atomically; `--dry-run` prints the candidate and writes
 nothing. The committed Gym artefacts (`example-games/gym/content/storyline-manifest.json`
 + `storyline-graph.mmd` for `storylines.csv`, and

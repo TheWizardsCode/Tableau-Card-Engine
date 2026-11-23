@@ -64,6 +64,7 @@ npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full 
 GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distribution)
 npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run storylines:validate  # Validate story-line content through the content adapter (default: Gym)
+npm run storylines:manifest  # Validate an episode manifest against its content file (default: the committed Appendix A manifest)
 npm run storylines:graph     # Regenerate the committed manifest/Mermaid artefacts (-- --check to guard drift)
 npm run storylines:ip-scan   # Scan the guarded set (GDD + content + artefacts) for prohibited third-party terms
 npm run storylines:author    # Transactional content edits (add-card / add-option / add-linked-card / update-card; --dry-run supported)
