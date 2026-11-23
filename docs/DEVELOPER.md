@@ -1680,6 +1680,25 @@ the [observation log](gym/long-erasure-observation-log.md) and the
 [playtest evaluation](design/storyline-playtest-evaluation.md); the design
 itself ships no gameplay code, so nothing here changes at runtime.
 
+### Episode runner
+
+The beat-sheet runtime layer the GDD's core loop is written against
+([§2.3](design/storyline-game-gdd.md#23-how-a-scene-outcome-selects-the-next-beat))
+ships as `createEpisodeRunner` in
+[`src/story-line/episode-runner.ts`](../src/story-line/episode-runner.ts) and is
+exported from `@story-line`. It walks an already validated episode manifest
+(acts → scenes → beats) one beat at a time: it charges the per-scene clock
+budget, classifies each scene close from the authored outcome table, takes the
+first matching route, records the nine-field `scene-exit` record and keeps a
+loss ledger of irreversible deltas. It is constructed **around** a
+`StorylineSystem`, so there is one choice model, one resource projection and
+one seeded RNG for the run, and neither it nor its transitive imports pull in
+Phaser.
+
+The full reference — public API, run-state and ledger shapes, the §2.3 contract
+as a step→test map, persistence and determinism — is
+[Core: Generic Story-Line System → Episode runner](core-engine/story-line.md#episode-runner).
+
 ### Authoring branches, costs and gates in CSV
 
 Writers author the whole option model in the `options` cell — no TypeScript

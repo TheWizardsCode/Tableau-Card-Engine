@@ -1347,6 +1347,41 @@ naming the manifest and the scene id; everything else is left to
 `validateEpisodeManifest` (GDD §2.4), because the runner must not re-check an
 already validated manifest.
 
+### The §2.3 contract as a step→test map
+
+The routing contract is implemented once, in `episode-runner.ts`, and every
+numbered step names the test that proves it. The step list is also data —
+`EPISODE_STEPS` in
+[`tests/story-line/helpers/episode-fixture.ts`](../../tests/story-line/helpers/episode-fixture.ts) —
+and each owning suite asserts in its first test that the map assigns exactly
+its steps to it, so a numbered step cannot land without an owner.
+
+| Step | Contract | Test that proves it |
+|---|---|---|
+| A.1 | Read the beat's `clockCost` from the validated manifest, never the legacy CSV cell | `episode-runner-beat-entry.test.ts` → “A.1/A.3 charges the manifest cost and presents the beat when affordable” |
+| A.2 | Refuse a beat the clock cannot pay: not played, no options, `budgetExhausted` set, `reason: 'budget-exhausted'` | `episode-runner-beat-entry.test.ts` → “A.2 refuses a beat that costs more than the remaining clock” |
+| A.3 | Charge the cost and present the beat's prose and its affordability-gated options; a cost exactly equal to the remaining clock is affordable | `episode-runner-beat-entry.test.ts` → “A.3 treats a cost exactly equal to the remaining clock as affordable”; “A.3 presents only options the declared-key affordability gate accepts” |
+| B.4 | Resolve the option through `@story-line` unchanged: effect, cost, extra, `pushedCard`, prose, journal and log | `episode-runner-choice.test.ts` → “B.4 delegates every B.5 case to the storyline system unchanged”; “B.4 lets the engine seam apply the option cost, not the runner” |
+| B.5 | Classify `pushedCard`: in-scene beat continues; an out-of-scene beat or ending card closes with `pendingChain`; none closes with `null` | `episode-runner-choice.test.ts` → “B.5 continues the scene when the pushed card is an in-scene beat”; “…beat of another scene”; “…ending card”; “…closes the scene with no pending chain when the choice pushes nothing” |
+| C.6 | Evaluate the objective once against the post-resolution `engine.getResources` snapshot | `episode-runner-scene-close.test.ts` → “evaluates the objective against post-resolution resources”; “reads engine.getResources exactly once for the objective” |
+| C.7 | Classify the outcome first match wins in declaration order, honouring an authored `budget: "exhausted"` rule before the catch-all | `episode-runner-scene-close.test.ts` → “classifies first match wins in declaration order”; “honours an authored budget-exhausted rule before the catch-all” |
+| C.8 | Apply the matching `losses` rules in declaration order, one ledger line and one activity-log line each | `episode-runner-scene-close.test.ts` → “applies the matching loss through the seam with one ledger and one log line”; “applies every matching loss rule in declaration order” |
+| C.9 | Select the first matching route in declaration order, skipping a `chain` route while `pendingChain` is `null` | `episode-runner-routing.test.ts` → “takes the first matching route in declaration order and flips with the order”; “skips a chain route while pendingChain is null” |
+| C.10 | Resolve `chain`, `beat` (with and without an explicit beat) and `ending` targets, including the ending's run close and the post-ending restart | `episode-runner-routing.test.ts` → “chain target opens an out-of-scene beat and enters its scene”; “chain target opens a declared ending and closes the run”; “beat target with an explicit beat opens exactly that beat”; “beat target without an explicit beat opens the target entryBeat” |
+| C.11 | Append exactly one nine-field `scene-exit` record per close, with the derived scene-exit and route log lines | `episode-runner-routing.test.ts` → “appends exactly one nine-field record per close, with the derived log lines” |
+| C.12 | Enter the target scene: reset `sceneClockRemaining`, push the scene/route histories, clear `pendingChain`, never restore irreversible keys | `episode-runner-routing.test.ts` → “resets the clock, pushes the histories, clears the chain and keeps irreversible keys” |
+
+The cross-cutting guarantees have their own suites: the end-to-end pipeline
+(the four endings, the refused close, the reset restart) is
+[`episode-runner-fixture.test.ts`](../../tests/story-line/episode-runner-fixture.test.ts),
+the one-RNG rule is
+[`episode-runner-determinism.test.ts`](../../tests/story-line/episode-runner-determinism.test.ts),
+and the nine persisted fields and their refusals are
+[`episode-runner-persistence.test.ts`](../../tests/story-line/episode-runner-persistence.test.ts).
+The no-RNG clauses inside the map are pinned separately by “consumes no RNG on
+an affordable entry or a refusal” (A) and “consumes no RNG from route selection,
+record emission or scene entry” (C.9–C.12).
+
 ### Beat entry
 
 GDD §2.3 steps A.1–A.3. `enterBeat(cardId, state)` enters a beat **of the

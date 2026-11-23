@@ -2846,7 +2846,7 @@ invisible.
 
 | Entry | Capability | Unlocks in this GDD | Why the engine cannot do it at this commit | Effort band (nearest precedent) | Type | Disposition |
 |---|---|---|---|---|---|---|
-| [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | `src/story-line/compile.ts` compiles one card's options; `src/story-line/resolve.ts` resolves one choice; neither knows a scene, objective, budget or route | large — `src/story-line/` itself | epic | Filed — `CG-0MWR0BAT30015DPQ` |
+| [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | **delivered** across the build epic — `src/story-line/episode-runner.ts` charges scene budgets, classifies outcomes from the authored table, routes on ordered totals and records the loss ledger | large — `src/story-line/` itself | epic | **Delivered** — epic `CG-0MWR0BAT30015DPQ` (`src/story-line/episode-runner.ts`) |
 | [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** across the build epic — the schema (ajv-pinned), the pure validator and the `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | **Delivered** — epic `CG-0MWR0BFMW003856N` |
 | [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
 | [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | `createResourceProjection(...).applyResourceDelta` in `src/story-line/resources.ts` forwards every finite delta unbounded; no bounds type, no spill/clamp report | small–medium — `src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) | feature | Filed — `CG-0MWR0BGVG004UE7X` |
@@ -2882,6 +2882,11 @@ beat sheet. The spike's act and clock bookkeeping live in its game rule module
 (`example-games/gym/GymLongErasureGame.ts`), which is exactly the code the
 backlog's epic must make generic.
 
+**Delivered since.** `src/story-line/episode-runner.ts` now provides this layer
+(`CG-0MWR0BAT30015DPQ`); the paragraph above records why the band was sized as
+it was, not a current gap. The follow-ups G1 did not deliver are listed in
+[§6.6](#66-disposition-record).
+
 **Nearest precedent and effort band.** **Large**: `src/story-line/` itself —
 compile, resolve, resources, journal, ui-adapter, validate — is the closest
 comparable build. The band is large because the entry is a new runtime layer
@@ -2890,8 +2895,10 @@ helper. Secondary precedents: `src/ui/PhaseManager.ts` (game-agnostic phase
 state machine) and `src/core-engine/SaveLoad.ts` /
 `serializeWithVersion` (versioned run state).
 
-**Disposition.** **Filed** — `CG-0MWR0BAT30015DPQ` (`epic`, high, effort `L`).
-Blocked by the GDD epic and by G2 (the manifest shape is its input).
+**Disposition.** **Delivered** — `CG-0MWR0BAT30015DPQ` (`epic`, high, effort `L`),
+shipped as `src/story-line/episode-runner.ts`. Blocked by the GDD epic and by
+G2 (the manifest shape is its input); both completed. What G1 deliberately did
+not deliver is listed in [§6.6](#66-disposition-record).
 
 #### <a id="g2"></a>G2 — Episode manifest schema and validator
 
@@ -3250,7 +3257,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 
 | Entry | Worklog item | Type | Priority | Effort | Blocked by | Status at filing |
 |---|---|---|---|---|---|---|
-| G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | **Delivered** — `src/story-line/episode-runner.ts` (epic `CG-0MWR0BAT30015DPQ`) |
 | G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | blocked, scheduled past the GDD close |
 | G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | blocked, scheduled past the GDD close |
 | G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
@@ -3264,6 +3271,31 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
 | G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
 | G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | **Delivered** — authoring CLI ergonomics |
+
+**G1's delivered scope.** G1 shipped as `createEpisodeRunner` in
+`src/story-line/episode-runner.ts` (epic `CG-0MWR0BAT30015DPQ`): the runtime
+layer — beat entry and the scene clock, choice classification, the objective and
+outcome tables, ordered routing, the loss ledger, the nine-field `scene-exit`
+record and versioned run state — plus its documentation and step→test map in
+[the story-line reference](../core-engine/story-line.md#episode-runner).
+
+**Out of scope for G1** (matching the epic's own out-of-scope list; none of these
+is marked delivered):
+
+- **G3** scene-space guard (`CG-0MWR0BG9H007AFNU`) — the runner emits the exit
+  and refusal data the guard needs; proving the invariants is G3's.
+- **G4** resource bounds / spill / clamped loss (`CG-0MWR0BGVG004UE7X`) — the
+  ledger records what the seam actually applied; clamping arithmetic is G4's.
+- **G5** irreversible-resource policy (`CG-0MWR0BHH9002OQUZ`) — content-level
+  refusal of `#extra` on irreversible keys is G5's.
+- **G9** act/scene transition presentation (`CG-0MWR0BJBU005TDTT`).
+- **G13** replay adapter — deferred to the game repo.
+- **G7** surfaced affordability (`CG-0MWR0BI3S008K9Y6`) and **G8** resource HUD
+  (`CG-0MWR0BIPV0074WLM`).
+- **Transcript event emission** (§3.5.3's eight-event table) and
+  `TranscriptStore` wiring — a follow-up child.
+- **Migrating `GymLongErasureGame.ts`** onto the runner.
+- The full game itself, its content volume and any balance tuning.
 
 **The build-epic handover.** When the build epic is created, its first act is to
 clear `startOn` on the filed entries it adopts and set each one's parent to the
@@ -3280,8 +3312,9 @@ epic's scope statement claims them.
 2. **Check the effort band against its precedent.** Each band names a module or
    module pair; the band is credible only if the precedent is comparable in
    surface area.
-3. **Check the disposition.** Every row of §6.6 is a live item id or the
-   `Deferred` marker, and every filed item is blocked and scheduled.
+3. **Check the disposition.** Every row of §6.6 is a live item id, a
+   **Delivered** marker or the `Deferred` marker, and every still-filed item is
+   blocked and scheduled.
 4. **Run the structural contract.**
    `npx vitest run --project unit tests/story-line/content/gdd-engine-gap-backlog.test.ts`
    fails if a cited path disappears, a required field or entry is missing, or a
