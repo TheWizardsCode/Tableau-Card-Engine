@@ -85,14 +85,26 @@ export type SceneOutcome = 'success' | 'partial' | 'failure';
 export type SceneCondition =
   | { objective: 'met' | 'unmet' }
   | { budget: 'exhausted' | 'intact' }
-  | { field: string; op: '>=' | '<=' | '>' | '<' | '=='; value: number };
+  | { field: string; op: ConditionOperator; value: number };
+
+/**
+ * The five comparison operators of the one condition vocabulary.
+ *
+ * Mirrors `@story-line`'s operator set (the `Condition.op` union and
+ * `validate.ts`'s `CONDITION_OPS`): the manifest never invents a second
+ * vocabulary, and a new operator arrives in both places at once.
+ */
+export const CONDITION_OPERATORS = ['>=', '<=', '>', '<', '=='] as const;
+
+/** A comparison operator shared with `@story-line`. */
+export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
 
 /** A declared-resource check, the same shape `@story-line` evaluates. */
 export interface ResourceCheck {
   /** Declared resource key the check reads; an undeclared key is a manifest error. */
   field: string;
   /** Comparison operator. */
-  op: '>=' | '<=' | '>' | '<' | '==';
+  op: ConditionOperator;
   /** Right-hand side of the comparison. */
   value: number;
 }
@@ -792,6 +804,9 @@ const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
   'unknown-scene',
   'non-total-routes',
   'non-total-outcome-rules',
+  'objective-invalid',
+  'loss-not-irreversible',
+  'numeric-invalid',
 ];
 
 /**
@@ -937,6 +952,262 @@ function resourceSetFindings(
         message:
           `Declared resource "${key}" starts at ${value}, outside its own bounds ` +
           `[${range.min}, ${range.max}], so the run begins in a state the design forbids.`,
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ── Semantic and numeric rules (GDD §2.4) ───────────────────
+
+/** True when `value` is one of the shared comparison operators. */
+function isConditionOperator(value: unknown): value is ConditionOperator {
+  return (
+    typeof value === 'string' && (CONDITION_OPERATORS as readonly string[]).includes(value)
+  );
+}
+
+/** The manifest's own declared keys, as the set the semantic rules check against. */
+function declaredKeySet(manifest: unknown): ReadonlySet<string> {
+  return new Set(declaredResourceKeys(manifest));
+}
+
+/** The GDD §2.4 player-facing objective budget, in characters. */
+const OBJECTIVE_STATEMENT_MAX_LENGTH = 90;
+
+/**
+ * `objective-invalid`: the objective is a real statement plus a declared check.
+ *
+ * Four defects share the §2.4 code, each with its own `reason`:
+ *
+ * | reason | meaning |
+ * |---|---|
+ * | `statement-empty` | `objective.statement` is empty or whitespace-only |
+ * | `statement-too-long` | `objective.statement` exceeds the 90-character budget |
+ * | `undeclared-objective-field` | `objective.check.field` is not a declared resource key |
+ * | `unknown-operator` | `objective.check.op` is outside `>= <= > < ==` |
+ *
+ * The declared key set is the manifest's own `resources.declared` (read through
+ * the same normalisation the resource rules use): the objective is evaluated
+ * against declared data, so an undeclared field must never read as a silent
+ * zero. Members the schema types are only read when they are the right shape;
+ * a structurally malformed objective is the schema's finding, not this rule's.
+ */
+function objectiveFindings(manifest: unknown, traversal: EpisodeManifestTraversal): FindingDraft[] {
+  const declared = declaredKeySet(manifest);
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    const objective = recordOf(recordOf(scene.value)?.objective);
+    if (objective === undefined) continue;
+    const objectivePath = `${scene.path}.objective`;
+
+    const statement = objective.statement;
+    if (typeof statement === 'string') {
+      if (statement.trim() === '') {
+        findings.push({
+          code: 'objective-invalid',
+          path: `${objectivePath}.statement`,
+          reason: 'statement-empty',
+          message: `Scene "${sceneName(scene)}" declares an empty objective statement; the statement is player-facing and must name the intent.`,
+        });
+      } else if (statement.length > OBJECTIVE_STATEMENT_MAX_LENGTH) {
+        findings.push({
+          code: 'objective-invalid',
+          path: `${objectivePath}.statement`,
+          reason: 'statement-too-long',
+          message:
+            `Scene "${sceneName(scene)}" declares a ${statement.length}-character objective statement, ` +
+            `over the ${OBJECTIVE_STATEMENT_MAX_LENGTH}-character budget; shorten it so it stays a single ` +
+            'player-facing line.',
+        });
+      }
+    }
+
+    const check = recordOf(objective.check);
+    if (check === undefined) continue;
+    const field = check.field;
+    if (typeof field === 'string' && !declared.has(field)) {
+      findings.push({
+        code: 'objective-invalid',
+        path: `${objectivePath}.check.field`,
+        reason: 'undeclared-objective-field',
+        message:
+          `Scene "${sceneName(scene)}" checks resource "${field}", which is not in ` +
+          `resources.declared [${listed(declared)}], so the objective would read an undeclared ` +
+          'key as zero.',
+      });
+    }
+    const op = check.op;
+    if (op !== undefined && !isConditionOperator(op)) {
+      findings.push({
+        code: 'objective-invalid',
+        path: `${objectivePath}.check.op`,
+        reason: 'unknown-operator',
+        message:
+          `Scene "${sceneName(scene)}" checks "${field ?? '?'}" with operator ` +
+          `${JSON.stringify(op)}, which is outside the shared vocabulary ` +
+          `[${CONDITION_OPERATORS.join(', ')}].`,
+      });
+    }
+  }
+  return findings;
+}
+
+/**
+ * `objective-invalid` (reason `undeclared-condition-field`): every
+ * `{ field, op, value }` scene condition names a declared resource key.
+ *
+ * The same declared-key check as the objective's `check.field`, applied to
+ * `outcomeRules[].when` and `routes[].when`. The `{ objective }` and
+ * `{ budget }` condition forms declare no field and are deliberately left alone.
+ * A distinct `reason` keeps this defect identifiable without parsing the
+ * message, because the §2.4 code is shared with the objective's own checks.
+ */
+function conditionFieldFindings(
+  manifest: unknown,
+  traversal: EpisodeManifestTraversal,
+): FindingDraft[] {
+  const declared = declaredKeySet(manifest);
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    for (const node of [...scene.outcomeRules, ...scene.routes]) {
+      const when = recordOf(recordOf(node.value)?.when);
+      if (when === undefined) continue;
+      const field = when.field;
+      if (typeof field !== 'string' || declared.has(field)) continue;
+      findings.push({
+        code: 'objective-invalid',
+        path: `${node.path}.when.field`,
+        reason: 'undeclared-condition-field',
+        message:
+          `Condition "${entryName(node)}" in scene "${sceneName(scene)}" tests "${field}", ` +
+          `which is not in resources.declared [${listed(declared)}], so the condition would read ` +
+          'an undeclared key as zero.',
+      });
+    }
+  }
+  return findings;
+}
+
+/** The keys the beat sheet never restores, in declaration order and de-duplicated. */
+function irreversibleKeys(manifest: unknown): ReadonlySet<string> {
+  const irreversible = recordOf(recordOf(manifest)?.resources)?.irreversible;
+  return new Set(
+    arrayOf(irreversible)
+      .filter((key): key is string => typeof key === 'string')
+      .map((key) => key.trim())
+      .filter((key) => key !== ''),
+  );
+}
+
+/**
+ * `loss-not-irreversible`: a close-time loss may only spend a never-restored key.
+ *
+ * Every `losses[]` entry's `field` must be in `resources.irreversible`; the
+ * finding names the loss rule id and the offending field by path, so a reviewer
+ * edits the rule rather than searching the manifest.
+ */
+function lossNotIrreversibleFindings(
+  manifest: unknown,
+  traversal: EpisodeManifestTraversal,
+): FindingDraft[] {
+  const irreversible = irreversibleKeys(manifest);
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    for (const loss of scene.losses) {
+      const field = stringMember(loss.value, 'field');
+      if (field === undefined || irreversible.has(field)) continue;
+      findings.push({
+        code: 'loss-not-irreversible',
+        path: `${loss.path}.field`,
+        message:
+          `Loss rule "${entryName(loss)}" in scene "${sceneName(scene)}" removes points from ` +
+          `"${field}", which is not in resources.irreversible [${listed(irreversible)}]; only a ` +
+          'key the beat sheet never restores may be lost at close.',
+      });
+    }
+  }
+  return findings;
+}
+
+/** True when `value` is a finite integer of at least `minimum`. */
+function isIntegerAtLeast(value: unknown, minimum: number): boolean {
+  return typeof value === 'number' && Number.isInteger(value) && value >= minimum;
+}
+
+/**
+ * `numeric-invalid`: every clock number is an integer inside its range.
+ *
+ * Four defects share the §2.4 code, each with its own `reason`:
+ *
+ * | reason | meaning |
+ * |---|---|
+ * | `budget-clock-invalid` | `budget.clock` is not an integer >= 1 |
+ * | `clock-cost-invalid` | a beat's `clockCost` is not an integer >= 0 |
+ * | `loss-amount-invalid` | a loss rule's `amount` is not an integer >= 1 |
+ * | `act-order-invalid` | `act.order` is not an integer >= 1 (uniqueness stays `duplicate-act`) |
+ *
+ * This family validates the **direct-call** path, not only the CLI: ajv already
+ * refuses `clock: 0`, but the validator may be handed an unvalidated object and
+ * must still report the defect rather than silently trusting it. A member the
+ * schema requires but that is **absent** is left to the schema; only a present,
+ * malformed value is reported here.
+ */
+function numericInvalidFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+
+  for (const act of traversal.acts) {
+    const order = recordOf(act.value)?.order;
+    if (order === undefined || isIntegerAtLeast(order, 1)) continue;
+    findings.push({
+      code: 'numeric-invalid',
+      path: `${act.path}.order`,
+      reason: 'act-order-invalid',
+      message:
+        `Act "${stringMember(act.value, 'id') ?? act.path}" declares order ` +
+        `${JSON.stringify(order)}; act order is the only ordering authority and must be an ` +
+        'integer of at least 1 (uniqueness is reported as duplicate-act).',
+    });
+  }
+
+  for (const scene of traversal.scenes) {
+    const clock = recordOf(recordOf(scene.value)?.budget)?.clock;
+    if (clock === undefined || isIntegerAtLeast(clock, 1)) continue;
+    findings.push({
+      code: 'numeric-invalid',
+      path: `${scene.path}.budget.clock`,
+      reason: 'budget-clock-invalid',
+      message:
+        `Scene "${sceneName(scene)}" declares budget.clock ${JSON.stringify(clock)}; the clock ` +
+        'must be an integer of at least 1.',
+    });
+  }
+
+  for (const beat of traversal.beats) {
+    const clockCost = recordOf(beat.value)?.clockCost;
+    if (clockCost === undefined || isIntegerAtLeast(clockCost, 0)) continue;
+    findings.push({
+      code: 'numeric-invalid',
+      path: `${beat.path}.clockCost`,
+      reason: 'clock-cost-invalid',
+      message:
+        `Beat "${stringMember(beat.value, 'cardId') ?? beat.path}" declares clockCost ` +
+        `${JSON.stringify(clockCost)}; a beat costs an integer of at least 0 ticks.`,
+    });
+  }
+
+  for (const scene of traversal.scenes) {
+    for (const loss of scene.losses) {
+      const amount = recordOf(loss.value)?.amount;
+      if (amount === undefined || isIntegerAtLeast(amount, 1)) continue;
+      findings.push({
+        code: 'numeric-invalid',
+        path: `${loss.path}.amount`,
+        reason: 'loss-amount-invalid',
+        message:
+          `Loss rule "${entryName(loss)}" in scene "${sceneName(scene)}" declares amount ` +
+          `${JSON.stringify(amount)}; a loss removes an integer of at least 1 point.`,
       });
     }
   }
@@ -1344,6 +1615,10 @@ export function validateEpisodeManifest(
     ...unknownReferenceFindings(manifest, traversal),
     ...nonTotalRouteFindings(traversal),
     ...nonTotalOutcomeRuleFindings(traversal),
+    ...objectiveFindings(manifest, traversal),
+    ...conditionFieldFindings(manifest, traversal),
+    ...lossNotIrreversibleFindings(manifest, traversal),
+    ...numericInvalidFindings(traversal),
     ...contentRuleFindings,
     ...(declaredResources === undefined ? [] : resourceSetFindings(manifest, declaredResources)),
   ]);

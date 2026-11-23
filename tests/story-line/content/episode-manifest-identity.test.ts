@@ -189,6 +189,9 @@ describe('clean control — the committed Appendix A manifest', () => {
       'unknown-scene',
       'non-total-routes',
       'non-total-outcome-rules',
+      'objective-invalid',
+      'loss-not-irreversible',
+      'numeric-invalid',
     ]);
   });
 

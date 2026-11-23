@@ -112,6 +112,7 @@ export {
 export type {
   Act,
   Beat,
+  ConditionOperator,
   EpisodeManifest,
   EpisodeManifestCounts,
   EpisodeManifestFinding,
@@ -134,6 +135,7 @@ export type {
   SceneRoute,
 } from './episode-manifest';
 export {
+  CONDITION_OPERATORS,
   DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH,
   EPISODE_MANIFEST_ISSUE_CODES,
   MANIFEST_VERSION,

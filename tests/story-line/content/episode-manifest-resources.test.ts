@@ -149,12 +149,20 @@ function changedPaths(expected: unknown, actual: unknown, path = ''): string[] {
  * The mutation path is the *manifest field* that changed; the code/path/reason
  * triple is what the validator reports. Keeping both means a fixture cannot
  * silently drift into a second defect (see the drift pin below).
+ *
+ * One fixture legitimately reports a second code: removing the only
+ * irreversible key also makes the Appendix A loss rule non-irreversible, which
+ * the semantic family reports as `loss-not-irreversible`. That cross-rule
+ * interaction is pinned in `alsoReports` rather than hidden by mutating the
+ * fixture twice.
  */
 const RESOURCE_FIXTURES: ReadonlyArray<{
   readonly file: string;
   readonly mutation: readonly string[];
   readonly findingPath: string;
   readonly reason: string;
+  /** Additional findings this one-mutation fixture legitimately triggers. */
+  readonly alsoReports?: readonly string[];
 }> = [
   {
     file: 'resources-missing-start.json',
@@ -186,6 +194,8 @@ const RESOURCE_FIXTURES: ReadonlyArray<{
     mutation: ['resources.irreversible[0]'],
     findingPath: 'resources.irreversible[0]',
     reason: 'irreversible-not-declared',
+    // The hull loss rule is now non-irreversible too (semantic rules).
+    alsoReports: ['loss-not-irreversible@acts[2].scenes[0].losses[0].field'],
   },
 ];
 
@@ -268,8 +278,12 @@ describe('resource-block fixtures', () => {
     (fixture) => {
       const result = validate(readFixture(fixture.file));
       expect(result.valid).toBe(false);
-      expect(pairs(result)).toEqual([`resource-set-mismatch@${fixture.findingPath}`]);
-      expect(result.findings[0].reason).toBe(fixture.reason);
+      expect(pairs(result)).toEqual(
+        [`resource-set-mismatch@${fixture.findingPath}`, ...(fixture.alsoReports ?? [])].sort(),
+      );
+      expect(
+        result.findings.find((finding) => finding.code === 'resource-set-mismatch')?.reason,
+      ).toBe(fixture.reason);
     },
   );
 

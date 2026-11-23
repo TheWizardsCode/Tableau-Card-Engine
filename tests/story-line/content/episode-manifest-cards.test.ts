@@ -156,6 +156,9 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
       'unknown-scene',
       'non-total-routes',
       'non-total-outcome-rules',
+      'objective-invalid',
+      'loss-not-irreversible',
+      'numeric-invalid',
       ...CARD_RULES,
       // The resource rules run because `validate()` binds a declared set.
       'resource-set-mismatch',
@@ -434,6 +437,9 @@ describe('rule activation — the content binding is what turns the rules on', (
       'unknown-scene',
       'non-total-routes',
       'non-total-outcome-rules',
+      'objective-invalid',
+      'loss-not-irreversible',
+      'numeric-invalid',
     ]);
     expect(result.findings).toEqual([]);
   });
@@ -448,6 +454,9 @@ describe('rule activation — the content binding is what turns the rules on', (
       'unknown-scene',
       'non-total-routes',
       'non-total-outcome-rules',
+      'objective-invalid',
+      'loss-not-irreversible',
+      'numeric-invalid',
       ...CARD_RULES,
     ]);
     expect(new Set(result.findings.map((finding) => finding.code))).toEqual(
