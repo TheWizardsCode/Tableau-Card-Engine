@@ -818,12 +818,18 @@ The repository root includes a `.pi/test-config.json` file that overrides the de
 per-command test timeout for the implement skill and the audit skill's test runner:
 
 ```json
-{"timeoutPerCommand": 1500}
+{"timeoutPerCommand": 3000}
 ```
 
 - **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
-  TCE's full suite takes 18–21 minutes, so this is set to 1500 s (25 min) to prevent premature
-timeout kills.
+  TCE's full suite takes 18–21 minutes, so this is set to 3000 s (50 min) so a legitimately
+  slow stage on a contended host is never truncated by the outer per-command timeout. The
+  value is the **sum of the worst-case inner stage bounds plus a margin** (SA-0MWEURUYL004I470):
+  unit ceiling 1200 s + browser 1200 s + two `vitest list` pre-flights 240 s = 2640 s of stage
+  bounds, plus ~60 s of terminology/env pre-checks and orchestration ⇒ ~2700 s worst case,
+  leaving ~300 s of margin. The previous 1500 s had **zero** slack (300 + 1200 = 1500), so a
+  raised unit bound would have been silently truncated; raise this value in the same change as
+  any inner bound so the outer `suite_timeout` notice never masks an inner result.
 
 **Why is `.pi/test-config.json` tracked by git?**
 
@@ -1329,18 +1335,61 @@ required: a `spawnSync` with a `timeout` hangs forever if the child ignores
 SIGTERM, which would defeat the whole point against a genuinely hung
 process. When the bound elapses the runner exits with code **124**
 (`HANG_TIMEOUT_EXIT_CODE`, the conventional GNU-timeout exit code; vitest
-itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
-with re-run guidance. Hangs are **never retried** — a genuine hang must
-surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
-explicitly: 5 minutes for the unit stage, 20 minutes for the browser stage
-(`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
-bound is deliberately generous — 115 files at ~7-8s each runs ~13-15 minutes
-nominal, and concurrent full-suite runs from parallel worktrees can stretch
-it further — while a true hang never completes and is still bounded. (The
-bound was raised from 15 to 20 minutes once the browser suite grew to 115
-files and normal run-to-run variance straddled the old 15-minute limit,
-risking an abort of an otherwise green stage.) Under `set -euo pipefail` the
-124 exit aborts the gate instead of stalling it indefinitely.
+itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic.
+Hangs are **never retried** — a genuine hang must surface, not be masked.
+
+**The diagnostic distinguishes a hang from host contention**
+(SA-0MWEURUYL004I470). Every `[hang-timeout]` block now reports, in the same
+message: the aborted **stage** (`--project unit` / `--project browser` / the
+pre-flight `vitest list`), the configured **bound**, the **elapsed** wall time,
+the **delta** over the bound, and the host **load average** at abort plus the
+**core count** — e.g.
+
+```
+[hang-timeout] unit did not complete within 600s — aborting (exit 124).
+elapsed 312s (+-288s over bound)
+host load 38.4 over 16 cores
+```
+
+A load average far above the core count means the host was contended (retry
+once it is quiet); a load near zero with a large overrun points at a genuine
+hang. The guidance is stage-appropriate: a browser-stage abort explains the
+starved `requestAnimationFrame` / undestroyed `Phaser.Game` failure mode, while
+a unit-stage abort points at a synchronous loop in test/engine code (vitest's
+`testTimeout` cannot preempt synchronous JS). All three hang messages (run
+abort, pre-flight `vitest list` abort, coverage-preflight fallback) share one
+builder (`hangDiagnostic`), so stage/bound/elapsed/load render identically.
+
+**Unit bound is hybrid and load-aware.** Measured green unit stages (worst
+first): 217, 206, 149, 147, 141, 128, 111, 106, 96, 88 s — the worst was 72 %
+of the old fixed 300 s bound, so a merely busy host could abort a green stage
+(the original incident: three concurrent suites on 16 cores at load 35–42).
+The unit bound is therefore derived, not pinned: a **static floor of 600 s**
+(2.8× the worst measured stage) scaled by the sampled 1-minute load average
+per core, `factor = clamp((load1m / cpuCount) / 0.75, 1, 2)`, clamped to a
+**finite ceiling of 1200 s**:
+
+| Load per core | Bound |
+| --- | --- |
+| ≤ 0.75 | 600 s (floor) |
+| 1.0 | 800 s |
+| ≥ 1.5 (e.g. 24 load on 16 cores) | 1200 s (ceiling) |
+
+`scripts/run-ci-tests.sh` therefore does **not** pass `--timeout-ms` for the
+unit stage (the runner sizes its own bound) and **does** pin the browser stage
+at 20 minutes (`--timeout-ms 1200000`, equal to the hybrid ceiling). The
+browser bound is deliberately generous — 115 files at ~7-8 s each runs ~13–15
+minutes nominal, and concurrent full-suite runs from parallel worktrees can
+stretch it further — while a true hang never completes and is still bounded
+by the finite ceiling. (The browser bound was raised from 15 to 20 minutes once
+the suite grew to 115 files and normal run-to-run variance straddled the old
+15-minute limit.) An explicit `--timeout-ms` always wins **verbatim** over the
+computed bound, so a small CI host can pin its own number; on Windows (where
+`os.loadavg()` is meaningless) the sampler reports load as unavailable and the
+600 s floor applies. The bound is computed once before the stage starts (to
+size it) from one injectable `sampleHostContention` seam, and sampled again at
+abort for the diagnostic. Under `set -euo pipefail` the 124 exit aborts the
+gate instead of stalling it indefinitely.
 
 Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
 re-run the suspected file(s) in isolation via
