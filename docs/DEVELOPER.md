@@ -228,10 +228,20 @@ game's thumbnails, icons and audio with no extra step.
 - Composition is idempotent; an existing correct link is untouched, a real
   file at a destination is never clobbered, and links for games the preset no
   longer selects are removed (so `core-only` leaves the tree clean).
+- A composed link's **relative** target is only valid for the checkout layout
+  it was written in, and Vite stats every public-dir entry while copying it —
+  so a single link whose target no longer resolves would abort
+  `npm run build` with `ENOENT`. Composition therefore prunes **dangling**
+  `gameAssets` links on every pass (and again at `buildStart`, before the
+  copy): a tree used from `.worklog/worktrees/<id>/`, or one whose sibling
+  game checkout was removed, heals itself instead of failing the build.
+  Dangling links are reported as `prunedDangling` in the composition report /
+  `--json` output; a link that resolves is never touched and a real file at a
+  destination is never removed.
 - The composed links are generated artefacts and are gitignored. Drive them
   manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
 
-Related work item: CG-0MUKYCG9L00587FA.
+Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI.
 
 > **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
 > is the authoritative guide to the preset schema (required and optional
