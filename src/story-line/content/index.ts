@@ -9,6 +9,7 @@
  * | Content model + adapter seam | `types` | `ContentCard`, `ContentAdapter`, `ContentFieldMapping`, `baseIdOf`, … |
  * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
+ * | Episode manifest shape | `episode-manifest` | `EpisodeManifest`/`Act`/`Scene`/`Beat`/… types, `MANIFEST_VERSION`, `DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH` |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports, `storylineEntryCards` |
  * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
@@ -107,6 +108,23 @@ export {
   validateContentCards,
   validateContentCsv,
 } from './validate';
+
+export type {
+  Act,
+  Beat,
+  EpisodeManifest,
+  LossRule,
+  Objective,
+  OutcomeRule,
+  ResourceBounds,
+  ResourceCheck,
+  RouteTarget,
+  Scene,
+  SceneCondition,
+  SceneOutcome,
+  SceneRoute,
+} from './episode-manifest';
+export { DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH, MANIFEST_VERSION } from './episode-manifest';
 
 export type { ProseField, ProseFieldSpec } from './prose';
 export { PROSE_FIELD_SPECS, mappedProseColumns } from './prose';

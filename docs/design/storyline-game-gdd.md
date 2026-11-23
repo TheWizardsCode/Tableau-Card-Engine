@@ -409,7 +409,7 @@ separate.
 | `id` | `string` | required | stable episode id, `^[a-z0-9][a-z0-9-]*$`, unique in the distribution |
 | `title` | `string` | required | player-facing episode title |
 | `content` | `{ adapter: string; file: string }` | required | the content adapter id and repo-relative CSV path the beats resolve in |
-| `resources` | `{ declared: string[]; irreversible: string[] }` | required | declared key set (must equal the content file's) and the subset the beat sheet never restores |
+| `resources` | `{ declared: string[]; irreversible: string[]; start: Record<string, number>; bounds: Record<string, { min: number; max: number }> }` | required | declared key set (must equal the content file's), the subset the beat sheet never restores, the run's starting bag (`start`, one value per declared key) and the per-key design bounds (`bounds`) — see [§2.8.2](#282-per-key-contract) |
 | `start` | `{ act: string; scene: string; beat: string }` | required | run entry point |
 | `endings` | `string[]` | required | content card ids that finish a run; non-empty, unique; fed to the route-space guard |
 | `acts` | `Act[]` | required | non-empty, ordered by `order` |
@@ -565,12 +565,22 @@ export type SceneCondition =
   | { budget: 'exhausted' | 'intact' }
   | { field: string; op: '>=' | '<=' | '>' | '<' | '=='; value: number };
 
+export interface ResourceBounds {
+  min: number;
+  max: number;
+}
+
 export interface EpisodeManifest {
   manifestVersion: 1;
   id: string;
   title: string;
   content: { adapter: string; file: string };
-  resources: { declared: string[]; irreversible: string[] };
+  resources: {
+    declared: string[];
+    irreversible: string[];
+    start: Record<string, number>;
+    bounds: Record<string, ResourceBounds>;
+  };
   start: { act: string; scene: string; beat: string };
   endings: string[];
   acts: Act[];
@@ -3622,7 +3632,15 @@ able to leave a scene without a door.
   },
   "resources": {
     "declared": ["hull", "morale", "stores", "goodwill", "charge"],
-    "irreversible": ["hull"]
+    "irreversible": ["hull"],
+    "start": { "hull": 5, "morale": 5, "stores": 4, "goodwill": 0, "charge": 2 },
+    "bounds": {
+      "hull": { "min": 0, "max": 5 },
+      "morale": { "min": 0, "max": 8 },
+      "stores": { "min": 0, "max": 6 },
+      "goodwill": { "min": 0, "max": 5 },
+      "charge": { "min": 0, "max": 4 }
+    }
   },
   "start": { "act": "act-i", "scene": "s-i-open", "beat": "le-i-open" },
   "endings": ["le-end-reset", "le-end-quiet", "le-end-ram", "le-end-abandon"],
