@@ -77,11 +77,11 @@
         }
       ],
       "effect": "Gain 120 coins",
-      "context": "The investment carries, and the road crews move out under a thin winter sun. For the first time in years, the town can see past its own gate.",
+      "context": "The road crews move out under a thin winter sun. For the first time in years, the town can see past its own gate. The investment helps the town trade beyond its borders.",
       "impact": "+120 coins",
       "fields": {
         "trigger": "Incident",
-        "cost": "0",
+        "cost": "100",
         "coinDelta": "120",
         "reputationDelta": "0"
       }
