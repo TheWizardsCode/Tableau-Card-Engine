@@ -411,6 +411,171 @@ function idsOf(nodes: readonly ManifestLeafNode[]): Set<string> {
   return ids;
 }
 
+// ── Outcome coverage and totality (GDD §2.4) ────────────────
+
+/**
+ * The three outcomes every scene's door table must be able to serve.
+ *
+ * Kept in the order the close step classifies them, so a message or a caller
+ * that enumerates the outcomes does so deterministically.
+ */
+export const SCENE_OUTCOMES: readonly SceneOutcome[] = ['success', 'partial', 'failure'];
+
+/**
+ * The outcomes an ordered route or outcome-rule table names explicitly.
+ *
+ * A route names its outcome in `on`, an outcome rule in `outcome`; the helper
+ * reads whichever the entry carries, so both totality rules share one coverage
+ * definition. An entry that names no known outcome (or is not an object)
+ * contributes nothing, which keeps the helper total over an unvalidated
+ * document.
+ *
+ * `on: "*"` is deliberately **not** expanded into the three outcomes: a
+ * wildcard is a door for every outcome, and the routes rule must report that
+ * distinctly from naming each outcome explicitly.
+ *
+ * @param entries Route or outcome-rule entries, in table order.
+ * @returns The known outcomes the table names, in first-appearance order.
+ */
+export function coveredOutcomes(entries: readonly unknown[]): SceneOutcome[] {
+  const covered: SceneOutcome[] = [];
+  for (const entry of entries) {
+    const named = stringMember(entry, 'on') ?? stringMember(entry, 'outcome');
+    const outcome = SCENE_OUTCOMES.find((candidate) => candidate === named);
+    if (outcome !== undefined && !covered.includes(outcome)) covered.push(outcome);
+  }
+  return covered;
+}
+
+/** The outcomes of {@link SCENE_OUTCOMES} a table does not name, in table order. */
+function missingOutcomes(covered: readonly SceneOutcome[]): SceneOutcome[] {
+  return SCENE_OUTCOMES.filter((outcome) => !covered.includes(outcome));
+}
+
+/** True when a route or rule entry declares a `when` gate (anything but absent). */
+function isGated(node: ManifestLeafNode): boolean {
+  return recordOf(node.value)?.when !== undefined;
+}
+
+/**
+ * Reads an ordered table (`routes` / `outcomeRules`) that is a well-formed
+ * table: an array whose every entry is an object.
+ *
+ * A member that is absent or not an array, or an array holding a non-object, is
+ * the schema's finding rather than the totality rules': returning `undefined`
+ * here is what keeps a structurally malformed manifest silent instead of noisy.
+ * An **empty** array is still a table — it simply has no door or no rule — so
+ * it is reported rather than skipped; the schema's `minItems: 1` is a separate
+ * check the validator never relies on.
+ */
+function tableOf(
+  scene: ManifestSceneNode,
+  member: 'routes' | 'outcomeRules',
+): readonly ManifestLeafNode[] | undefined {
+  const entries = recordOf(scene.value)?.[member];
+  if (!Array.isArray(entries)) return undefined;
+  if (entries.some((entry) => recordOf(entry) === undefined)) return undefined;
+  return member === 'routes' ? scene.routes : scene.outcomeRules;
+}
+
+/** The scene id a totality message names, falling back to the scene path. */
+function sceneName(scene: ManifestSceneNode): string {
+  return stringMember(scene.value, 'id') ?? scene.path;
+}
+
+/** The id a totality message names for a route/rule entry, falling back to its path. */
+function entryName(node: ManifestLeafNode): string {
+  return stringMember(node.value, 'id') ?? node.path;
+}
+
+/**
+ * `non-total-outcome-rules`: every scene close classifies.
+ *
+ * A rule table is total when its **last** rule is unconditional (it is then the
+ * catch-all: its declared `outcome` classifies every close the earlier rules
+ * did not match) or when all three outcomes are named explicitly. The rule
+ * therefore fires when coverage is incomplete **and** the last rule is gated by
+ * a `when`, because that is the shape in which a close matching no rule
+ * classifies as nothing. That is the structural reading of GDD §2.4 — totality
+ * of *this tuning's* table, not a reachability proof (the scene-space guard,
+ * `CG-0MWR0BG9H007AFNU`, owns reachability).
+ *
+ * An empty table has no catch-all at all and is always reported.
+ */
+function nonTotalOutcomeRuleFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    const rules = tableOf(scene, 'outcomeRules');
+    if (rules === undefined) continue;
+    const last = rules[rules.length - 1];
+    if (last === undefined) {
+      findings.push({
+        code: 'non-total-outcome-rules',
+        path: `${scene.path}.outcomeRules`,
+        message: `Scene "${sceneName(scene)}" declares no outcome rules, so a scene close cannot be classified.`,
+      });
+      continue;
+    }
+    const covered = coveredOutcomes(rules.map((rule) => rule.value));
+    const missing = missingOutcomes(covered);
+    if (missing.length === 0 || !isGated(last)) continue;
+    findings.push({
+      code: 'non-total-outcome-rules',
+      path: last.path,
+      message:
+        `Scene "${sceneName(scene)}" has no unconditional catch-all outcome rule: its table does not name ` +
+        `${listed(missing)}, and the last rule "${entryName(last)}" is gated by a "when" condition, so a ` +
+        'close that matches no rule classifies as nothing.',
+    });
+  }
+  return findings;
+}
+
+/**
+ * `non-total-routes`: every scene close has a door.
+ *
+ * A route table answers every close when it names all three outcomes or when
+ * some route uses `on: "*"`. Independently of coverage, the **last** route must
+ * be unconditional: a gated tail means a close that matched no earlier route
+ * leaves the scene with no door. That is why the Appendix A `s-i-answer`
+ * "safety net" (a gated wildcard followed by an unconditional `on: "*"`)
+ * stays clean while a gated tail is refused.
+ *
+ * At most one finding is reported per scene — pointing at the gated tail when
+ * that is the only defect, otherwise at the table — and the message names every
+ * outcome the table does not serve. Totality here is structural (GDD §2.4),
+ * not a reachability proof.
+ */
+function nonTotalRouteFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  for (const scene of traversal.scenes) {
+    const routes = tableOf(scene, 'routes');
+    if (routes === undefined) continue;
+    const covered = coveredOutcomes(routes.map((route) => route.value));
+    const missing = missingOutcomes(covered);
+    const hasWildcard = routes.some((route) => stringMember(route.value, 'on') === '*');
+    const coverageGap = missing.length > 0 && !hasWildcard;
+    const last = routes[routes.length - 1];
+    const gatedTail = last !== undefined && isGated(last) ? last : undefined;
+    if (!coverageGap && gatedTail === undefined) continue;
+    const defects: string[] = [];
+    if (coverageGap) {
+      defects.push(`its routes do not name ${listed(missing)} and none answers on: "*"`);
+    }
+    if (gatedTail !== undefined) {
+      defects.push(`the last route "${entryName(gatedTail)}" is gated by a "when" condition`);
+    }
+    findings.push({
+      code: 'non-total-routes',
+      path: coverageGap || gatedTail === undefined ? `${scene.path}.routes` : gatedTail.path,
+      message:
+        `Scene "${sceneName(scene)}" has no total route table: ${defects.join(', and ')}, so a close ` +
+        'that matches no route leaves the scene with no door.',
+    });
+  }
+  return findings;
+}
+
 // ── Rule predicates over the traversal ──────────────────────
 
 /** A finding before its `manifestId` is attached and its order is settled. */
@@ -597,6 +762,8 @@ const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
   'duplicate-beat',
   'unknown-act',
   'unknown-scene',
+  'non-total-routes',
+  'non-total-outcome-rules',
 ];
 
 /**
@@ -979,6 +1146,8 @@ export function validateEpisodeManifest(
     ...duplicateSceneFindings(traversal),
     ...duplicateBeatFindings(traversal),
     ...unknownReferenceFindings(manifest, traversal),
+    ...nonTotalRouteFindings(traversal),
+    ...nonTotalOutcomeRuleFindings(traversal),
     ...contentRuleFindings,
   ]);
 

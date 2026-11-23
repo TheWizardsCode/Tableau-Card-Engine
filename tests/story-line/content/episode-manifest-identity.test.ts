@@ -88,6 +88,15 @@ function readFixture(name: string): Record<string, unknown> {
   return readJson(join(FIXTURE_DIR, name));
 }
 
+/** The identity/scope rules this child implements, in table order. */
+const IDENTITY_RULES: readonly EpisodeManifestIssueCode[] = [
+  'duplicate-act',
+  'duplicate-scene',
+  'duplicate-beat',
+  'unknown-act',
+  'unknown-scene',
+];
+
 /**
  * The committed fixtures, and the one mutation each carries.
  *
@@ -178,6 +187,8 @@ describe('clean control — the committed Appendix A manifest', () => {
       'duplicate-beat',
       'unknown-act',
       'unknown-scene',
+      'non-total-routes',
+      'non-total-outcome-rules',
     ]);
   });
 
@@ -208,10 +219,10 @@ describe('identity fixtures', () => {
     },
   );
 
-  it('covers every implemented rule exactly once', () => {
+  it('covers every identity rule exactly once', () => {
     const covered = IDENTITY_FIXTURES.map((fixture) => fixture.code);
     expect(new Set(covered).size).toBe(covered.length);
-    expect([...covered].sort()).toEqual([...validateEpisodeManifest(readJson(REFERENCE_PATH)).rules].sort());
+    expect([...covered].sort()).toEqual([...IDENTITY_RULES].sort());
   });
 });
 

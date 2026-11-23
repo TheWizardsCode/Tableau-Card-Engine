@@ -147,13 +147,15 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
     expect(result.manifestId).toBe('long-erasure');
   });
 
-  it('reports the identity rules followed by the four card-resolution rules', () => {
+  it('reports the manifest-only rules followed by the four card-resolution rules', () => {
     expect(validate(reference()).rules).toEqual([
       'duplicate-act',
       'duplicate-scene',
       'duplicate-beat',
       'unknown-act',
       'unknown-scene',
+      'non-total-routes',
+      'non-total-outcome-rules',
       ...CARD_RULES,
     ]);
   });
@@ -428,6 +430,8 @@ describe('rule activation — the content binding is what turns the rules on', (
       'duplicate-beat',
       'unknown-act',
       'unknown-scene',
+      'non-total-routes',
+      'non-total-outcome-rules',
     ]);
     expect(result.findings).toEqual([]);
   });
@@ -440,6 +444,8 @@ describe('rule activation — the content binding is what turns the rules on', (
       'duplicate-beat',
       'unknown-act',
       'unknown-scene',
+      'non-total-routes',
+      'non-total-outcome-rules',
       ...CARD_RULES,
     ]);
     expect(new Set(result.findings.map((finding) => finding.code))).toEqual(
