@@ -1742,6 +1742,48 @@ apply no resource delta, and a restored ledger deep-equals the saved one
 (`getLossLedger()` and `getState().lossLedger`), so restoring a checkpoint can
 never top a resource up or lose a recorded loss.
 
+### Acceptance fixture
+
+The epic's end-to-end proof is
+[`tests/story-line/episode-runner-fixture.test.ts`](../../tests/story-line/episode-runner-fixture.test.ts):
+a scripted-choice driver plays the committed
+[`long-erasure-episode.json`](../../example-games/gym/content/long-erasure-episode.json)
+manifest and its [CSV](../../example-games/gym/content/long-erasure.csv) through
+the public runner surface. No game module and no rendering are involved, and
+the suite's import graph never enters `example-games/`. The manifest validates
+clean through `validateEpisodeManifest` with the fixture's bound content cards,
+declared key set and content adapter.
+
+**Four-ending walkthrough.** Each route starts at `s-i-open:le-i-open` and is
+asserted by the ending card id the run closes on:
+
+| Ending | Scripted route (beat → option) | Final close |
+|---|---|---|
+| `le-end-abandon` | `le-i-open` Log the erasure → `le-i-log` Transmit the warning → `le-i-transmit` Shelter in the dead zone → `le-ii-shelter` Ration the stores → `le-ii-offer` Abandon the voyage | `s-ii-offer` success (`stores-kept`) → chain ending |
+| `le-end-quiet` | Rally the survey crew → Hold the survey line → Shelter in the dead zone → Ration the stores → Refuse him → Side with the captain → `le-iii-approach` Unwrite the Loom (charge 2) | `s-iii-core` success (`crew-with-you`) → chain ending |
+| `le-end-ram` | The same core prefix → `le-iii-approach` Ram the core (hull 3) | `s-iii-core` success (`crew-with-you`) → chain ending |
+| `le-end-reset` | Rally the survey crew → Hold the survey line → Shelter in the dead zone → Strip the derelict (hull 1) → Share the berth → Refuse him → Side with the captain → `le-iii-approach` Finish the weave | `s-iii-core` success (`crew-with-you`) → chain ending |
+
+The reset ending's restart action (`resetRun`) returns act, scene and beat to
+`manifest.start`, reloads the entry scene's clock and clears the pending chain,
+histories, loss ledger and scene-exit list. Resources are the game's state and
+are never touched: the hull lost to the derelict stays lost (4 of the starting
+5), which is the proof that a restart is not a refund.
+
+**Refused-close arithmetic.** `s-iii-core`'s budget is 5 ticks.
+`le-iii-approach` costs 3, leaving 2; `le-iii-ahead` costs 3, so the entry is
+refused (`budget-exhausted`, no charge, no options, run position unchanged).
+The close then classifies `failure` through `watch-spent` — the failure rule
+precedes the objective rule in declaration order — and its `losses` entry
+`hull-sacrificed` applies `hull: -1` through `engine.applyResourceDelta`,
+recording exactly one `rule` ledger line. Routing takes `quiet-core` (the
+`choose-the-ending` success chain is not eligible) and closes the run on
+`le-end-quiet`.
+
+Every scene exit the suite produces is checked against the manifest: its
+`routeId` and `ruleId` must name a declared route and outcome rule of its
+scene, and exactly one exit is appended per close, in close order.
+
 ## Gym demo
 
 [`GymStorylineScene`](../../example-games/gym/scenes/GymStorylineScene.ts)
@@ -1799,6 +1841,12 @@ follows.
   and routed like the live run, a mid-scene clock that is not reloaded, ledger
   fidelity for both line kinds, version-mismatch and undeclared-scene refusals
   with no partial state, and the no-RNG / no-delta guarantees.
+- `tests/story-line/episode-runner-fixture.test.ts` — the acceptance fixture:
+  the committed `long-erasure` manifest validates clean, four scripted routes
+  reach the four endings by ending card id, the refused `s-iii-core` close
+  classifies `failure` and applies `hull-sacrificed`, the reset restart returns
+  to `manifest.start` without refunding hull, every exit names a declared route
+  and outcome rule, and the suite imports no game module.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle, and carrying the
