@@ -53,6 +53,7 @@ import {
   hangDiagnostic,
   deriveStage,
   HANG_TIMEOUT_EXIT_CODE,
+  KILL_GRACE_MS,
   DEFAULT_RUN_TIMEOUT_MS,
   LIST_TIMEOUT_MS,
   resolveVitestBin,
@@ -70,7 +71,6 @@ import {
   PreflightError,
   type VitestRunner,
   type VitestListRunner,
-  type HostReaders,
   type HostContention,
   type HangDiagnosticContext,
   sampleHostContention,
@@ -645,6 +645,54 @@ describe('parseTimeoutArgs (--timeout-ms flag)', () => {
   });
 });
 
+describe('parseRunnerArgs hybrid unit bound', () => {
+  const idle = { load1m: 2, cpuCount: 8 } as HostContention;
+  const loaded = { load1m: 12, cpuCount: 8 } as HostContention;
+  const extreme = { load1m: 40, cpuCount: 8 } as HostContention;
+  const noLoad = { load1m: null, cpuCount: 8 } as HostContention;
+
+  it('applies the floor on an idle host with --project unit and no --timeout-ms', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], idle).timeoutMs).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('applies scaling on a loaded host with --project unit', () => {
+    // load=12, cores=8 → 1.5/core → ceiling
+    expect(parseRunnerArgs(['--project', 'unit'], loaded).timeoutMs).toBe(UNIT_CEILING_MS);
+  });
+
+  it('clamps to the ceiling on an extreme host', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], extreme).timeoutMs).toBe(UNIT_CEILING_MS);
+  });
+
+  it('applies the floor when load is unavailable (Windows)', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], noLoad).timeoutMs).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('an explicit --timeout-ms wins verbatim over the hybrid bound (unit)', () => {
+    expect(parseRunnerArgs(['--project', 'unit', '--timeout-ms', '450000'], extreme).timeoutMs).toBe(
+      450_000,
+    );
+  });
+
+  it('keeps DEFAULT_RUN_TIMEOUT_MS for the browser stage (no hybrid)', () => {
+    expect(parseRunnerArgs(['--project', 'browser'], extreme).timeoutMs).toBe(
+      DEFAULT_RUN_TIMEOUT_MS,
+    );
+  });
+
+  it('keeps DEFAULT_RUN_TIMEOUT_MS when no --project is given', () => {
+    expect(parseRunnerArgs([], extreme).timeoutMs).toBe(DEFAULT_RUN_TIMEOUT_MS);
+  });
+
+  it('the computed bound never exceeds the ceiling nor falls below the floor', () => {
+    for (const load1m of [0, 0.5, 3, 8, 12, 100]) {
+      const bound = parseRunnerArgs(['--project', 'unit'], { load1m, cpuCount: 8 }).timeoutMs;
+      expect(bound).toBeGreaterThanOrEqual(UNIT_FLOOR_MS);
+      expect(bound).toBeLessThanOrEqual(UNIT_CEILING_MS);
+    }
+  });
+});
+
 // ── runVitestSync (real subprocess timeout wiring) ───────────
 
 describe('runVitestSync (production runner)', () => {
@@ -663,12 +711,18 @@ describe('runVitestSync (production runner)', () => {
     // into exit 124.
     const { dir, bin } = writeFakeBin('setInterval(() => {}, 1000);\n');
 
-    const result = await runVitestSync([], 300, bin);
+    const result = await runVitestSync(['--project', 'unit'], 300, bin, KILL_GRACE_MS, {
+      load1m: 38.4,
+      cpuCount: 16,
+    });
 
     expect(result.status).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(result.output).toContain('[hang-timeout]');
-    // Elapsed rounds up to a positive number of seconds (>=1 under load).
-    expect(result.output).toMatch(/\d+s/);
+    // New diagnostic content: stage, bound, elapsed, delta, load, cores.
+    expect(result.output).toContain('[hang-timeout] unit did not complete within 0s');
+    expect(result.output).toContain('elapsed ');
+    expect(result.output).toContain('over bound)');
+    expect(result.output).toContain('host load 38.4 over 16 cores');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -679,10 +733,11 @@ describe('runVitestSync (production runner)', () => {
       "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);\n",
     );
 
-    const result = await runVitestSync([], 300, bin, 200); // 200ms SIGTERM→SIGKILL grace
+    const result = await runVitestSync([], 300, bin, 200, { load1m: null, cpuCount: 4 }); // 200ms grace
 
     expect(result.status).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(result.output).toContain('[hang-timeout]');
+    expect(result.output).toContain('host load unavailable (4 cores)');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -720,8 +775,10 @@ const INCIDENT_DROPPED_GROUP_OUTPUT = [
 
 describe('parseRunnerArgs (opt-in expectation flags)', () => {
   it('defaults to no expectation when the flags are absent', () => {
-    expect(parseRunnerArgs(['--project', 'unit'])).toEqual({
-      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+    // Inject an idle host so the unit-stage hybrid bound is deterministic and
+    // never reads the real load average/core count.
+    expect(parseRunnerArgs(['--project', 'unit'], { load1m: 2, cpuCount: 8 })).toEqual({
+      timeoutMs: UNIT_FLOOR_MS,
       forwarded: ['--project', 'unit'],
       expectedFiles: [],
       expectProjectCoverage: false,
@@ -771,8 +828,15 @@ describe('parseRunnerArgs (opt-in expectation flags)', () => {
   });
 
   it('parseTimeoutArgs remains a forwarding subset parser', () => {
-    expect(parseTimeoutArgs(['--expected-file', 'tests/a.test.ts', '--project', 'unit'])).toEqual({
-      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+    // Inject an idle host so the unit-stage hybrid bound is deterministic
+    // (real host load is never read in a test).
+    expect(
+      parseTimeoutArgs(['--expected-file', 'tests/a.test.ts', '--project', 'unit'], {
+        load1m: 2,
+        cpuCount: 8,
+      }),
+    ).toEqual({
+      timeoutMs: UNIT_FLOOR_MS,
       forwarded: ['--project', 'unit'],
     });
   });

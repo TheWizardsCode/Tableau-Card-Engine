@@ -490,10 +490,21 @@ export interface ParsedRunnerArgs {
  *   --expect-project-coverage                    derive the expected set via
  *                                                vitest list pre-flight
  *
+ * When no explicit `--timeout-ms` is present and the stage is `unit`, the
+ * bound is derived by the hybrid load-aware strategy (`deriveUnitBound` over a
+ * fresh `sampleHostContention()`): floor 600s scaled up to a 1200s ceiling by
+ * load per core. An explicit `--timeout-ms` is used verbatim and never scaled;
+ * every other stage keeps `DEFAULT_RUN_TIMEOUT_MS`.
+ *
+ * `contention` is injectable so tests never sample the real host.
+ *
  * Throws on an invalid value so `main` can exit 2 with a clear message.
  */
-export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
-  let timeoutMs = DEFAULT_RUN_TIMEOUT_MS;
+export function parseRunnerArgs(
+  rawArgs: string[],
+  contention?: HostContention,
+): ParsedRunnerArgs {
+  let explicitTimeoutMs: number | null = null;
   const forwarded: string[] = [];
   const expectedFiles: string[] = [];
   let expectProjectCoverage = false;
@@ -512,12 +523,12 @@ export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
     const arg = rawArgs[i];
     if (arg === '--timeout-ms') {
       const raw = rawArgs[++i];
-      timeoutMs = parsePositiveInt(raw, '--timeout-ms');
+      explicitTimeoutMs = parsePositiveInt(raw, '--timeout-ms');
       continue;
     }
     if (arg.startsWith('--timeout-ms=')) {
       const raw = arg.slice('--timeout-ms='.length);
-      timeoutMs = parsePositiveInt(raw, '--timeout-ms');
+      explicitTimeoutMs = parsePositiveInt(raw, '--timeout-ms');
       continue;
     }
     if (arg === '--expected-file') {
@@ -542,15 +553,27 @@ export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
     }
     forwarded.push(arg);
   }
+
+  // Explicit override wins verbatim; otherwise the unit stage derives its
+  // hybrid load-aware bound and every other stage keeps the default.
+  const timeoutMs =
+    explicitTimeoutMs ??
+    (deriveStage(forwarded) === 'unit'
+      ? deriveUnitBound(contention ?? sampleHostContention())
+      : DEFAULT_RUN_TIMEOUT_MS);
+
   return { timeoutMs, forwarded, expectedFiles, expectProjectCoverage };
 }
 
 /** Backwards-compatible subset parser kept for imports that referenced it. */
-export function parseTimeoutArgs(args: string[]): {
+export function parseTimeoutArgs(
+  args: string[],
+  contention?: HostContention,
+): {
   timeoutMs: number;
   forwarded: string[];
 } {
-  const parsed = parseRunnerArgs(args);
+  const parsed = parseRunnerArgs(args, contention);
   return { timeoutMs: parsed.timeoutMs, forwarded: parsed.forwarded };
 }
 
@@ -1394,13 +1417,15 @@ async function runVitestProcess(
  * `spawnSync` with a `timeout` hangs forever if the child ignores SIGTERM
  * (a genuinely hung vitest would stall the runner instead of aborting).
  *
- * `binPath` and `killGraceMs` are injectable for tests.
+ * `binPath`, `killGraceMs` and `contention` are injectable for tests — the
+ * contention sample is never read from the real host in a test.
  */
 export async function runVitestAsync(
   args: string[],
   timeoutMs: number,
   binPath: string = resolveVitestBin(),
   killGraceMs: number = KILL_GRACE_MS,
+  contention?: HostContention,
 ): Promise<VitestRunResult> {
   const attempted = await runVitestProcess([binPath, 'run', ...args], {
     streamToParent: true,
@@ -1409,12 +1434,12 @@ export async function runVitestAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const contention = sampleHostContention();
+    // Sampled after the kill (an indicator of contention during the run).
     const message = hangDiagnostic({
       stage: deriveStage(args),
       boundMs: timeoutMs,
       elapsedSecs: attempted.elapsedSecs,
-      contention,
+      contention: contention ?? sampleHostContention(),
     });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
@@ -1432,13 +1457,15 @@ export const runVitestSync = runVitestAsync;
  * captured (not streamed — the collection is a quiet pre-check) and an
  * overrun reports exit 124 with the abbreviated hang diagnostic.
  *
- * `binPath` and `killGraceMs` are injectable for tests.
+ * `binPath`, `killGraceMs` and `contention` are injectable for tests — the
+ * contention sample is never read from the real host in a test.
  */
 export async function runVitestListAsync(
   args: string[],
   timeoutMs: number,
   binPath: string = resolveVitestBin(),
   killGraceMs: number = KILL_GRACE_MS,
+  contention?: HostContention,
 ): Promise<VitestRunResult> {
   const attempted = await runVitestProcess([binPath, 'list', ...args], {
     streamToParent: false,
@@ -1447,12 +1474,11 @@ export async function runVitestListAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const contention = sampleHostContention();
     const message = hangDiagnostic({
       stage: 'vitest list',
       boundMs: timeoutMs,
       elapsedSecs: attempted.elapsedSecs,
-      contention,
+      contention: contention ?? sampleHostContention(),
     });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
