@@ -50,6 +50,8 @@ import {
   parseRunnerArgs,
   hangTimeoutMessage,
   listHangMessage,
+  hangDiagnostic,
+  deriveStage,
   HANG_TIMEOUT_EXIT_CODE,
   DEFAULT_RUN_TIMEOUT_MS,
   LIST_TIMEOUT_MS,
@@ -69,6 +71,8 @@ import {
   type VitestRunner,
   type VitestListRunner,
   type HostReaders,
+  type HostContention,
+  type HangDiagnosticContext,
   sampleHostContention,
   deriveUnitBound,
   UNIT_FLOOR_MS,
@@ -1442,5 +1446,89 @@ describe('deriveUnitBound', () => {
 
   it('returns the floor when load1m is null (Windows / unavailable)', () => {
     expect(deriveUnitBound({ load1m: null, cpuCount: 4 })).toBe(UNIT_FLOOR_MS);
+  });
+});
+
+describe('deriveStage', () => {
+  it('extracts --project value when spaced', () => {
+    expect(deriveStage(['--project', 'unit'])).toBe('unit');
+  });
+
+  it('extracts --project value when equals', () => {
+    expect(deriveStage(['--project=browser'])).toBe('browser');
+  });
+
+  it('returns "unknown project" when no --project flag', () => {
+    expect(deriveStage(['--filesOnly', '--json'])).toBe('unknown project');
+  });
+
+  it('picks the first --project when duplicated', () => {
+    expect(deriveStage(['--project', 'unit', '--project', 'browser'])).toBe('unit');
+  });
+});
+
+describe('hangDiagnostic', () => {
+  const baseCtx = {
+    stage: 'unit',
+    boundMs: 300_000,
+    elapsedSecs: 312,
+    contention: { load1m: 38.4, cpuCount: 16 },
+  } as HangDiagnosticContext;
+
+  it('renders stage, bound, elapsed, delta, and load', () => {
+    const msg = hangDiagnostic(baseCtx);
+    expect(msg).toContain('[hang-timeout] unit did not complete within 300s');
+    expect(msg).toContain('aborting (exit 124)');
+    expect(msg).toContain('elapsed 312s (+12s over bound)');
+    expect(msg).toContain('host load 38.4 over 16 cores');
+  });
+
+  it('does not include browser-stage guidance for unit stage', () => {
+    const msg = hangDiagnostic(baseCtx);
+    expect(msg).not.toContain('requestAnimationFrame');
+    expect(msg).not.toContain('Phaser');
+  });
+
+  it('does not include unit-stage guidance for browser stage', () => {
+    const browserCtx = { ...baseCtx, stage: 'browser' } as HangDiagnosticContext;
+    const msg = hangDiagnostic(browserCtx);
+    expect(msg).toContain('requestAnimationFrame');
+    expect(msg).toContain('Phaser');
+    expect(msg).not.toContain('synchronous loop');
+  });
+
+  it('handles null load (Windows) with core count', () => {
+    const nullLoadCtx = { ...baseCtx, contention: { load1m: null, cpuCount: 4 } } as HangDiagnosticContext;
+    const msg = hangDiagnostic(nullLoadCtx);
+    expect(msg).toContain('host load unavailable (4 cores)');
+  });
+
+  it('handles null contention (no data)', () => {
+    const noDataCtx = { ...baseCtx, contention: null };
+    const msg = hangDiagnostic(noDataCtx);
+    expect(msg).toContain('host load unavailable (unknown cores)');
+  });
+
+  it('shows zero delta when elapsed equals bound', () => {
+    const ctx = { ...baseCtx, elapsedSecs: 300 };
+    const msg = hangDiagnostic(ctx as HangDiagnosticContext);
+    expect(msg).toContain('elapsed 300s (+0s over bound)');
+  });
+});
+
+describe('hangTimeoutMessage / listHangMessage backward compat', () => {
+  it('hangTimeoutMessage prints elapsed time as the bound (deprecated shape)', () => {
+    const msg = hangTimeoutMessage(312);
+    expect(msg).toContain('[hang-timeout]');
+    expect(msg).toContain('did not complete within 312s');
+    expect(msg).toContain('exit 124');
+    expect(msg).toContain('Vitest run did not complete');
+  });
+
+  it('listHangMessage prints elapsed time in abbreviated form (deprecated)', () => {
+    const msg = listHangMessage(125);
+    expect(msg).toContain('[hang-timeout] vitest list');
+    expect(msg).toContain('did not complete within 125s');
+    expect(msg).toContain('exit 124');
   });
 });

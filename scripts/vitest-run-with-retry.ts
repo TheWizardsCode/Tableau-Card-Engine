@@ -317,9 +317,97 @@ export function deriveUnitBound(contention: HostContention): number {
  */
 export const PREFLIGHT_FAILURE_EXIT_CODE = 2;
 
+// ── Hang diagnostic ────────────────────────────────────────────────────
+
+/** Context needed by the unified hang-diagnostic builder. */
+export interface HangDiagnosticContext {
+  /** Stage label, e.g. "unit", "browser", or "vitest list (<args>)". */
+  stage: string;
+  /** The configured wall-clock bound in milliseconds. */
+  boundMs: number;
+  /** Wall-clock elapsed time in whole seconds. */
+  elapsedSecs: number;
+  /** Host contention sample at abort (may be null if unavailable). */
+  contention: HostContention | null;
+}
+
+/**
+ * Unified hang-diagnostic builder. Always renders: the stage, the configured
+ * bound, the elapsed wall time, the delta over the bound, and host load
+ * average / core count — so a contended host is distinguishable from a
+ * genuine hang without opening the cache entry.
+ *
+ * Guidance is stage-appropriate: the browser block (starved
+ * requestAnimationFrame, undestroyed Phaser.Game) is not printed for unit-stage
+ * aborts, which instead point at a synchronous loop in test/engine code.
+ */
+export function hangDiagnostic(ctx: HangDiagnosticContext): string {
+  const { stage, boundMs, elapsedSecs, contention } = ctx;
+  const boundSecs = Math.round(boundMs / 1000);
+  const delta = elapsedSecs - boundSecs;
+
+  const lines: string[] = [
+    `\n[hang-timeout] ${stage} did not complete within ${boundSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`,
+    `elapsed ${elapsedSecs}s (+${delta}s over bound)`,
+  ];
+
+  if (contention && contention.load1m !== null) {
+    lines.push(
+      `host load ${contention.load1m.toFixed(1)} over ${contention.cpuCount} cores`,
+    );
+  } else if (contention && contention.load1m === null) {
+    lines.push(`host load unavailable (${contention.cpuCount} cores)`);
+  } else {
+    lines.push(`host load unavailable (unknown cores)`);
+  }
+
+  // Stage-appropriate guidance.
+  if (stage === 'browser') {
+    lines.push(
+      'The browser stage can stall indefinitely under CPU contention (e.g. a',
+      'requestAnimationFrame loop starved of frames, or a Phaser game destroy',
+      'that never completes). This is treated as a hang, NOT a transient',
+      'failure: no retry is performed. Re-run the suite (ideally without other',
+      'CPU-heavy processes competing), or run the suspected file(s) in',
+      'isolation via `npx vitest run --project browser tests/<file>` to diagnose.',
+    );
+  } else {
+    // unit, vitest list, or any other stage.
+    lines.push(
+      'The test engine cannot preempt synchronous JavaScript — a hung',
+      'run usually indicates a synchronous loop in test or engine code.',
+      `Run one file under --project ${stage === 'vitest list' ? 'unit' : stage} in`,
+      'isolation to narrow down the offender.',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Derive a human-readable stage label from the forwarded vitest arguments.
+ *
+ * @param args - Forwarded CLI arguments (never includes `--timeout-ms`).
+ * @returns A stage label such as "unit", "browser", or "vitest list".
+ */
+export function deriveStage(args: string[]): string {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--project' && i + 1 < args.length) {
+      return args[i + 1];
+    }
+    if (args[i]?.startsWith('--project=')) {
+      return args[i].slice('--project='.length);
+    }
+  }
+  return 'unknown project';
+}
+
 /**
  * Message emitted when the wall-clock bound is exceeded and the run is
- * aborted. `elapsedSecs` is the wall time before the abort.
+ * aborted. Kept for backward compatibility. Production paths use
+ * `hangDiagnostic` which is stage-aware.
+ *
+ * @deprecated Use `hangDiagnostic` with explicit stage/bound/contention.
  */
 export function hangTimeoutMessage(elapsedSecs: number): string {
   return [
@@ -334,8 +422,10 @@ export function hangTimeoutMessage(elapsedSecs: number): string {
 }
 
 /**
- * Abbreviated hang diagnostic for the pre-flight `vitest list` collection —
- * enough to surface + fail closed without the full browser-stage essay.
+ * Abbreviated hang diagnostic for the pre-flight `vitest list` collection.
+ * Kept for backward compatibility. Production paths use `hangDiagnostic`.
+ *
+ * @deprecated Use `hangDiagnostic` with explicit stage/bound/contention.
  */
 export function listHangMessage(elapsedSecs: number): string {
   return `\n[hang-timeout] vitest list did not complete within ${elapsedSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`;
@@ -592,7 +682,12 @@ export async function deriveExpectedFiles(
 
   if (result.status === HANG_TIMEOUT_EXIT_CODE) {
     throw new PreflightError(
-      `vitest list did not complete within ${Math.round(timeoutMs / 1000)}s (exit ${HANG_TIMEOUT_EXIT_CODE})`,
+      hangDiagnostic({
+        stage: 'vitest list',
+        boundMs: timeoutMs,
+        elapsedSecs: Math.round(timeoutMs / 1000),
+        contention: null,
+      }),
     );
   }
   if (result.status !== 0) {
@@ -1314,7 +1409,13 @@ export async function runVitestAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const message = hangTimeoutMessage(attempted.elapsedSecs);
+    const contention = sampleHostContention();
+    const message = hangDiagnostic({
+      stage: deriveStage(args),
+      boundMs: timeoutMs,
+      elapsedSecs: attempted.elapsedSecs,
+      contention,
+    });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
   }
@@ -1346,7 +1447,13 @@ export async function runVitestListAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const message = listHangMessage(attempted.elapsedSecs);
+    const contention = sampleHostContention();
+    const message = hangDiagnostic({
+      stage: 'vitest list',
+      boundMs: timeoutMs,
+      elapsedSecs: attempted.elapsedSecs,
+      contention,
+    });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
   }
