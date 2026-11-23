@@ -3,11 +3,20 @@
  *
  * An episode manifest is the beat-sheet layer's authored data: acts, scenes,
  * beats, objectives, budgets, outcome rules, routes and loss rules
- * (`docs/design/storyline-game-gdd.md` §2.2). This module owns the two
- * machine-readable artefacts of that shape — the canonical JSON schema path and
- * the TypeScript types the editor and the validator share — and nothing else:
- * the pure validator lands with its rule families, so no runtime, game or
- * Phaser import belongs here.
+ * (`docs/design/storyline-game-gdd.md` §2.2). This module owns the
+ * machine-readable artefacts of that shape — the canonical JSON schema path,
+ * the TypeScript types the editor and the validator share, and the pure
+ * manifest validator (GDD §2.4) — and nothing else: no runtime, game or Phaser
+ * import belongs here.
+ *
+ * **Validator contract.** `validateEpisodeManifest` is *pure* (the document it
+ * inspects is never mutated) and *total* (any value, including a malformed
+ * manifest, is reported rather than thrown on), and it is *deterministic*: it
+ * reads no clock, RNG or ambient state, findings are sorted by `path` then
+ * `code`, and two runs over the same input produce byte-identical text and
+ * JSON reports. Later §2.4 rule families add predicates over
+ * `walkEpisodeManifest`'s one traversal; they never add a second traversal,
+ * a second finding shape or a new ordering rule.
  *
  * The types mirror GDD §2.2.9 verbatim, plus the `resources.start` and
  * `resources.bounds` members documented in §2.2.1 and §2.8.2. Every fixed-shape
@@ -24,6 +33,8 @@
  *
  * @module
  */
+
+import type { ContentCard } from './types';
 
 /**
  * Canonical repository-relative path of the episode-manifest JSON schema.
@@ -195,4 +206,527 @@ export interface LossRule {
   amount: number;
   /** Player-facing line for the loss ledger and the journal. */
   statement: string;
+}
+
+// ── Validator surface (GDD §2.4) ────────────────────────────
+
+/**
+ * Every rule code in the GDD §2.4 rule table, in table order.
+ *
+ * Declared in full here — including the families later children implement — so
+ * a new rule family adds a predicate, never a new code, and a caller can key
+ * its own handling off a closed set. `clock-cost-mismatch` is the
+ * migration-only rule: it compares a beat's `clockCost` with the legacy CSV
+ * cell and is retired by G10 (CG-0MWR0BJXI007UINE) along with that column.
+ */
+export const EPISODE_MANIFEST_ISSUE_CODES = [
+  'duplicate-act',
+  'duplicate-scene',
+  'duplicate-beat',
+  'unknown-card',
+  'unknown-scene',
+  'unknown-act',
+  'unassigned-card',
+  'dangling-chain',
+  'non-total-routes',
+  'non-total-outcome-rules',
+  'objective-invalid',
+  'loss-not-irreversible',
+  'numeric-invalid',
+  'resource-set-mismatch',
+  'clock-cost-mismatch',
+  'ending-successor',
+] as const;
+
+/** A GDD §2.4 rule code. */
+export type EpisodeManifestIssueCode = (typeof EPISODE_MANIFEST_ISSUE_CODES)[number];
+
+/**
+ * A rule the validator ran, named by the code it reports.
+ *
+ * The result carries the implemented list so a caller (and a test) can tell a
+ * clean manifest apart from an unimplemented rule: declaring the whole §2.4
+ * code union up front must never make an unimplemented rule look satisfied.
+ */
+export type EpisodeManifestRule = EpisodeManifestIssueCode;
+
+/** One rule violation, addressed by its JSON path inside the manifest. */
+export interface EpisodeManifestFinding {
+  /** The §2.4 rule code that fired. */
+  readonly code: EpisodeManifestIssueCode;
+  /** Dotted JSON path of the offending field, e.g. `acts[1].scenes[0].beats[2].cardId`. */
+  readonly path: string;
+  /** Reviewer-facing explanation, naming the conflicting declaration by path. */
+  readonly message: string;
+  /** The manifest the finding belongs to (`''` when the document declares no string id). */
+  readonly manifestId: string;
+}
+
+/** What the validator traversed — provenance for the reports. */
+export interface EpisodeManifestCounts {
+  /** Number of `acts[]` elements traversed. */
+  readonly acts: number;
+  /** Number of `acts[].scenes[]` elements traversed. */
+  readonly scenes: number;
+  /** Number of `acts[].scenes[].beats[]` elements traversed. */
+  readonly beats: number;
+}
+
+/** The result of validating one episode manifest. */
+export interface EpisodeManifestValidationResult {
+  /** The manifest's declared id (`''` when absent or not a string). */
+  readonly manifestId: string;
+  /** Every finding, deduplicated and sorted by `path` then `code`. */
+  readonly findings: readonly EpisodeManifestFinding[];
+  /** The rules that ran, so an unimplemented rule is never mistaken for a pass. */
+  readonly rules: readonly EpisodeManifestRule[];
+  /** The traversal's element counts. */
+  readonly counts: EpisodeManifestCounts;
+  /** True when the implemented rules reported nothing. */
+  readonly valid: boolean;
+}
+
+// ── The one traversal ───────────────────────────────────────
+
+/** A manifest node with the dotted JSON path that addresses it. */
+export interface ManifestLeafNode {
+  /** Dotted JSON path of the node itself (not of a member). */
+  readonly path: string;
+  /** The raw node value — never trusted, and read through total accessors only. */
+  readonly value: unknown;
+}
+
+/** A scene, with its path and its ordered child leaves. */
+export interface ManifestSceneNode extends ManifestLeafNode {
+  /** `beats[]`, in declaration order. */
+  readonly beats: readonly ManifestLeafNode[];
+  /** `outcomeRules[]`, in declaration order. */
+  readonly outcomeRules: readonly ManifestLeafNode[];
+  /** `routes[]`, in declaration order. */
+  readonly routes: readonly ManifestLeafNode[];
+  /** `losses[]`, in declaration order (empty when absent). */
+  readonly losses: readonly ManifestLeafNode[];
+}
+
+/** An act, with its path and its scenes. */
+export interface ManifestActNode extends ManifestLeafNode {
+  /** `scenes[]`, in declaration order. */
+  readonly scenes: readonly ManifestSceneNode[];
+}
+
+/** The manifest's single ordered act → scene → leaf traversal. */
+export interface EpisodeManifestTraversal {
+  /** Acts, in declaration order. */
+  readonly acts: readonly ManifestActNode[];
+  /** Every scene in the episode, flattened in act → scene order. */
+  readonly scenes: readonly ManifestSceneNode[];
+  /** Every beat in the episode, flattened in act → scene → beat order. */
+  readonly beats: readonly ManifestLeafNode[];
+}
+
+/**
+ * Walks the manifest once, in document order, tolerating any shape.
+ *
+ * This is the traversal every §2.4 rule family reads: it yields node objects
+ * with the dotted JSON path that addresses them, so a rule reports a path
+ * without re-deriving one, and a malformed document yields fewer nodes rather
+ * than an exception.
+ *
+ * @param manifest A manifest document of any shape.
+ * @returns The acts, the flattened scenes and the flattened beats.
+ */
+export function walkEpisodeManifest(manifest: unknown): EpisodeManifestTraversal {
+  const acts: ManifestActNode[] = [];
+  const scenes: ManifestSceneNode[] = [];
+  const beats: ManifestLeafNode[] = [];
+
+  arrayOf(recordOf(manifest)?.acts).forEach((act, actIndex) => {
+    const actPath = `acts[${actIndex}]`;
+    const actScenes = arrayOf(recordOf(act)?.scenes).map((scene, sceneIndex) => {
+      const scenePath = `${actPath}.scenes[${sceneIndex}]`;
+      const sceneRecord = recordOf(scene);
+      const leavesOf = (member: string): ManifestLeafNode[] =>
+        arrayOf(sceneRecord?.[member]).map((value, index) => ({
+          path: `${scenePath}.${member}[${index}]`,
+          value,
+        }));
+      const node: ManifestSceneNode = {
+        path: scenePath,
+        value: scene,
+        beats: leavesOf('beats'),
+        outcomeRules: leavesOf('outcomeRules'),
+        routes: leavesOf('routes'),
+        losses: leavesOf('losses'),
+      };
+      scenes.push(node);
+      beats.push(...node.beats);
+      return node;
+    });
+    acts.push({ path: actPath, value: act, scenes: actScenes });
+  });
+
+  return { acts, scenes, beats };
+}
+
+// ── Total accessors ─────────────────────────────────────────
+
+/** Reads `value` as a plain object, or `undefined` for any other shape. */
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+/** Reads `value` as an array, or `[]` for any other shape. */
+function arrayOf(value: unknown): readonly unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/** Reads a string member, or `undefined` when absent or not a string. */
+function stringMember(value: unknown, member: string): string | undefined {
+  const memberValue = recordOf(value)?.[member];
+  return typeof memberValue === 'string' ? memberValue : undefined;
+}
+
+/** Reads a finite numeric member, or `undefined` when absent or not a number. */
+function numberMember(value: unknown, member: string): number | undefined {
+  const memberValue = recordOf(value)?.[member];
+  return typeof memberValue === 'number' && Number.isFinite(memberValue) ? memberValue : undefined;
+}
+
+/** Renders an id collection for a message, in document order. */
+function listed(ids: Iterable<string>): string {
+  const items = [...ids];
+  return items.length === 0 ? '(none)' : items.join(', ');
+}
+
+/** The declared ids of the given nodes, in document order. */
+function idsOf(nodes: readonly ManifestLeafNode[]): Set<string> {
+  const ids = new Set<string>();
+  for (const node of nodes) {
+    const id = stringMember(node.value, 'id');
+    if (id !== undefined) ids.add(id);
+  }
+  return ids;
+}
+
+// ── Rule predicates over the traversal ──────────────────────
+
+/** A finding before its `manifestId` is attached and its order is settled. */
+interface FindingDraft {
+  readonly code: EpisodeManifestIssueCode;
+  readonly path: string;
+  readonly message: string;
+}
+
+/** A node's candidate key plus the path that addresses the key. */
+interface KeyedCandidate<Key> {
+  readonly path: string;
+  readonly key: Key;
+}
+
+/** Reads a string member as a duplicate candidate. */
+function keyedString(node: ManifestLeafNode, member: string): KeyedCandidate<string> | undefined {
+  const key = stringMember(node.value, member);
+  return key === undefined ? undefined : { path: `${node.path}.${member}`, key };
+}
+
+/** Reads a numeric member as a duplicate candidate. */
+function keyedNumber(node: ManifestLeafNode, member: string): KeyedCandidate<number> | undefined {
+  const key = numberMember(node.value, member);
+  return key === undefined ? undefined : { path: `${node.path}.${member}`, key };
+}
+
+/** Reports every repetition of a key, naming the first declaration by path. */
+function duplicateFindings<Key>(
+  nodes: readonly ManifestLeafNode[],
+  code: EpisodeManifestIssueCode,
+  read: (node: ManifestLeafNode) => KeyedCandidate<Key> | undefined,
+  describe: (key: Key, firstPath: string) => string,
+): FindingDraft[] {
+  const firstPaths = new Map<Key, string>();
+  const findings: FindingDraft[] = [];
+  for (const node of nodes) {
+    const candidate = read(node);
+    if (candidate === undefined) continue;
+    const firstPath = firstPaths.get(candidate.key);
+    if (firstPath === undefined) {
+      firstPaths.set(candidate.key, candidate.path);
+      continue;
+    }
+    findings.push({
+      code,
+      path: candidate.path,
+      message: describe(candidate.key, firstPath),
+    });
+  }
+  return findings;
+}
+
+/** `duplicate-act`: act ids, and act order, unique across the manifest. */
+function duplicateActFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  return [
+    ...duplicateFindings(
+      traversal.acts,
+      'duplicate-act',
+      (node) => keyedString(node, 'id'),
+      (id, firstPath) => `Duplicate act id "${id}" (already declared at ${firstPath}).`,
+    ),
+    ...duplicateFindings(
+      traversal.acts,
+      'duplicate-act',
+      (node) => keyedNumber(node, 'order'),
+      (order, firstPath) =>
+        `Duplicate act order ${order} (already used by ${firstPath}); act order is the only ordering authority.`,
+    ),
+  ];
+}
+
+/** `duplicate-scene`: scene ids unique across the episode, not just the act. */
+function duplicateSceneFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  return duplicateFindings(
+    traversal.scenes,
+    'duplicate-scene',
+    (node) => keyedString(node, 'id'),
+    (id, firstPath) =>
+      `Duplicate scene id "${id}" (already declared at ${firstPath}); scene ids are unique across the episode.`,
+  );
+}
+
+/** `duplicate-beat`: beat identity is the card id, unique across the episode. */
+function duplicateBeatFindings(traversal: EpisodeManifestTraversal): FindingDraft[] {
+  return duplicateFindings(
+    traversal.beats,
+    'duplicate-beat',
+    (node) => keyedString(node, 'cardId'),
+    (cardId, firstPath) =>
+      `Duplicate beat card id "${cardId}" (already declared at ${firstPath}); a beat is identified by its card id.`,
+  );
+}
+
+/**
+ * `unknown-act` / `unknown-scene`: every act and scene reference resolves.
+ *
+ * A route target names its act and its scene explicitly, so each is checked
+ * for existence on its own. `act.entryScene` names no act, so its act is
+ * *implied* by where the scene lives: a scene that resolves into another act
+ * means the act named by the entry point is wrong (`unknown-act`), while a
+ * scene that resolves nowhere is `unknown-scene`.
+ */
+function unknownReferenceFindings(
+  manifest: unknown,
+  traversal: EpisodeManifestTraversal,
+): FindingDraft[] {
+  const findings: FindingDraft[] = [];
+  const actIds = idsOf(traversal.acts);
+  const scenesById = new Map<string, ManifestSceneNode>();
+  for (const scene of traversal.scenes) {
+    const id = stringMember(scene.value, 'id');
+    if (id !== undefined && !scenesById.has(id)) scenesById.set(id, scene);
+  }
+
+  const start = recordOf(manifest)?.start;
+  const startAct = stringMember(start, 'act');
+  if (startAct !== undefined && !actIds.has(startAct)) {
+    findings.push({
+      code: 'unknown-act',
+      path: 'start.act',
+      message: `start.act "${startAct}" does not name an act of this manifest (acts: ${listed(actIds)}).`,
+    });
+  }
+  const startScene = stringMember(start, 'scene');
+  if (startScene !== undefined && !scenesById.has(startScene)) {
+    findings.push({
+      code: 'unknown-scene',
+      path: 'start.scene',
+      message: `start.scene "${startScene}" does not name a scene of this manifest (scenes: ${listed(scenesById.keys())}).`,
+    });
+  }
+
+  for (const act of traversal.acts) {
+    const entryScene = stringMember(act.value, 'entryScene');
+    if (entryScene === undefined) continue;
+    if (act.scenes.some((scene) => stringMember(scene.value, 'id') === entryScene)) continue;
+    const owner = scenesById.get(entryScene);
+    findings.push(
+      owner === undefined
+        ? {
+            code: 'unknown-scene',
+            path: `${act.path}.entryScene`,
+            message: `act.entryScene "${entryScene}" does not name a scene of this manifest (scenes: ${listed(scenesById.keys())}).`,
+          }
+        : {
+            code: 'unknown-act',
+            path: `${act.path}.entryScene`,
+            message: `act.entryScene "${entryScene}" is a scene of ${owner.path}, not of ${act.path}.`,
+          },
+    );
+  }
+
+  for (const scene of traversal.scenes) {
+    for (const route of scene.routes) {
+      const to = recordOf(recordOf(route.value)?.to);
+      if (stringMember(to, 'kind') !== 'beat') continue;
+      const actId = stringMember(to, 'act');
+      if (actId !== undefined && !actIds.has(actId)) {
+        findings.push({
+          code: 'unknown-act',
+          path: `${route.path}.to.act`,
+          message: `Route target act "${actId}" does not name an act of this manifest (acts: ${listed(actIds)}).`,
+        });
+      }
+      const sceneId = stringMember(to, 'scene');
+      if (sceneId !== undefined && !scenesById.has(sceneId)) {
+        findings.push({
+          code: 'unknown-scene',
+          path: `${route.path}.to.scene`,
+          message: `Route target scene "${sceneId}" does not name a scene of this manifest (scenes: ${listed(scenesById.keys())}).`,
+        });
+      }
+    }
+  }
+
+  return findings;
+}
+
+/** The rule families implemented at this commit; later children append here. */
+const IMPLEMENTED_RULES: readonly EpisodeManifestRule[] = [
+  'duplicate-act',
+  'duplicate-scene',
+  'duplicate-beat',
+  'unknown-act',
+  'unknown-scene',
+];
+
+/** Orders findings by `path`, then `code` — the report's stable total order. */
+function compareFindings(left: EpisodeManifestFinding, right: EpisodeManifestFinding): number {
+  if (left.path !== right.path) return left.path < right.path ? -1 : 1;
+  if (left.code !== right.code) return left.code < right.code ? -1 : 1;
+  return 0;
+}
+
+/**
+ * Deduplicates (by `path` + `code`), attaches the manifest id and sorts.
+ *
+ * Ordering is a property of this collector rather than of each rule, so a new
+ * rule cannot introduce a nondeterministic report.
+ */
+function collectFindings(
+  manifestId: string,
+  drafts: readonly FindingDraft[],
+): EpisodeManifestFinding[] {
+  const seen = new Set<string>();
+  const findings: EpisodeManifestFinding[] = [];
+  for (const draft of drafts) {
+    const key = `${draft.code}\u0000${draft.path}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    findings.push({
+      code: draft.code,
+      path: draft.path,
+      message: draft.message,
+      manifestId,
+    });
+  }
+  return findings.sort(compareFindings);
+}
+
+/**
+ * Validates an episode manifest's identity and scope (GDD §2.4).
+ *
+ * Pure and total: the document is inspected, never mutated, and any value —
+ * including a malformed manifest — yields findings rather than an exception.
+ * Deterministic: no clock, RNG or ambient state is read, and findings are
+ * sorted by `path` then `code`, so the text and JSON reports are byte-identical
+ * across runs.
+ *
+ * @param manifest          The (possibly unvalidated) manifest document.
+ * @param _contentCards     Bound content cards — the input the card-resolution
+ *                          rules read (CG-0MWSJYGEG007WOIU); unused by the
+ *                          identity rules, which need only the manifest.
+ * @param _declaredResources Declared resource keys — the input the resource
+ *                          rules read (CG-0MWSJYLZ3005C2V1); unused by the
+ *                          identity rules.
+ * @returns The findings, the rules that ran and the traversal counts.
+ */
+export function validateEpisodeManifest(
+  manifest: unknown,
+  _contentCards: readonly ContentCard[] = [],
+  _declaredResources: readonly string[] = [],
+): EpisodeManifestValidationResult {
+  const traversal = walkEpisodeManifest(manifest);
+  const manifestId = stringMember(manifest, 'id') ?? '';
+  const findings = collectFindings(manifestId, [
+    ...duplicateActFindings(traversal),
+    ...duplicateSceneFindings(traversal),
+    ...duplicateBeatFindings(traversal),
+    ...unknownReferenceFindings(manifest, traversal),
+  ]);
+
+  return {
+    manifestId,
+    findings,
+    rules: IMPLEMENTED_RULES,
+    counts: {
+      acts: traversal.acts.length,
+      scenes: traversal.scenes.length,
+      beats: traversal.beats.length,
+    },
+    valid: findings.length === 0,
+  };
+}
+
+/**
+ * Renders the human-readable report, in the shape `content/validate.ts` uses.
+ *
+ * @param result The validation result.
+ * @returns Newline-joined report text (no trailing newline).
+ */
+export function formatEpisodeManifestReport(result: EpisodeManifestValidationResult): string {
+  const lines: string[] = [];
+  lines.push('Episode manifest validation report');
+  lines.push('===================================');
+  lines.push(`Manifest: ${result.manifestId === '' ? '(unnamed)' : result.manifestId}`);
+  lines.push(
+    `Traversed: ${result.counts.acts} act(s), ${result.counts.scenes} scene(s), ${result.counts.beats} beat(s)`,
+  );
+  lines.push(
+    `Rules (${result.rules.length}): ${result.rules.length === 0 ? '(none)' : result.rules.join(', ')}`,
+  );
+  lines.push('');
+  if (result.findings.length === 0) {
+    lines.push('ERRORS (0): none');
+  } else {
+    lines.push(`ERRORS (${result.findings.length}):`);
+    for (const finding of result.findings) {
+      lines.push(`  ✗ [${finding.code}] ${finding.path}: ${finding.message}`);
+    }
+  }
+  lines.push('');
+  lines.push(result.valid ? 'RESULT: VALID' : 'RESULT: INVALID');
+  return lines.join('\n');
+}
+
+/**
+ * Renders the stable JSON report (for tooling/CI consumption).
+ *
+ * The `findings` array is the same data the text report renders, so the two
+ * reports always agree; the key order is fixed and no timestamp is emitted, so
+ * a committed report is byte-comparable.
+ *
+ * @param result The validation result.
+ * @returns Pretty-printed JSON.
+ */
+export function episodeManifestValidationToJson(result: EpisodeManifestValidationResult): string {
+  return JSON.stringify(
+    {
+      valid: result.valid,
+      manifestId: result.manifestId,
+      counts: result.counts,
+      rules: result.rules,
+      findings: result.findings,
+    },
+    null,
+    2,
+  );
 }

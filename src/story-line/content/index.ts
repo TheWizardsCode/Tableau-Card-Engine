@@ -9,7 +9,7 @@
  * | Content model + adapter seam | `types` | `ContentCard`, `ContentAdapter`, `ContentFieldMapping`, `baseIdOf`, … |
  * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
- * | Episode manifest shape | `episode-manifest` | `EpisodeManifest`/`Act`/`Scene`/`Beat`/… types, `MANIFEST_VERSION`, `DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH` |
+ * | Episode manifest shape | `episode-manifest` | `EpisodeManifest`/`Act`/`Scene`/`Beat`/… types, `MANIFEST_VERSION`, `DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH`, `validateEpisodeManifest`, its finding/result types, text/JSON reports |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports, `storylineEntryCards` |
  * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
@@ -113,7 +113,16 @@ export type {
   Act,
   Beat,
   EpisodeManifest,
+  EpisodeManifestCounts,
+  EpisodeManifestFinding,
+  EpisodeManifestIssueCode,
+  EpisodeManifestRule,
+  EpisodeManifestTraversal,
+  EpisodeManifestValidationResult,
   LossRule,
+  ManifestActNode,
+  ManifestLeafNode,
+  ManifestSceneNode,
   Objective,
   OutcomeRule,
   ResourceBounds,
@@ -124,7 +133,15 @@ export type {
   SceneOutcome,
   SceneRoute,
 } from './episode-manifest';
-export { DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH, MANIFEST_VERSION } from './episode-manifest';
+export {
+  DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH,
+  EPISODE_MANIFEST_ISSUE_CODES,
+  MANIFEST_VERSION,
+  episodeManifestValidationToJson,
+  formatEpisodeManifestReport,
+  validateEpisodeManifest,
+  walkEpisodeManifest,
+} from './episode-manifest';
 
 export type { ProseField, ProseFieldSpec } from './prose';
 export { PROSE_FIELD_SPECS, mappedProseColumns } from './prose';
