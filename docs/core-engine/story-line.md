@@ -1282,8 +1282,12 @@ walks the graph and fails on any `phaser` specifier).
 |---|---|---|
 | `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
 | `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()`. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `enterBeat()` / `getBudgetExhausted()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
+| `BeatEntry` | type | One beat-entry outcome: the `presented` or `refused` variant (see "Beat entry"). |
+| `PresentedBeatEntry` | type | A beat the clock paid for: charged cost, prose and gated options. |
+| `RefusedBeatEntry` | type | A beat the clock could not pay for: no charge, no options, `budget-exhausted`. |
+| `BeatEntryRefusalReason` | type | Why an entry was refused; currently only `'budget-exhausted'`. |
 | `SceneExitRecord` | type | The nine-field record appended once per scene close. |
 | `LossLedgerEntry` | type | One irreversible-loss line: the `chain` or `rule` variant. |
 | `LOSS_LEDGER_KINDS` | const | The two ledger kinds, `['chain', 'rule']`. |
@@ -1301,6 +1305,7 @@ const runner = createEpisodeRunner({
 
 runner.getState();       // EpisodeRunState — frozen snapshot
 runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
+runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
 ```
 
 Construction consumes no RNG and applies no resource delta. A requested run
@@ -1308,6 +1313,49 @@ whose manifest starts at a scene no act declares throws an actionable error
 naming the manifest and the scene id; everything else is left to
 `validateEpisodeManifest` (GDD §2.4), because the runner must not re-check an
 already validated manifest.
+
+### Beat entry
+
+GDD §2.3 steps A.1–A.3. `enterBeat(cardId, state)` enters a beat **of the
+current scene** (a beat of another scene is entered by routing, step 12):
+
+1. **A.1 — read the cost.** The beat's `clockCost` is read from the validated
+   manifest's `Beat`, never from the legacy per-card CSV `clockCost` column
+   (which survives only as a validator cross-check and retires with G10).
+2. **A.2 — refuse what the clock cannot pay.** If `clockCost > sceneClockRemaining`
+   the beat is **refused**: it is not played, `currentBeatId` and the clock are
+   left unchanged, no options are returned, `budgetExhausted` is set (read
+   through `getBudgetExhausted()`), and the record reports
+   `reason: 'budget-exhausted'`. The refusal is the scene's close trigger; the
+   scene close classifies it through the authored outcome table (step 7), so an
+   exhausted close is never hard-coded to `failure`.
+3. **A.3 — charge and present.** Otherwise the cost is charged
+   (`sceneClockRemaining -= clockCost`), `currentBeatId` becomes the beat, and
+   the record carries the card's `context` prose, the scene id (for the scene
+   banner) and the surviving options. Options are gated by the shipped
+   `isOptionAffordable` over the manifest's declared keys
+   (`storyline.resources`); the runner never re-derives affordability.
+   **A cost exactly equal to the remaining clock is affordable** — spending the
+   last tick on the last beat is a legal, authored climax, so that entry is
+   presented with `clockRemaining: 0`.
+
+```ts
+const entry = runner.enterBeat('le-i-open', gameState);
+if (entry.status === 'presented') {
+  renderProse(entry.context);      // the card's `context` paragraph
+  renderOptions(entry.options);    // already affordability-gated
+} else {
+  closeScene(entry.reason);        // 'budget-exhausted'
+}
+```
+
+A `BeatEntry` is a discriminated union on `status`, so the options cannot be
+reached on a refusal; the record and its options array are frozen. Beat entry
+consumes no RNG and applies no resource delta. Requesting a `cardId` the
+current scene does not assign throws an actionable error naming the scene
+(a content defect, not a modelling gap). `budgetExhausted` is close-path
+bookkeeping: it is **not** part of the frozen `EpisodeRunState` snapshot and is
+reset when the run enters the next scene (step 12).
 
 ### Run state
 
@@ -1407,6 +1455,10 @@ follows.
 - `tests/story-line/compile.test.ts` — options-only and CSV compilation,
   registry precedence, draw-time condition **and cost** filtering, snapshot
   stability.
+- `tests/story-line/episode-runner-surface.test.ts` / `episode-runner-beat-entry.test.ts`
+  — the runner's shipped surface (run state, frozen snapshots, no Phaser import,
+  the nine `scene-exit` fields) and beat entry (A.1–A.3: manifest cost, exact-cost
+  affordability, refusal with `budget-exhausted`, gated options, no RNG).
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
   deterministic serial naming, pending-choice lifecycle, and carrying the

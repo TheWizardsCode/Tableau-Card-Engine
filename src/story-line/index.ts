@@ -146,12 +146,16 @@ export type { StorylineOptionRegistry } from './compile';
 export { createEpisodeRunner } from './episode-runner';
 export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
 export type {
+  BeatEntry,
+  BeatEntryRefusalReason,
   ChainLossLedgerEntry,
   EpisodeRunState,
   EpisodeRunner,
   EpisodeRunnerConfig,
   LossLedgerEntry,
   LossLedgerKind,
+  PresentedBeatEntry,
+  RefusedBeatEntry,
   RuleLossLedgerEntry,
   SceneExitRecord,
 } from './types';

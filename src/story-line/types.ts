@@ -645,13 +645,89 @@ export const SCENE_EXIT_FIELDS = [
   'nextBeat',
 ] as const;
 
+// ── Beat entry (GDD §2.3 steps A.1–A.3) ─────────────────────
+
+/**
+ * Why a beat entry was refused.
+ *
+ * `budget-exhausted` is currently the only reason: the scene clock cannot pay
+ * the beat's `clockCost`, so the scene closes instead of the beat being played
+ * (GDD §2.3 step 2).
+ */
+export type BeatEntryRefusalReason = 'budget-exhausted';
+
+/**
+ * A beat the scene clock paid for: the beat is played.
+ *
+ * The record is the presentation payload for GDD §2.3 step 3 — the caller
+ * renders `context` as the card prose, the scene banner from `sceneId`, and
+ * `options` as the surviving choices. The options are already gated by
+ * `isOptionAffordable` over the manifest's declared keys; the caller never
+ * re-derives affordability.
+ */
+export interface PresentedBeatEntry<TState = unknown> {
+  /** Discriminator: the clock paid for this beat, so it is played. */
+  readonly status: 'presented';
+  /** The scene the beat was entered in. */
+  readonly sceneId: string;
+  /** The beat's content card id (its manifest `Beat.cardId`). */
+  readonly cardId: string;
+  /** Ticks the entry charged, read from the manifest's `Beat.clockCost`. */
+  readonly clockCost: number;
+  /** Clock ticks left **after** the charge (never negative). */
+  readonly clockRemaining: number;
+  /**
+   * The beat card's `context` prose, or `null` when the content carries none
+   * (an adapter that maps no `context` column, or a bare runtime card).
+   */
+  readonly context: string | null;
+  /**
+   * The options that survive the declared-key affordability gate, in authored
+   * order. Empty for a non-choice beat.
+   */
+  readonly options: readonly StorylineOption<TState>[];
+}
+
+/**
+ * A beat the scene clock could not pay for: it is not played.
+ *
+ * No cost is charged, `currentBeatId` is unchanged and no options are
+ * presented. The refusal is the scene's close trigger: `budgetExhausted` is
+ * set on the runner (read through `EpisodeRunner.getBudgetExhausted`) and the
+ * closed scene's `budget-exhausted` reason is carried on this record.
+ */
+export interface RefusedBeatEntry {
+  /** Discriminator: the clock could not pay, so the beat is not played. */
+  readonly status: 'refused';
+  /** The scene the entry was requested in. */
+  readonly sceneId: string;
+  /** The beat's content card id (its manifest `Beat.cardId`). */
+  readonly cardId: string;
+  /** Ticks the entry would have charged, read from `Beat.clockCost`. */
+  readonly clockCost: number;
+  /** Clock ticks left — unchanged, because a refusal charges nothing. */
+  readonly clockRemaining: number;
+  /** Why the entry was refused; always `budget-exhausted`. */
+  readonly reason: BeatEntryRefusalReason;
+  /** Always `true`: the refusal is what closes the scene budget-exhausted. */
+  readonly budgetExhausted: true;
+}
+
+/**
+ * One beat-entry outcome: presented (played) or refused (scene closes).
+ *
+ * A discriminated union on `status`, so a caller cannot present options for a
+ * refused entry — the refusal carries none.
+ */
+export type BeatEntry<TState = unknown> = PresentedBeatEntry<TState> | RefusedBeatEntry;
+
 /**
  * The episode runner: the beat-sheet layer constructed around a
  * {@link StorylineSystem}.
  *
- * Later GDD §2.3 features (beat entry, choice resolution, scene close,
- * routing, persistence) add behaviour to this surface; the constructed run
- * state shape and the read-only accessors below stay stable.
+ * Later GDD §2.3 features (choice resolution, scene close, routing,
+ * persistence) add behaviour to this surface; the constructed run state shape
+ * and the read-only accessors below stay stable.
  */
 export interface EpisodeRunner<
   TState = unknown,
@@ -674,4 +750,30 @@ export interface EpisodeRunner<
    * The `scene-exit` records appended so far, in close order (frozen copy).
    */
   getSceneExits(): readonly SceneExitRecord[];
+  /**
+   * Enters a beat of the current scene (GDD §2.3 steps A.1–A.3).
+   *
+   * Reads the beat's `clockCost` from the validated manifest: when the cost
+   * exceeds `sceneClockRemaining` the beat is refused (not played, no options,
+   * `budgetExhausted` set, reason `budget-exhausted`); otherwise the cost is
+   * charged and the beat is presented. A cost exactly equal to the remaining
+   * clock is affordable.
+   *
+   * @param cardId    The beat's content card id; must be a beat of the current
+   *                  scene (a beat of another scene is entered by routing).
+   * @param state     The game state the option affordability gate reads through
+   *                  the storyline engine adapter.
+   * @returns A frozen {@link BeatEntry}; entry consumes no RNG and applies no
+   *          resource delta.
+   * @throws Error when `cardId` is not a beat assigned to the current scene.
+   */
+  enterBeat(cardId: string, state: TState): BeatEntry<TState>;
+  /**
+   * Whether the current scene's last beat entry was refused for want of clock.
+   *
+   * Set by a refusal and read by the scene close (GDD §2.3 step 7); entering a
+   * scene resets it. It is run-state, not scene-exit data, so it is not part of
+   * the frozen {@link EpisodeRunState} snapshot.
+   */
+  getBudgetExhausted(): boolean;
 }

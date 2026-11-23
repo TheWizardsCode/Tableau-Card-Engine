@@ -15,7 +15,10 @@
  * - a frozen {@link EpisodeRunState} snapshot and a frozen
  *   {@link SceneExitRecord} list, so a caller can read the run without being
  *   able to mutate it, and later features add behaviour without changing the
- *   constructed shape.
+ *   constructed shape;
+ * - beat entry (GDD §2.3 steps A.1–A.3): charge the manifest's `clockCost` and
+ *   present the beat, or refuse it for want of clock and report the
+ *   `budget-exhausted` close trigger.
  *
  * The single-choice model (compilation, resolution, resource projection and
  * RNG), the game's state and the activity log all stay with the supplied
@@ -25,14 +28,18 @@
  * @module
  */
 
+import { isOptionAffordable } from './compile';
 import type { EpisodeManifest, Scene } from './content/episode-manifest';
+import type { StorylineResourceKey, StorylineResources } from './resources';
 import type {
+  BeatEntry,
   EpisodeRunState,
   EpisodeRunner,
   EpisodeRunnerConfig,
   LossLedgerEntry,
   SceneExitRecord,
   StorylineCard,
+  StorylineOption,
 } from './types';
 
 /**
@@ -48,6 +55,12 @@ interface MutableEpisodeRunState {
   currentSceneId: string;
   currentBeatId: string;
   sceneClockRemaining: number;
+  /**
+   * Set by a refused beat entry and read by the scene close (GDD §2.3 step 7);
+   * cleared on scene entry. Not part of the public {@link EpisodeRunState}
+   * snapshot — it is close-path bookkeeping, not persisted run state.
+   */
+  budgetExhausted: boolean;
   pendingChain: string | null;
   readonly sceneHistory: string[];
   readonly routeHistory: string[];
@@ -62,6 +75,41 @@ function findScene(manifest: EpisodeManifest, sceneId: string): Scene | undefine
     if (scene !== undefined) return scene;
   }
   return undefined;
+}
+
+/**
+ * Reads a beat card's `context` prose.
+ *
+ * The prose is a **content** field (`ContentCard.context`, mapped from the
+ * adapter's `context` column); a bare runtime `StorylineCard` carries none, so
+ * the read is total and returns `null` rather than assuming the card shape.
+ *
+ * @param card The beat's content card.
+ */
+function readCardContext<TCard extends StorylineCard>(card: TCard): string | null {
+  const prose = (card as { context?: unknown }).context;
+  return typeof prose === 'string' && prose.length > 0 ? prose : null;
+}
+
+/**
+ * Presents only the options the declared-key affordability gate accepts.
+ *
+ * The gate is the shipped {@link isOptionAffordable} helper over the manifest's
+ * declared keys (`storyline.resources`) — the runner never re-derives
+ * affordability. Registry-authored options are already filtered at draw time;
+ * CSV-authored options are not, so this gate is what makes step A.3 true for
+ * the content path.
+ *
+ * @param options          The beat's compiled options, in authored order.
+ * @param resources        Current resource values (the engine projection).
+ * @param declaredResources The run's declared resource keys.
+ */
+function gateAffordableOptions<TState>(
+  options: readonly StorylineOption<TState>[],
+  resources: StorylineResources,
+  declaredResources: readonly StorylineResourceKey[],
+): StorylineOption<TState>[] {
+  return options.filter((option) => isOptionAffordable(option, resources, declaredResources));
 }
 
 /**
@@ -97,12 +145,13 @@ export function createEpisodeRunner<
     );
   }
 
-  const state: MutableEpisodeRunState = {
+  const runState: MutableEpisodeRunState = {
     seed,
     currentActId: start.act,
     currentSceneId: entryScene.id,
     currentBeatId: start.beat,
     sceneClockRemaining: entryScene.budget.clock,
+    budgetExhausted: false,
     pendingChain: null,
     sceneHistory: [],
     routeHistory: [],
@@ -113,18 +162,87 @@ export function createEpisodeRunner<
   /** Freezes a copy of the run state so a caller can never mutate the run. */
   const snapshot = (): EpisodeRunState =>
     Object.freeze({
-      seed: state.seed,
-      currentActId: state.currentActId,
-      currentSceneId: state.currentSceneId,
-      currentBeatId: state.currentBeatId,
-      sceneClockRemaining: state.sceneClockRemaining,
-      pendingChain: state.pendingChain,
-      sceneHistory: Object.freeze([...state.sceneHistory]),
-      routeHistory: Object.freeze([...state.routeHistory]),
+      seed: runState.seed,
+      currentActId: runState.currentActId,
+      currentSceneId: runState.currentSceneId,
+      currentBeatId: runState.currentBeatId,
+      sceneClockRemaining: runState.sceneClockRemaining,
+      pendingChain: runState.pendingChain,
+      sceneHistory: Object.freeze([...runState.sceneHistory]),
+      routeHistory: Object.freeze([...runState.routeHistory]),
       lossLedger: Object.freeze(
-        state.lossLedger.map((entry) => Object.freeze({ ...entry })),
+        runState.lossLedger.map((entry) => Object.freeze({ ...entry })),
       ),
     });
+
+  /**
+   * Enters a beat of the current scene (GDD §2.3 steps A.1–A.3).
+   *
+   * The clock comparison happens before any mutation, so a refusal leaves the
+   * run exactly where it was and never plays the beat. On the affordable path
+   * the cost is charged only after the beat's content card and its gated
+   * options resolve, so a content defect cannot leave a half-charged entry.
+   */
+  const enterBeat = (cardId: string, gameState: TState): BeatEntry<TState> => {
+    const scene = findScene(manifest, runState.currentSceneId);
+    if (scene === undefined) {
+      throw new Error(
+        `Episode runner: current scene "${runState.currentSceneId}" is not declared by the ` +
+          `manifest "${manifest.id}". Fix the run state before entering a beat.`,
+      );
+    }
+
+    const beat = scene.beats.find((candidate) => candidate.cardId === cardId);
+    if (beat === undefined) {
+      throw new Error(
+        `Episode runner: beat "${cardId}" is not assigned to the current scene "${scene.id}". ` +
+          'A beat of another scene is entered by routing (GDD §2.3 step 12), not by enterBeat.',
+      );
+    }
+
+    // A.2 — refusal first: no charge, no position change, no options.
+    if (beat.clockCost > runState.sceneClockRemaining) {
+      runState.budgetExhausted = true;
+      return Object.freeze({
+        status: 'refused',
+        sceneId: scene.id,
+        cardId,
+        clockCost: beat.clockCost,
+        clockRemaining: runState.sceneClockRemaining,
+        reason: 'budget-exhausted',
+        budgetExhausted: true,
+      });
+    }
+
+    const card = content.get(cardId);
+    if (card === undefined) {
+      throw new Error(
+        `Episode runner: beat "${cardId}" in scene "${scene.id}" has no content card in the ` +
+          `run's card map. Load the manifest's content file before entering the beat.`,
+      );
+    }
+
+    const resources = storyline.engine.getResources(gameState);
+    const options = gateAffordableOptions(
+      storyline.getStorylineOptions(card, gameState),
+      resources,
+      storyline.resources,
+    );
+
+    // A.3 — charge only once the beat can actually be presented.
+    runState.sceneClockRemaining -= beat.clockCost;
+    runState.currentBeatId = cardId;
+
+    return Object.freeze({
+      status: 'presented',
+      sceneId: scene.id,
+      cardId,
+      clockCost: beat.clockCost,
+      clockRemaining: runState.sceneClockRemaining,
+      context: readCardContext(card),
+      options: Object.freeze(options),
+    });
+  };
 
   return {
     manifest,
@@ -132,6 +250,8 @@ export function createEpisodeRunner<
     content,
     getState: snapshot,
     getSceneExits: () =>
-      Object.freeze(state.sceneExits.map((record) => Object.freeze({ ...record }))),
+      Object.freeze(runState.sceneExits.map((record) => Object.freeze({ ...record }))),
+    enterBeat,
+    getBudgetExhausted: () => runState.budgetExhausted,
   };
 }
