@@ -1286,7 +1286,7 @@ walks the graph and fails on any `phaser` specifier).
 |---|---|---|
 | `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
 | `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `enterBeat()` / `resolveChoice()` / `getBudgetExhausted()`. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `applyLossRule()` / `getBudgetExhausted()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
 | `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
 | `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
@@ -1312,6 +1312,7 @@ const runner = createEpisodeRunner({
 
 runner.getState();       // EpisodeRunState — frozen snapshot
 runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
+runner.getLossLedger();  // readonly LossLedgerEntry[] — frozen snapshot
 runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
 runner.resolveChoice(option, gameState);  // ChoiceResolution — next / case / pendingChain
 ```
@@ -1457,13 +1458,66 @@ the two disagree, and checks this section lists the same nine names.
 
 ### Loss ledger entries
 
-`lossLedger` lines are never positive (a refund records nothing) and are
-ordered by observation:
+GDD §2.2.8. The ledger is the beat sheet's permanent record of every
+irreversible loss; the resources themselves live in the game's state, and every
+change reaches them through `storyline.engine.applyResourceDelta` — the runner
+performs no resource arithmetic of its own. It has exactly two sources, and
+both record what the run **observed**, never a value re-derived from authored
+data:
 
 | `kind` | Fields | Recorded when |
 |---|---|---|
-| `chain` | `sceneId`, `beatId`, `field`, `delta` | an irreversible resource fell across a beat resolution — observed by diffing `engine.getResources`, never computed by the runner |
+| `chain` | `sceneId`, `beatId`, `field`, `delta` | an irreversible key fell across a beat resolution |
 | `rule` | `sceneId`, `ruleId`, `field`, `delta`, `statement` | a scene's `losses[]` rule fired at close, in declaration order |
+
+**Chain lines.** `resolveChoice()` snapshots the manifest's
+`resources.irreversible` keys from `engine.getResources` immediately before and
+after the one choice model resolves, and records one line per key whose **net**
+change is negative. Keys are visited in the manifest's declaration order, so a
+single resolution that spends two irreversible keys appends both lines in
+authored order. `delta` is the observed difference (e.g. `#cost=hull:1` records
+`-1`), and `beatId` is the beat being resolved — the player's choice spent the
+resource, and the ledger only noticed.
+
+**Rule lines.** `applyLossRule(rule, state)` is the ledger's **rule-loss seam**,
+called once per matching `losses[]` entry, in declaration order, by the scene
+close (step C.8). The manifest authors `amount` as a magnitude removed, so the
+seam passes `-amount` to `engine.applyResourceDelta`; the recorded `delta` is
+then read back from `engine.getResources`, so it is the change the seam actually
+applied rather than a repeat of the authored number. `sceneId` is the scene the
+rule fired in (`currentSceneId` at close), `ruleId` is the rule's `id`, and
+`statement` is the rule's player-facing line, copied verbatim for the ledger
+consumer and the journal.
+
+```ts
+// Scene close, GDD §2.3 step C.8 — matching rules in declaration order.
+for (const rule of scene.losses?.filter((loss) => loss.on === outcome) ?? []) {
+  runner.applyLossRule(rule, gameState);
+  appendLossLogLine(rule);           // statement + signed amount + key
+}
+```
+
+**Invariants.**
+
+- The ledger **never holds a positive line**: a refund (a net positive change on
+  an irreversible key) records nothing, and neither does a zero change.
+- A line **never exists without its apply**: a rule whose field the seam cannot
+  change — or an adapter that omits the optional `applyResourceDelta` seam —
+  applies nothing, so nothing is recorded. `applyLossRule` returns the appended
+  line, or `null` when nothing was observed to fall.
+- Lines are **ordered by observation**, across both sources: chain lines appear
+  where the resolution that spent them happened, rule lines where the close
+  applied them.
+- The ledger is **read-only to callers**: `getLossLedger()` (and
+  `getState().lossLedger`) return frozen snapshots with freshly-copied entries,
+  so mutating what a caller received cannot change the run.
+- Every line is **JSON-safe** and survives a `JSON.parse(JSON.stringify(...))`
+  round-trip unchanged, because the ephemeral score and epilogue read it from a
+  save or a transcript.
+
+Irreversible keys are never reset, topped up or compensated when a scene is
+entered or closed; the ledger and the journal are what survive the reset
+ending.
 
 The numbered §2.3 subsections (beat entry, choice resolution, scene close,
 routing, persistence) are documented here as they ship.

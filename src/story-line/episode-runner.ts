@@ -21,7 +21,11 @@
  *   `budget-exhausted` close trigger;
  * - choice resolution (GDD §2.3 steps B.4–B.5): delegate the chosen option to
  *   the run's one `@story-line` choice model, then classify the card it pushed
- *   as continuing the scene or closing it with a pending chain.
+ *   as continuing the scene or closing it with a pending chain;
+ * - the loss ledger (GDD §2.2.8): one `chain` line per irreversible key that
+ *   fell across a resolution (observed by diffing `engine.getResources`, never
+ *   computed), and one `rule` line per authored `LossRule` the scene close
+ *   applies through the engine seam. The ledger never holds a positive line.
  *
  * The single-choice model (compilation, resolution, resource projection and
  * RNG), the game's state and the activity log all stay with the supplied
@@ -32,10 +36,11 @@
  */
 
 import { isOptionAffordable } from './compile';
-import type { EpisodeManifest, Scene } from './content/episode-manifest';
-import type { StorylineResourceKey, StorylineResources } from './resources';
+import type { EpisodeManifest, LossRule, Scene } from './content/episode-manifest';
+import { readResource, type StorylineResourceKey, type StorylineResources } from './resources';
 import type {
   BeatEntry,
+  ChainLossLedgerEntry,
   ChoiceNext,
   ChoiceResolution,
   EpisodeRunState,
@@ -43,6 +48,7 @@ import type {
   EpisodeRunnerConfig,
   LossLedgerEntry,
   PushedCardCase,
+  RuleLossLedgerEntry,
   SceneExitRecord,
   StorylineCard,
   StorylineOption,
@@ -195,6 +201,29 @@ function gateAffordableOptions<TState>(
 }
 
 /**
+ * The irreversible subset of a resource bag, in the manifest's declaration
+ * order.
+ *
+ * The diff window is this snapshot, not the whole bag: a change to a reversible
+ * key is not a loss the ledger records. An absent key reads as `0` (the
+ * shipped {@link readResource} rule), so a bag that omits a zero-valued key
+ * still diffs correctly.
+ *
+ * @param resources  Current declared resources (the engine projection).
+ * @param irreversible The manifest's `resources.irreversible` keys.
+ */
+function snapshotIrreversible(
+  resources: StorylineResources,
+  irreversible: readonly StorylineResourceKey[],
+): Readonly<Record<StorylineResourceKey, number>> {
+  const snapshot: Record<StorylineResourceKey, number> = {};
+  for (const key of irreversible) {
+    snapshot[key] = readResource(resources, key);
+  }
+  return snapshot;
+}
+
+/**
  * Creates an episode runner positioned at the manifest's start.
  *
  * Construction is deliberately light: the manifest is assumed validated (GDD
@@ -241,6 +270,81 @@ export function createEpisodeRunner<
     routeHistory: [],
     lossLedger: [],
     sceneExits: [],
+  };
+
+  /** The manifest's never-restored resource keys, in declaration order. */
+  const irreversibleKeys = manifest.resources.irreversible;
+
+  /**
+   * Records every irreversible key that **fell** between two snapshots.
+   *
+   * This is the chain-loss seam and nothing else: the player's choice spent the
+   * resource through the one choice model, and this observes the net change.
+   * A positive (refund) or zero net change records nothing — the ledger never
+   * holds a positive line — and keys are visited in the manifest's declaration
+   * order, so one resolution that costs two keys appends in authored order.
+   */
+  const recordChainLoss = (
+    sceneId: string,
+    beatId: string,
+    before: Readonly<Record<StorylineResourceKey, number>>,
+    after: Readonly<Record<StorylineResourceKey, number>>,
+  ): void => {
+    for (const field of irreversibleKeys) {
+      const delta = after[field] - before[field];
+      if (delta < 0) {
+        const entry: ChainLossLedgerEntry = Object.freeze({
+          kind: 'chain',
+          sceneId,
+          beatId,
+          field,
+          delta,
+        });
+        runState.lossLedger.push(entry);
+      }
+    }
+  };
+
+  /**
+   * Applies one authored `LossRule` through the engine seam and records the
+   * loss it observed (GDD §2.3 step C.8 / §2.2.8).
+   *
+   * The manifest authors `amount` as a magnitude removed, so the signed delta
+   * handed to `engine.applyResourceDelta` is `-amount` — the same sign
+   * convention `selectDeclaredDelta(source, -1, …)` uses for a cost. The value
+   * recorded is **not** that authored magnitude: it is the change read back
+   * from `engine.getResources` after the seam applied, which is what makes the
+   * ledger an observation rather than arithmetic of the runner's own.
+   *
+   * Total by construction: a scene close calls this once per matching rule, and
+   * the validator guarantees each field is irreversible and each amount is an
+   * integer ≥ 1. An adapter that omits the optional resource seam applies
+   * nothing, so nothing is recorded (a line never exists without its apply).
+   *
+   * @param rule  The `losses[]` entry that fired, from the validated manifest.
+   * @param state The game state the seam mutates.
+   * @returns The appended rule line, or `null` when nothing was observed to fall.
+   */
+  const applyLossRule = (rule: LossRule, state: TState): RuleLossLedgerEntry | null => {
+    const engine = storyline.engine;
+    if (engine.applyResourceDelta === undefined) return null;
+
+    const before = readResource(engine.getResources(state), rule.field);
+    engine.applyResourceDelta(state, { [rule.field]: -rule.amount });
+    const after = readResource(engine.getResources(state), rule.field);
+    const delta = after - before;
+    if (!(delta < 0)) return null;
+
+    const entry: RuleLossLedgerEntry = Object.freeze({
+      kind: 'rule',
+      sceneId: runState.currentSceneId,
+      ruleId: rule.id,
+      field: rule.field,
+      delta,
+      statement: rule.statement,
+    });
+    runState.lossLedger.push(entry);
+    return entry;
   };
 
   /** Freezes a copy of the run state so a caller can never mutate the run. */
@@ -351,7 +455,22 @@ export function createEpisodeRunner<
       );
     }
 
+    // The chain-loss diff window: the irreversible keys immediately before and
+    // after the one choice model resolves. The runner applies nothing here — it
+    // reads what the model's engine seam applied.
+    const lossSceneId = runState.currentSceneId;
+    const lossBeatId = runState.currentBeatId;
+    const resourcesBefore = snapshotIrreversible(
+      storyline.engine.getResources(state),
+      irreversibleKeys,
+    );
     const resolution = storyline.resolveStorylineOption(state, card, option);
+    const resourcesAfter = snapshotIrreversible(
+      storyline.engine.getResources(state),
+      irreversibleKeys,
+    );
+    recordChainLoss(lossSceneId, lossBeatId, resourcesBefore, resourcesAfter);
+
     // `@story-line` pushes an instance card (`le-i-log-0`); the manifest, the
     // scene close and the route targets all speak base ids, so classification
     // compares — and the pending chain records — the adapter's base id.
@@ -390,8 +509,11 @@ export function createEpisodeRunner<
     getState: snapshot,
     getSceneExits: () =>
       Object.freeze(runState.sceneExits.map((record) => Object.freeze({ ...record }))),
+    getLossLedger: () =>
+      Object.freeze(runState.lossLedger.map((entry) => Object.freeze({ ...entry }))),
     enterBeat,
     resolveChoice,
+    applyLossRule,
     getBudgetExhausted: () => runState.budgetExhausted,
   };
 }

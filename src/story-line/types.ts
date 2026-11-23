@@ -23,7 +23,7 @@
  * @module
  */
 
-import type { EpisodeManifest, SceneOutcome } from './content/episode-manifest';
+import type { EpisodeManifest, LossRule, SceneOutcome } from './content/episode-manifest';
 import type {
   StorylineResourceKey,
   StorylineResources,
@@ -816,6 +816,20 @@ export interface EpisodeRunner<
    */
   getSceneExits(): readonly SceneExitRecord[];
   /**
+   * The loss ledger: every irreversible loss observed or applied, in
+   * observation order (frozen copy).
+   *
+   * Chain lines are appended by choice resolution (a negative net change on an
+   * irreversible key between `engine.getResources` snapshots); rule lines are
+   * appended by the scene close when it applies a `losses[]` rule through the
+   * engine seam. The ledger never holds a positive (refund) line, and a line
+   * never exists without the corresponding `engine.applyResourceDelta` call.
+   * `getState().lossLedger` is the same data on the run-state snapshot; this
+   * accessor is the narrow read for a ledger consumer (the journal, the
+   * epilogue and the scoring model).
+   */
+  getLossLedger(): readonly LossLedgerEntry[];
+  /**
    * Enters a beat of the current scene (GDD §2.3 steps A.1–A.3).
    *
    * Reads the beat's `clockCost` from the validated manifest: when the cost
@@ -860,6 +874,29 @@ export interface EpisodeRunner<
    *         declared ending (a content defect, not a modelling gap).
    */
   resolveChoice(option: StorylineOption<TState>, state: TState): ChoiceResolution<TCard>;
+  /**
+   * Applies one authored `LossRule` through the engine seam and records the
+   * loss it observed (GDD §2.3 step C.8 / §2.2.8).
+   *
+   * This is the ledger's **rule-loss seam**, called once per matching
+   * `losses[]` entry, in declaration order, by the scene close (step 8) — it is
+   * not a general-purpose resource mutator. The manifest authors `amount` as a
+   * magnitude removed, so the seam passes `-amount` to
+   * `engine.applyResourceDelta`; the recorded `delta` is then read back from
+   * `engine.getResources`, so the ledger observes what the seam applied rather
+   * than repeating the authored number. Ordering, outcome matching and the
+   * activity-log line are the scene close's business, not this seam's.
+   *
+   * A positive or zero observed change records nothing, and an adapter that
+   * omits the optional resource seam applies nothing and records nothing — a
+   * ledger line never exists without its apply.
+   *
+   * @param rule  The `losses[]` entry that fired, from the validated manifest.
+   * @param state The game state the engine seam mutates.
+   * @returns The appended rule line, or `null` when nothing was observed to
+   *          fall (no seam, or a non-negative net change).
+   */
+  applyLossRule(rule: LossRule, state: TState): RuleLossLedgerEntry | null;
   /**
    * Whether the current scene's last beat entry was refused for want of clock.
    *
