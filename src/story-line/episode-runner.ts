@@ -22,6 +22,12 @@
  * - choice resolution (GDD §2.3 steps B.4–B.5): delegate the chosen option to
  *   the run's one `@story-line` choice model, then classify the card it pushed
  *   as continuing the scene or closing it with a pending chain;
+ * - the scene close (GDD §2.3 steps C.6–C.8): evaluate the scene objective
+ *   once against post-resolution resources, classify the outcome first-match
+ *   wins from the authored outcome table (`budgetExhausted` is an authored
+ *   input, never a hard-coded failure), then apply every matching loss rule in
+ *   declaration order through the engine seam — one ledger line and one
+ *   activity-log line each;
  * - the loss ledger (GDD §2.2.8): one `chain` line per irreversible key that
  *   fell across a resolution (observed by diffing `engine.getResources`, never
  *   computed), and one `rule` line per authored `LossRule` the scene close
@@ -36,7 +42,8 @@
  */
 
 import { isOptionAffordable } from './compile';
-import type { EpisodeManifest, LossRule, Scene } from './content/episode-manifest';
+import type { EpisodeManifest, LossRule, Scene, SceneCondition } from './content/episode-manifest';
+import { evaluateCondition } from './resolve';
 import { readResource, type StorylineResourceKey, type StorylineResources } from './resources';
 import type {
   BeatEntry,
@@ -49,7 +56,10 @@ import type {
   LossLedgerEntry,
   PushedCardCase,
   RuleLossLedgerEntry,
+  SceneCloseResult,
+  SceneConditionContext,
   SceneExitRecord,
+  SceneOutcomeClassification,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -78,6 +88,79 @@ interface MutableEpisodeRunState {
   readonly routeHistory: string[];
   readonly lossLedger: LossLedgerEntry[];
   readonly sceneExits: SceneExitRecord[];
+}
+
+/**
+ * Evaluates one scene condition against a close context (GDD §2.3 step 7).
+ *
+ * The scene-condition vocabulary has exactly three forms and this is the one
+ * place they are read — the outcome table's `when` gates now, and the route
+ * table's `when` gates when routing ships. Raw `{ field, op, value }` checks
+ * delegate to the shipped `@story-line` `evaluateCondition`, so a declared
+ * resource that is absent reads as `0` exactly as it does in choice
+ * resolution.
+ *
+ * Pure: reads its arguments, mutates nothing and consumes no RNG.
+ *
+ * @param condition The authored scene condition (`objective`, `budget` or raw).
+ * @param context   The objective verdict, exhaustion flag and resources.
+ * @returns Whether the condition holds.
+ */
+export function evaluateSceneCondition(
+  condition: SceneCondition,
+  context: SceneConditionContext,
+): boolean {
+  if ('objective' in condition) {
+    return (condition.objective === 'met') === context.objectiveMet;
+  }
+  if ('budget' in condition) {
+    return (condition.budget === 'exhausted') === context.budgetExhausted;
+  }
+  return evaluateCondition(condition, context.resources);
+}
+
+/**
+ * Classifies a scene's outcome from its authored outcome table (GDD §2.3
+ * step 7).
+ *
+ * First match wins in **declaration order**. The validator guarantees the last
+ * rule is unconditional (`non-total-outcome-rules`), so the table is total and
+ * there is no defensive catch-all: a table that classifies nothing is a
+ * content defect and is reported loudly rather than silently defaulted.
+ *
+ * Pure: reads the scene and context, mutates nothing and consumes no RNG.
+ *
+ * @param scene   The scene whose `outcomeRules` are consulted.
+ * @param context The objective verdict, exhaustion flag and resources.
+ * @returns The winning rule id and its outcome.
+ * @throws Error when no rule matches (an unvalidated, non-total table).
+ */
+export function classifySceneOutcome(
+  scene: Scene,
+  context: SceneConditionContext,
+): SceneOutcomeClassification {
+  for (const rule of scene.outcomeRules) {
+    if (rule.when === undefined || evaluateSceneCondition(rule.when, context)) {
+      return { ruleId: rule.id, outcome: rule.outcome };
+    }
+  }
+
+  throw new Error(
+    `Episode runner: scene "${scene.id}" has no matching outcome rule for objectiveMet=` +
+      `${context.objectiveMet}, budgetExhausted=${context.budgetExhausted}. The last outcome rule ` +
+      'must be unconditional (validateEpisodeManifest reports non-total-outcome-rules); fix the content.',
+  );
+}
+
+/**
+ * Formats a rule loss for the activity log: the authored statement plus the
+ * signed amount the engine seam actually applied and the key it fell on.
+ *
+ * @param entry The loss line the close appended to the ledger.
+ */
+function formatRuleLossLine(entry: RuleLossLedgerEntry): string {
+  const amount = entry.delta < 0 ? `\u2212${Math.abs(entry.delta)}` : `+${entry.delta}`;
+  return `${entry.statement} (${amount} ${entry.field})`;
 }
 
 /** Finds a scene by id across every act, in declaration order. */
@@ -502,6 +585,58 @@ export function createEpisodeRunner<
     });
   };
 
+  /**
+   * Closes the current scene: objective (C.6), outcome (C.7) and losses (C.8).
+   *
+   * The objective reads `engine.getResources` exactly once and the outcome
+   * table shares that same post-resolution snapshot, so a close observes one
+   * moment in time. Loss rules then apply in declaration order through the
+   * ledger seam, each appending one ledger line and — when the seam really
+   * applied a fall — one activity-log line.
+   */
+  const closeScene = (state: TState): SceneCloseResult => {
+    const scene = findScene(manifest, runState.currentSceneId);
+    if (scene === undefined) {
+      throw new Error(
+        `Episode runner: current scene "${runState.currentSceneId}" is not declared by the ` +
+          `manifest "${manifest.id}". Fix the run state before closing the scene.`,
+      );
+    }
+
+    // C.6 — one read of the post-resolution resources for the objective, and
+    // the same snapshot feeds every raw-resource condition in the table.
+    const resources = storyline.engine.getResources(state);
+    const objectiveMet = evaluateCondition(scene.objective.check, resources);
+
+    // C.7 — first match wins in declaration order; `budgetExhausted` is an
+    // authored input, never a hard-coded outcome.
+    const { ruleId, outcome } = classifySceneOutcome(scene, {
+      objectiveMet,
+      budgetExhausted: runState.budgetExhausted,
+      resources,
+    });
+
+    // C.8 — every matching loss, in declaration order. A rule the seam did not
+    // apply records no ledger line and therefore no log line either.
+    const losses: RuleLossLedgerEntry[] = [];
+    for (const rule of scene.losses ?? []) {
+      if (rule.on !== outcome) continue;
+      const entry = applyLossRule(rule, state);
+      if (entry === null) continue;
+      losses.push(entry);
+      storyline.engine.appendLog(state, formatRuleLossLine(entry), 'loss');
+    }
+
+    return Object.freeze({
+      sceneId: scene.id,
+      objectiveMet,
+      outcome,
+      ruleId,
+      budgetExhausted: runState.budgetExhausted,
+      losses: Object.freeze(losses),
+    });
+  };
+
   return {
     manifest,
     storyline,
@@ -513,6 +648,7 @@ export function createEpisodeRunner<
       Object.freeze(runState.lossLedger.map((entry) => Object.freeze({ ...entry }))),
     enterBeat,
     resolveChoice,
+    closeScene,
     applyLossRule,
     getBudgetExhausted: () => runState.budgetExhausted,
   };

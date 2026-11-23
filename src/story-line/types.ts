@@ -786,6 +786,67 @@ export interface ChoiceResolution<TCard extends StorylineCard = StorylineCard> {
   readonly resolution: StorylineResolution<TCard>;
 }
 
+// ── Scene close (GDD §2.3 steps C.6–C.8) ───────────────────
+
+/**
+ * Everything a scene condition is evaluated against at scene close
+ * (GDD §2.3 step 7).
+ *
+ * The one context vocabulary the outcome table and the route gates share: a
+ * `when` condition may read the evaluated objective, the scene-budget
+ * exhaustion flag, or the post-resolution declared resources.
+ */
+export interface SceneConditionContext {
+  /** Whether the scene objective's `check` held at close. */
+  readonly objectiveMet: boolean;
+  /** Whether a beat was refused for want of clock (close trigger). */
+  readonly budgetExhausted: boolean;
+  /** The post-resolution resources the raw `{ field, op, value }` form reads. */
+  readonly resources: StorylineResources;
+}
+
+/**
+ * The outcome table's classification (GDD §2.3 step 7): the rule that won and
+ * the outcome it assigned.
+ *
+ * The validator guarantees the table is total (the final rule is
+ * unconditional), so there is deliberately no fallback outcome here: a table
+ * that classifies nothing is a content defect and is reported loudly.
+ */
+export interface SceneOutcomeClassification {
+  /** The `outcomeRules[].id` that classified the outcome. */
+  readonly ruleId: string;
+  /** The outcome that rule assigned. */
+  readonly outcome: SceneOutcome;
+}
+
+/**
+ * The result of closing the current scene (GDD §2.3 steps C.6–C.8).
+ *
+ * It carries exactly what routing needs to build the `scene-exit` record — the
+ * objective verdict, the classified outcome and its winning rule, and the
+ * exhaustion flag the record repeats — plus the loss lines this close appended
+ * to the ledger. Routing, the scene-exit record and the banner all read this
+ * one result: none of them re-evaluates the objective or the outcome table.
+ */
+export interface SceneCloseResult {
+  /** The scene that closed (`currentSceneId` at close). */
+  readonly sceneId: string;
+  /** Whether the scene objective was met against post-resolution resources. */
+  readonly objectiveMet: boolean;
+  /** The classified outcome, first match wins in declaration order. */
+  readonly outcome: SceneOutcome;
+  /** The `outcomeRules[].id` that classified the outcome. */
+  readonly ruleId: string;
+  /** Whether the close was triggered by a refused beat entry. */
+  readonly budgetExhausted: boolean;
+  /**
+   * The loss lines this close appended, in declaration order — one per matching
+   * `losses[]` rule the engine seam actually applied (empty when none fired).
+   */
+  readonly losses: readonly RuleLossLedgerEntry[];
+}
+
 /**
  * The episode runner: the beat-sheet layer constructed around a
  * {@link StorylineSystem}.
@@ -874,6 +935,31 @@ export interface EpisodeRunner<
    *         declared ending (a content defect, not a modelling gap).
    */
   resolveChoice(option: StorylineOption<TState>, state: TState): ChoiceResolution<TCard>;
+  /**
+   * Closes the current scene (GDD §2.3 steps C.6–C.8).
+   *
+   * C.6: reads `engine.getResources` **once** and evaluates the scene's
+   * objective `check` against those post-resolution resources, recording
+   * `objectiveMet`.
+   *
+   * C.7: classifies the outcome first-match-wins in the manifest's declaration
+   * order over the authored `outcomeRules`, through the one
+   * {@link SceneConditionContext} vocabulary. The last rule is unconditional by
+   * validation, so classification is total; `budgetExhausted` is one of the
+   * inputs, never a hard-coded `failure`.
+   *
+   * C.8: applies **every** matching `losses[]` rule in declaration order through
+   * {@link EpisodeRunner.applyLossRule}, appending one ledger line and one
+   * activity-log line per rule that the engine seam actually applied.
+   *
+   * The close consumes no RNG, does not route (C.9–C.12), and does not mutate
+   * the run's position or clock beyond the loss deltas the seam applies.
+   *
+   * @param state The game state the engine reads and the loss seam mutates.
+   * @returns A frozen {@link SceneCloseResult} for routing and the scene-exit
+   *          record.
+   */
+  closeScene(state: TState): SceneCloseResult;
   /**
    * Applies one authored `LossRule` through the engine seam and records the
    * loss it observed (GDD §2.3 step C.8 / §2.2.8).

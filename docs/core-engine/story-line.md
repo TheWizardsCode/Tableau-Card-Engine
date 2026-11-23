@@ -1286,11 +1286,16 @@ walks the graph and fails on any `phaser` specifier).
 |---|---|---|
 | `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`. |
 | `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed }` — the validated manifest, the one choice model, the card map and the run's seed. |
-| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `applyLossRule()` / `getBudgetExhausted()`. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `applyLossRule()` / `getBudgetExhausted()`. |
 | `EpisodeRunState` | type | The read-only run state (see below). |
 | `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
 | `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
 | `PushedCardCase` | type | The §2.3 step B.5 case: `'in-scene-beat'`, `'out-of-scene-beat'`, `'ending'` or `'none'`. |
+| `evaluateSceneCondition` | function | Evaluates one `SceneCondition` (`objective`, `budget` or raw resource) against a close context; shared with routing's `when` gates. |
+| `classifySceneOutcome` | function | First-match-wins outcome classification over a scene's authored `outcomeRules`. |
+| `SceneConditionContext` | type | `{ objectiveMet, budgetExhausted, resources }` — the one context the outcome and route gates read. |
+| `SceneOutcomeClassification` | type | The winning outcome rule's `{ ruleId, outcome }`. |
+| `SceneCloseResult` | type | One scene close's `{ sceneId, objectiveMet, outcome, ruleId, budgetExhausted, losses }` — what routing and the `scene-exit` record read. |
 | `BeatEntry` | type | One beat-entry outcome: the `presented` or `refused` variant (see "Beat entry"). |
 | `PresentedBeatEntry` | type | A beat the clock paid for: charged cost, prose and gated options. |
 | `RefusedBeatEntry` | type | A beat the clock could not pay for: no charge, no options, `budget-exhausted`. |
@@ -1315,6 +1320,7 @@ runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
 runner.getLossLedger();  // readonly LossLedgerEntry[] — frozen snapshot
 runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
 runner.resolveChoice(option, gameState);  // ChoiceResolution — next / case / pendingChain
+runner.closeScene(gameState);            // SceneCloseResult — objective / outcome / losses
 ```
 
 Construction consumes no RNG and applies no resource delta. A requested run
@@ -1354,7 +1360,7 @@ if (entry.status === 'presented') {
   renderProse(entry.context);      // the card's `context` paragraph
   renderOptions(entry.options);    // already affordability-gated
 } else {
-  closeScene(entry.reason);        // 'budget-exhausted'
+  closeScene(gameState);        // 'budget-exhausted' close trigger
 }
 ```
 
@@ -1394,7 +1400,7 @@ const resolved = runner.resolveChoice(option, gameState);
 if (resolved.next === 'continue') {
   runner.enterBeat(resolved.cardId!, gameState); // still the same scene
 } else {
-  closeScene();                    // reads resolved.pendingChain for the chain route
+  closeScene(gameState);           // reads resolved.pendingChain for the chain route
 }
 ```
 
@@ -1414,6 +1420,57 @@ resolution changed, the engine seam changed. A pushed card that is neither an
 assigned beat nor a declared ending is a content defect (`validateEpisodeManifest`
 reports it as `unassigned-card`), so the runner throws an actionable error
 naming the card and the episode instead of silently classifying it.
+
+### Scene close
+
+GDD §2.3 steps C.6–C.8. `closeScene(state)` closes the current scene in the
+contract's order and returns one frozen {@link SceneCloseResult}:
+
+1. **C.6 — objective, exactly once.** `engine.getResources(state)` is read
+   **once** and the scene's `objective.check` is evaluated against that
+   post-resolution snapshot. `objectiveMet` records the verdict; the same
+   snapshot is the resource bag the outcome table's raw conditions read, so a
+   close observes one moment in time.
+2. **C.7 — outcome, first match wins.** The first `outcomeRules` entry in
+   **declaration order** whose `when` matches classifies the outcome. `when` is
+   one of the three `SceneCondition` forms — `{ objective }`, `{ budget }` or a
+   raw `{ field, op, value }` resource check — evaluated by the exported
+   `evaluateSceneCondition(condition, { objectiveMet, budgetExhausted, resources })`
+   helper (the same helper routing's `when` gates use). The last rule is
+   unconditional by validation (`non-total-outcome-rules`), so classification is
+   total; the classifier has **no defensive catch-all** and throws an actionable
+   error naming the scene if a table classifies nothing.
+   **`budgetExhausted` is an authored input, never a hard-coded `failure`.** A
+   refused beat entry sets it on the run, and a scene that can exhaust its budget
+   authors a `{ budget: "exhausted" }` rule *before* its catch-all — the
+   committed `s-iii-core` authors `watch-spent` (failure) ahead of
+   `crew-with-you`/`crew-gone`, so a refused close classifies `failure` through
+   the table, and a scene whose objective was already achieved may legitimately
+   classify `partial` instead.
+3. **C.8 — losses, declaration order.** Every `losses[]` rule whose `on` equals
+   the classified outcome is applied through `EpisodeRunner.applyLossRule`
+   (hence `engine.applyResourceDelta`) in **declaration order**. Each applied
+   rule appends one ledger `rule` line and one `engine.appendLog` line carrying
+   the authored `statement` plus the signed amount the seam actually applied and
+   the key it fell on, e.g.
+   `Breaking for the core on the last of the watch costs the hull. (−1 hull)`,
+   tagged `'loss'`. A rule the seam did not apply (no resource seam, or a clamped
+   non-negative change) records neither line.
+
+```ts
+const closed = runner.closeScene(gameState);
+// { sceneId, objectiveMet, outcome, ruleId, budgetExhausted, losses }
+closed.objectiveMet; // C.6 verdict
+closed.outcome;      // C.7 word
+closed.ruleId;       // the outcomeRules[] entry that classified it
+closed.losses;       // C.8 ledger lines this close appended, in order
+```
+
+The close consumes no RNG, performs no routing (C.9–C.12 owns the route
+selection, the scene-exit record and scene entry) and does not move the run's
+position or clock: it only classifies and applies the authored losses. The
+returned result is the single shape routing reads, so the objective and the
+outcome table are never re-evaluated.
 
 ### Run state
 
