@@ -62,8 +62,17 @@ import type {
   SceneCondition,
   SceneRoute,
 } from './content/episode-manifest';
+import type { ContentAdapter } from './content/types';
 import { evaluateCondition } from './resolve';
-import { readResource, type StorylineResourceKey, type StorylineResources } from './resources';
+import {
+  createResourceProjection,
+  normaliseResourceKeys,
+  readResource,
+  type StorylineResourceField,
+  type StorylineResourceKey,
+  type StorylineResourceProjection,
+  type StorylineResources,
+} from './resources';
 import type {
   BeatEntry,
   ChainLossLedgerEntry,
@@ -718,6 +727,210 @@ function snapshotIrreversible(
     snapshot[key] = readResource(resources, key);
   }
   return snapshot;
+}
+
+// ── Irreversible-declaration wiring ─────────────────────────
+
+/**
+ * Which non-authoritative declaration a divergence was found in.
+ *
+ * The **manifest** is the authoritative source and therefore never a source of
+ * an issue: `adapter` is the authoring declaration the manifest-free CSV
+ * validator uses, and `projection` is the engine seam a resolution guard reads.
+ */
+export type IrreversibleDeclarationSource = 'adapter' | 'projection';
+
+/**
+ * How a declaration diverges from the manifest's authoritative set.
+ *
+ * - `missing` — the declaration omits a key the manifest declares
+ *   irreversible, so a grant on that key would not be refused there;
+ * - `undeclared` — the declaration names a key the manifest does not declare
+ *   irreversible, so it would refuse a grant the manifest allows;
+ * - `not-projected` — a projection declares an irreversible key its own
+ *   declared resource set cannot read or apply.
+ */
+export type IrreversibleDeclarationIssueReason =
+  | 'missing'
+  | 'undeclared'
+  | 'not-projected';
+
+/** One divergence between a declaration and the manifest's authoritative set. */
+export interface IrreversibleDeclarationIssue {
+  /** The non-authoritative declaration the divergence was found in. */
+  readonly source: IrreversibleDeclarationSource;
+  /** Stable machine-readable reason. */
+  readonly reason: IrreversibleDeclarationIssueReason;
+  /** The resource key the divergence concerns. */
+  readonly key: StorylineResourceKey;
+  /** Human-readable explanation naming the key and the authoritative source. */
+  readonly message: string;
+}
+
+/** The declaration-bearing part of a projection (no state accessors needed). */
+export interface IrreversibleProjectionDeclaration {
+  /** The projection's declared resource keys, in declaration order. */
+  readonly resources: readonly StorylineResourceKey[];
+  /** The projection's declared never-restored keys, in declaration order. */
+  readonly irreversible: readonly StorylineResourceKey[];
+}
+
+/** The declarations to compare against the manifest's authoritative set. */
+export interface IrreversibleDeclarationInput {
+  /** The validated manifest — the authoritative `resources.irreversible` source. */
+  readonly manifest: EpisodeManifest;
+  /** The content adapter's authoring declaration, when the caller has one. */
+  readonly adapter?: Pick<ContentAdapter, 'irreversibleResources'>;
+  /** The engine projection a resolution guard reads, when the caller has one. */
+  readonly projection?: IrreversibleProjectionDeclaration;
+}
+
+/** The outcome of comparing every declaration with the manifest's set. */
+export interface IrreversibleDeclarationAudit {
+  /** True when every supplied declaration agrees with the manifest. */
+  readonly ok: boolean;
+  /** The manifest's authoritative set, normalised and in declaration order. */
+  readonly manifest: readonly StorylineResourceKey[];
+  /** The adapter's declaration, normalised (empty when none was supplied). */
+  readonly adapter: readonly StorylineResourceKey[];
+  /** The projection's declaration, normalised (empty when none was supplied). */
+  readonly projection: readonly StorylineResourceKey[];
+  /** Every divergence found, in declaration order (empty when `ok`). */
+  readonly issues: readonly IrreversibleDeclarationIssue[];
+}
+
+/**
+ * Audits the adapter and projection declarations against the manifest's
+ * authoritative `resources.irreversible` set.
+ *
+ * The manifest is the single source of truth: the episode runner derives the
+ * projection's declaration from it ({@link createEpisodeResourceProjection}),
+ * while the content adapter must declare its own copy because the CSV
+ * validator never sees a manifest. This helper makes that second declaration
+ * accountable — every divergence is reported per key and per source rather
+ * than silently accepted, so a manifest re-tune cannot leave the authoring
+ * vocabulary (or the engine guard) behind.
+ *
+ * Only supplied declarations are compared: an omitted adapter or projection
+ * declares nothing and is reported as an empty set, not as a divergence.
+ *
+ * @param input The manifest plus the declarations to check.
+ * @returns The normalised declarations and every divergence found.
+ */
+export function auditIrreversibleDeclaration(
+  input: IrreversibleDeclarationInput,
+): IrreversibleDeclarationAudit {
+  const manifest = normaliseResourceKeys(input.manifest.resources.irreversible);
+  const adapter = normaliseResourceKeys(input.adapter?.irreversibleResources ?? []);
+  const projection = normaliseResourceKeys(input.projection?.irreversible ?? []);
+  const authoritative = new Set(manifest);
+  const issues: IrreversibleDeclarationIssue[] = [];
+
+  const compare = (
+    source: IrreversibleDeclarationSource,
+    declared: readonly StorylineResourceKey[],
+  ): void => {
+    const declaredSet = new Set(declared);
+    for (const key of manifest) {
+      if (declaredSet.has(key)) continue;
+      issues.push({
+        source,
+        reason: 'missing',
+        key,
+        message:
+          `The ${source} declaration omits "${key}", which the manifest declares ` +
+          'irreversible; a grant on it would not be refused there.',
+      });
+    }
+    for (const key of declared) {
+      if (authoritative.has(key)) continue;
+      issues.push({
+        source,
+        reason: 'undeclared',
+        key,
+        message:
+          `The ${source} declaration names "${key}" irreversible, but the manifest's ` +
+          'resources.irreversible does not; it would refuse a grant the manifest allows.',
+      });
+    }
+  };
+
+  if (input.adapter !== undefined) compare('adapter', adapter);
+  if (input.projection !== undefined) compare('projection', projection);
+
+  if (input.projection !== undefined) {
+    const projected = new Set(normaliseResourceKeys(input.projection.resources));
+    for (const key of projection) {
+      if (projected.has(key)) continue;
+      issues.push({
+        source: 'projection',
+        reason: 'not-projected',
+        key,
+        message:
+          `The projection declares "${key}" irreversible but does not project it; ` +
+          'the engine seam cannot read or apply that key.',
+      });
+    }
+  }
+
+  return { ok: issues.length === 0, manifest, adapter, projection, issues };
+}
+
+/** Options controlling {@link createEpisodeResourceProjection}. */
+export interface EpisodeResourceProjectionOptions {
+  /**
+   * The content adapter whose authoring `irreversibleResources` declaration
+   * must agree with the manifest's authoritative set. When supplied, a
+   * divergence is a construction error (fail closed) rather than a silently
+   * different authoring vocabulary.
+   */
+  readonly adapter?: Pick<ContentAdapter, 'irreversibleResources'>;
+}
+
+/**
+ * Builds the run's resource projection with the manifest's irreversible
+ * declaration threaded in.
+ *
+ * This is the one place a run's projection is bound to the manifest, so the
+ * projection cannot disagree with the authoritative `resources.irreversible`:
+ * the declaration is derived, never re-typed by the game. The projection is
+ * structurally assignable to the engine adapter's resource members, so the
+ * manifest-declared key reaches the engine seam (and the resolution guard)
+ * with no second declaration.
+ *
+ * When an adapter is supplied its authoring declaration is audited too, and a
+ * divergence throws (naming every divergent key) instead of being silently
+ * accepted.
+ *
+ * @param manifest The validated manifest (the authoritative declaration).
+ * @param fields   One accessor pair per declared resource key.
+ * @param options  Optional adapter whose declaration must agree.
+ * @returns The projection, carrying the manifest's irreversible keys.
+ * @throws Error when the supplied adapter's declaration diverges from the
+ *         manifest (see {@link auditIrreversibleDeclaration}).
+ */
+export function createEpisodeResourceProjection<TState>(
+  manifest: EpisodeManifest,
+  fields: Readonly<Record<StorylineResourceKey, StorylineResourceField<TState>>>,
+  options: EpisodeResourceProjectionOptions = {},
+): StorylineResourceProjection<TState> {
+  const projection = createResourceProjection(fields, {
+    irreversible: manifest.resources.irreversible,
+  });
+  if (options.adapter === undefined) return projection;
+
+  const audit = auditIrreversibleDeclaration({
+    manifest,
+    adapter: options.adapter,
+    projection,
+  });
+  if (audit.ok) return projection;
+
+  throw new Error(
+    `Episode resource projection: the irreversible declarations disagree. ${audit.issues
+      .map((issue) => issue.message)
+      .join(' ')}`,
+  );
 }
 
 /**

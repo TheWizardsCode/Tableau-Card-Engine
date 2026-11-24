@@ -160,6 +160,19 @@ storyline.registerStorylineOptions('evt-storm', [
 and the accessors cannot drift apart — and it is spread straight into the
 adapter (`resources`, `getResources`, `applyResourceDelta`).
 
+The projection also carries a game's **never-restored** keys
+(`createResourceProjection(fields, { irreversible: ['hull'] })` →
+`projection.irreversible`, declaration order preserved, `[]` by default). A
+key declared irreversible may still be **spent** as a cost, but content must
+never grant it back. The episode manifest's `resources.irreversible` is the
+authoritative source: `createEpisodeResourceProjection(manifest, fields)`
+derives the projection's declaration from it, so the engine seam cannot
+disagree with the manifest. The content adapter's `irreversibleResources`
+declaration is the manifest-free copy the CSV validator uses, and
+`auditIrreversibleDeclaration({ manifest, adapter, projection })` reports every
+divergence per key (and `createEpisodeResourceProjection` fails closed when
+handed a diverging adapter) rather than silently accepting one.
+
 The declared set is threaded through the whole lifecycle:
 
 - `StorylineSystem.resources` reports the keys in force (the adapter's
@@ -683,6 +696,12 @@ validated against. A blank cell inherits the file's leading `#resources:`
 declaration; a cell and declaration that are both absent fall back to the
 default `coins` / `reputation` projection (see
 [Declaring the resource keys](#declaring-the-resource-keys)).
+
+An adapter may declare `irreversibleResources` (e.g. `['hull']`) — the
+never-restored keys its content may spend but never grant back. The episode
+manifest's `resources.irreversible` remains authoritative; this declaration is
+the manifest-free copy the CSV validator checks, and the run wiring audits the
+two for drift (see [Declared resources](#declared-resources)).
 
 Every column **not** in `fields` lands in `ContentCard.fields`, keyed by column
 name, so game columns (coin/reputation deltas, renown, payoff, …) are editable

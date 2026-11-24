@@ -20,6 +20,13 @@
  *   phantom resource at runtime (validation reports it at authoring time
  *   instead).
  *
+ * The declared set may also name a **never-restored subset**: a resource key
+ * that can be spent but must never be granted back (the Long Erasure's `hull`).
+ * That declaration travels on the projection as
+ * {@link StorylineResourceProjection.irreversible}, in declaration order and
+ * empty by default, so a resolution guard can refuse a grant without a second
+ * seam and a game that declares nothing is unchanged.
+ *
  * Nothing here depends on Phaser or imports a game module.
  *
  * The module is also the **read-through for the episode manifest's resource
@@ -338,6 +345,15 @@ export interface StorylineResourceField<TState> {
 export interface StorylineResourceProjection<TState> {
   /** The declared keys, in declaration order. */
   readonly resources: readonly StorylineResourceKey[];
+  /**
+   * The declared never-restored keys, in declaration order.
+   *
+   * A key here may still be **spent** (an option cost), but content must never
+   * grant it back: the resolution guard refuses a positive extra effect on it.
+   * Empty when the projection declares none (the default), so a game with no
+   * irreversible key is byte-identical to before.
+   */
+  readonly irreversible: readonly StorylineResourceKey[];
   /** Current values of every declared resource (absent reads as `0`). */
   getResources(state: TState): StorylineResources;
   /**
@@ -345,6 +361,18 @@ export interface StorylineResourceProjection<TState> {
    * zero deltas are ignored — the projection never invents a resource.
    */
   applyResourceDelta(state: TState, delta: StorylineResourcesDelta): void;
+}
+
+/** Options controlling {@link createResourceProjection}. */
+export interface ResourceProjectionOptions {
+  /**
+   * The declared never-restored keys, in declaration order (a run's
+   * `resources.irreversible`, for example). Normalised like every other key
+   * declaration (trimmed, blanks and duplicates dropped); omitted means
+   * "declares none", leaving {@link StorylineResourceProjection.irreversible}
+   * empty and every existing behaviour unchanged.
+   */
+  readonly irreversible?: Iterable<StorylineResourceKey>;
 }
 
 /**
@@ -356,15 +384,24 @@ export interface StorylineResourceProjection<TState> {
  * reported by {@link StorylineResourceProjection.getResources} (an absent
  * field reads as `0`) in declaration order.
  *
- * @param fields One accessor pair per declared resource key.
+ * The optional `irreversible` declaration names the keys that may be spent but
+ * never granted back. It is carried verbatim on the projection (normalised,
+ * order preserved) and defaults to `[]`, so a caller that declares none keeps
+ * the pre-existing contract exactly.
+ *
+ * @param fields  One accessor pair per declared resource key.
+ * @param options Optional never-restored key declaration.
  */
 export function createResourceProjection<TState>(
   fields: Readonly<Record<StorylineResourceKey, StorylineResourceField<TState>>>,
+  options: ResourceProjectionOptions = {},
 ): StorylineResourceProjection<TState> {
   const resources = normaliseResourceKeys(Object.keys(fields));
+  const irreversible = normaliseResourceKeys(options.irreversible ?? []);
 
   return {
     resources,
+    irreversible,
     getResources(state: TState): StorylineResources {
       const bag: Record<StorylineResourceKey, number> = {};
       for (const key of resources) {

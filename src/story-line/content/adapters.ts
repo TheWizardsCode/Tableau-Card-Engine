@@ -104,6 +104,12 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
  * Mechanics ride on the **option** attributes (`#cost` / `#extra` / `#when`),
  * so no bespoke resource column exists: the declared set is the mapped
  * `resources` column (`hull, morale, stores, goodwill, charge`).
+ *
+ * `hull` is declared **irreversible** here as the authoring-side half of the
+ * never-restored contract: the episode manifest's `resources.irreversible` is
+ * the authoritative source, and this declaration gives the manifest-free CSV
+ * validator the same vocabulary. The run wiring derives the projection from
+ * the manifest and audits the two declarations for drift.
  */
 export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
   gameId: 'long-erasure',
@@ -132,6 +138,7 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     epilogue: 'epilogue',
   },
   editableColumns: ['act', LEGACY_CLOCK_COST_COLUMN],
+  irreversibleResources: ['hull'],
   newCardDefaults: {
     options: '',
     storylineId: 'long-erasure',

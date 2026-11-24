@@ -97,6 +97,7 @@ export type {
   ManifestResourceReadIssue,
   ManifestResourceReadReason,
   ManifestStartBagRead,
+  ResourceProjectionOptions,
   StorylineResourceField,
   StorylineResourceKey,
   StorylineResourceProjection,
@@ -144,7 +145,9 @@ export type { StorylineOptionRegistry } from './compile';
 
 // ── Episode runner (GDD §2.3) ────────────────────────────────
 export {
+  auditIrreversibleDeclaration,
   classifySceneOutcome,
+  createEpisodeResourceProjection,
   createEpisodeRunner,
   deserializeRunState,
   EPISODE_RUN_STATE_SCHEMA_VERSION,
@@ -154,6 +157,15 @@ export {
   resolveRouteTarget,
   selectRoute,
   serializeRunState,
+} from './episode-runner';
+export type {
+  EpisodeResourceProjectionOptions,
+  IrreversibleDeclarationAudit,
+  IrreversibleDeclarationInput,
+  IrreversibleDeclarationIssue,
+  IrreversibleDeclarationIssueReason,
+  IrreversibleDeclarationSource,
+  IrreversibleProjectionDeclaration,
 } from './episode-runner';
 export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
 export type {

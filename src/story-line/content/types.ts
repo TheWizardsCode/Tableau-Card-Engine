@@ -191,6 +191,18 @@ export interface ContentAdapter {
    * deterministic; `''`/undefined when the game has nothing to add.
    */
   readonly describeImpact?: (card: ContentCard) => string;
+  /**
+   * The resource keys this game's content may never **grant** back — the
+   * authoring declaration of the run's irreversible set (e.g. `['hull']`).
+   *
+   * The manifest's `resources.irreversible` is the authoritative source; this
+   * declaration exists because the CSV validator never sees a manifest, so it
+   * is the vocabulary the manifest-free authoring checks use. The run wiring
+   * derives the engine projection from the manifest and audits the two for
+   * drift, so the declarations cannot diverge silently. Omitted means "declares
+   * none", which is byte-identical to the pre-irreversible contract.
+   */
+  readonly irreversibleResources?: readonly string[];
 }
 
 /**
