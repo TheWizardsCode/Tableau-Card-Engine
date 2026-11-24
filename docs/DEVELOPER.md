@@ -1357,7 +1357,7 @@ the **delta** over the bound, and the host **load average** at abort plus the
 
 ```
 [hang-timeout] unit did not complete within 600s — aborting (exit 124).
-elapsed 312s (+-288s over bound)
+elapsed 1312s (+712s over bound)
 host load 38.4 over 16 cores
 ```
 
@@ -1368,7 +1368,12 @@ starved `requestAnimationFrame` / undestroyed `Phaser.Game` failure mode, while
 a unit-stage abort points at a synchronous loop in test/engine code (vitest's
 `testTimeout` cannot preempt synchronous JS). All three hang messages (run
 abort, pre-flight `vitest list` abort, coverage-preflight fallback) share one
-builder (`hangDiagnostic`), so stage/bound/elapsed/load render identically.
+builder (`hangDiagnostic`), so stage/bound/elapsed/load render identically and
+the bound is never presented as the elapsed time. The coverage-preflight
+fallback (`deriveExpectedFiles`) times the collection around its own attempts
+and samples the load at abort, so a `vitest list` hang reports the same five
+facts — measured elapsed wall time and host load included — instead of echoing
+the bound back as if it were the elapsed time.
 
 **Unit bound is hybrid and load-aware.** Measured green unit stages (worst
 first): 217, 206, 149, 147, 141, 128, 111, 106, 96, 88 s — the worst was 72 %

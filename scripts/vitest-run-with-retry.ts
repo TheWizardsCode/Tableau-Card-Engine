@@ -74,6 +74,34 @@
  *     into its own process group). The attempt reports exit code 124 with
  *     a hang diagnostic. Hangs are NEVER retried — a genuine hang must
  *     surface, not be masked.
+ *   - Size the unit stage's bound from the host, and print that bound: the
+ *     unit bound is HYBRID and load-aware (SA-0MWEURUYL004I470) — a raised
+ *     static floor (`UNIT_FLOOR_MS` = 600 s, 2.8x the worst measured green
+ *     unit stage) scaled by the sampled 1-minute load average per core
+ *     (factor `clamp((load1m / cpuCount) / 0.75, 1, 2)`), clamped to the
+ *     finite ceiling `UNIT_CEILING_MS` (1200 s = the browser bound). An
+ *     explicit `--timeout-ms` still wins verbatim, and on Windows (no load
+ *     average) the floor applies unscaled.
+ *
+ * Measured baseline behind the unit floor (SA-0MWEURUYL004I470). Ten green
+ * unit stages recorded in `.worklog/cache`: 88, 96, 106, 111, 128, 141, 147,
+ * 149, 206, 217 s — worst 217 s (2026-11-11), i.e. 72 % of the old fixed
+ * 300 s bound and only 2.8x smaller than the new 600 s floor. The old fixed
+ * 300 s bound aborted a GREEN unit stage (241 files, still working) under
+ * sustained contention — load 35-42 on 16 cores from three concurrent suite
+ * runs plus a Monte-Carlo sweep — and the diagnostic could not tell that
+ * contention from a genuine hang. Both halves are fixed here: the bound is
+ * sized from the load, and every hang message names the stage, the bound,
+ * the elapsed wall time, the delta over the bound and the host load at abort
+ * through the single `hangDiagnostic` builder (run abort, pre-flight
+ * `vitest list` abort, and the coverage-pre-flight fallback).
+ *
+ * Inner bounds must stay inside the outer gate budget
+ * (`.pi/test-config.json` `timeoutPerCommand` = 3000 s): unit ceiling 1200 +
+ * browser 1200 + two `vitest list` pre-flights 240 = 2640 s of stage bounds,
+ * plus ~60 s of pre-checks and orchestration = ~2700 s worst case, leaving
+ * ~300 s of margin. Raise the outer value in the same change as any inner
+ * bound — the previous 1500 s held 300 + 1200 with zero slack.
  *
  * Op-in project-coverage gate (CG-0MVL21CVM003VK5H):
  *
@@ -182,6 +210,11 @@ export const ACCEPTABLE_TRANSIENT_SIGNATURES: readonly string[] = [
  * (CG-0MT08R2QR0070F3N). Default: 10 minutes — ample for the browser stage
  * (~24 files at 8-10s each) with headroom for CPU contention, while still
  * failing fast on a true hang. Override with `--timeout-ms <n>`.
+ *
+ * The unit stage does NOT use this default: it derives its own hybrid,
+ * load-aware bound (`deriveUnitBound`, SA-0MWEURUYL004I470) so a contended
+ * host is not handed a bound calibrated for an idle one. Every other stage
+ * keeps this default unless pinned with `--timeout-ms`.
  */
 export const DEFAULT_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -291,11 +324,30 @@ export function sampleHostContention(
  * applies without scaling. An explicit `--timeout-ms` overrides this entirely
  * and is handled by the caller (`parseRunnerArgs`).
  *
+ * Both constants are the per-host floor/ceiling an operator can read without
+ * running a suite, and the computed bound never leaves that closed range.
+ * Inner bounds must fit the outer gate budget: unit ceiling 1200 + browser
+ * 1200 + two `vitest list` pre-flights 240 = 2640 s, ~2700 s with
+ * orchestration, against `.pi/test-config.json` `timeoutPerCommand` = 3000 s.
+ *
  * @param contention - Result from `sampleHostContention`.
  * @returns The bound in milliseconds, clamped between floor and ceiling.
  */
-export const UNIT_FLOOR_MS = 600_000;  // 600 s — 2.8× worst measured green stage
+export const UNIT_FLOOR_MS = 600_000;  // 600 s — 2.8x worst measured green stage
 export const UNIT_CEILING_MS = 1_200_000; // 1200 s — matches browser bound
+
+/**
+ * Measured baseline behind `UNIT_FLOOR_MS` (SA-0MWEURUYL004I470): ten green
+ * unit stages recorded in `.worklog/cache` — 88, 96, 106, 111, 128, 141, 147,
+ * 149, 206, 217 s (worst 217 s, 2026-11-11). The floor is 2.8x the worst
+ * observation; the old fixed 300 s bound was only 1.4x it, which is why a
+ * contended host aborted a green stage. Recorded as a constant so the numbers
+ * live beside the bound they justify, and so the docs and the code cannot
+ * drift apart.
+ */
+export const MEASURED_UNIT_STAGE_SECS: readonly number[] = [
+  88, 96, 106, 111, 128, 141, 147, 149, 206, 217,
+];
 
 export function deriveUnitBound(contention: HostContention): number {
   if (contention.load1m === null) {
@@ -376,6 +428,8 @@ export function hangDiagnostic(ctx: HangDiagnosticContext): string {
     lines.push(
       'The test engine cannot preempt synchronous JavaScript — a hung',
       'run usually indicates a synchronous loop in test or engine code.',
+      'This is treated as a hang, NOT a transient failure:',
+      'no retry is performed.',
       `Run one file under --project ${stage === 'vitest list' ? 'unit' : stage} in`,
       'isolation to narrow down the offender.',
     );
@@ -400,35 +454,6 @@ export function deriveStage(args: string[]): string {
     }
   }
   return 'unknown project';
-}
-
-/**
- * Message emitted when the wall-clock bound is exceeded and the run is
- * aborted. Kept for backward compatibility. Production paths use
- * `hangDiagnostic` which is stage-aware.
- *
- * @deprecated Use `hangDiagnostic` with explicit stage/bound/contention.
- */
-export function hangTimeoutMessage(elapsedSecs: number): string {
-  return [
-    `\n[hang-timeout] Vitest run did not complete within ${elapsedSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`,
-    'The browser stage can stall indefinitely under CPU contention (e.g. a',
-    'requestAnimationFrame loop starved of frames, or a Phaser game destroy',
-    'that never completes). This is treated as a hang, NOT a transient',
-    'failure: no retry is performed. Re-run the suite (ideally without other',
-    'CPU-heavy processes competing), or run the suspected file(s) in',
-    'isolation via `npx vitest run --project browser tests/<file>` to diagnose.',
-  ].join('\n');
-}
-
-/**
- * Abbreviated hang diagnostic for the pre-flight `vitest list` collection.
- * Kept for backward compatibility. Production paths use `hangDiagnostic`.
- *
- * @deprecated Use `hangDiagnostic` with explicit stage/bound/contention.
- */
-export function listHangMessage(elapsedSecs: number): string {
-  return `\n[hang-timeout] vitest list did not complete within ${elapsedSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`;
 }
 
 export interface VitestRunResult {
@@ -673,6 +698,18 @@ export function looksLikeUnknownStaticParse(output: string): boolean {
 }
 
 /**
+ * Injectable inputs for the pre-flight's hang diagnostic
+ * (SA-0MWEURUYL004I470). Both default to live values in production and are
+ * injected in tests so no test ever reads the real clock or host load.
+ */
+export interface PreflightHangOptions {
+  /** Host contention sample to render; `undefined` takes a live sample. */
+  contention?: HostContention | null;
+  /** Monotonic milliseconds clock used to measure the pre-flight's wall time. */
+  now?: () => number;
+}
+
+/**
  * Derive the expected repo-relative test-file set from a collection-only
  * `vitest list --filesOnly --json` over the forwarded args. Uses
  * `--staticParse` (no test imports, so the browser stage pays no second
@@ -684,13 +721,23 @@ export function looksLikeUnknownStaticParse(output: string): boolean {
  * unparsable JSON. Callers must treat the error as "expectation unknown ⇒
  * refuse to run the gate" — they must never silently downgrade to no
  * expectation (AC 9 of CG-0MVL21CVM003VK5H).
+ *
+ * A hang renders the same `hangDiagnostic` block as every other stage
+ * (SA-0MWEURUYL004I470): the stage label, the configured bound, the MEASURED
+ * elapsed wall time, the delta over the bound and the host load at abort.
+ * The elapsed time is timed around the collection attempts and the load is
+ * sampled through `sampleHostContention` — the bound is never passed off as
+ * the elapsed time.
  */
 export async function deriveExpectedFiles(
   forwarded: string[],
   runList: VitestListRunner,
   cwd: string = process.cwd(),
   timeoutMs: number = LIST_TIMEOUT_MS,
+  options: PreflightHangOptions = {},
 ): Promise<string[]> {
+  const now = options.now ?? (() => Date.now());
+  const startedAtMs = now();
   const collectionArgs = (withStaticParse: boolean): string[] => {
     const base = ['--filesOnly', '--json'];
     const args = withStaticParse ? ['--staticParse', ...base] : base;
@@ -704,12 +751,16 @@ export async function deriveExpectedFiles(
   }
 
   if (result.status === HANG_TIMEOUT_EXIT_CODE) {
+    const elapsedSecs = Math.max(1, Math.round((now() - startedAtMs) / 1000));
     throw new PreflightError(
       hangDiagnostic({
         stage: 'vitest list',
         boundMs: timeoutMs,
-        elapsedSecs: Math.round(timeoutMs / 1000),
-        contention: null,
+        elapsedSecs,
+        contention:
+          options.contention === undefined
+            ? sampleHostContention()
+            : options.contention,
       }),
     );
   }
@@ -1455,7 +1506,7 @@ export const runVitestSync = runVitestAsync;
  * `node <vitest-bin> list <args>` in its own process group with the same
  * wall-clock bound and SIGTERM/SIGKILL escalation as a run. Output is fully
  * captured (not streamed — the collection is a quiet pre-check) and an
- * overrun reports exit 124 with the abbreviated hang diagnostic.
+ * overrun reports exit 124 with the full stage-aware hang diagnostic.
  *
  * `binPath`, `killGraceMs` and `contention` are injectable for tests — the
  * contention sample is never read from the real host in a test.

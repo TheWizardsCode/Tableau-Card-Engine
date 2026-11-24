@@ -48,8 +48,6 @@ import {
   runVitestSync,
   parseTimeoutArgs,
   parseRunnerArgs,
-  hangTimeoutMessage,
-  listHangMessage,
   hangDiagnostic,
   deriveStage,
   HANG_TIMEOUT_EXIT_CODE,
@@ -77,7 +75,26 @@ import {
   deriveUnitBound,
   UNIT_FLOOR_MS,
   UNIT_CEILING_MS,
+  MEASURED_UNIT_STAGE_SECS,
 } from '../../scripts/vitest-run-with-retry';
+
+/**
+ * Synthesise the runner's real hang output for a fixture run. Production paths
+ * emit `hangDiagnostic(...)`; fixtures reuse it rather than a hand-written
+ * literal, so no test can reintroduce the retired elapsed-as-bound wording
+ * (SA-0MWEURUYL004I470).
+ */
+const hangOutput = (
+  elapsedSecs: number,
+  stage = 'unit',
+  boundMs = 300_000,
+): string =>
+  hangDiagnostic({
+    stage,
+    boundMs,
+    elapsedSecs,
+    contention: { load1m: 38.4, cpuCount: 16 },
+  } as HangDiagnosticContext);
 
 // ── Output fixtures (match real vitest reporter output) ─────
 
@@ -447,7 +464,7 @@ describe('runWithRetry (retry-once orchestration)', () => {
       calls += 1;
       return calls === 1
         ? { status: 1, output: TRANSIENT_OUTPUT }
-        : { status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) };
+        : { status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(60) };
     };
     expect(await runWithRetry([], runner, warnSpy, 60_000)).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(calls).toBe(2);
@@ -578,7 +595,7 @@ describe('hang timeout (bounded wall-clock abort)', () => {
     let calls = 0;
     const runner: VitestRunner = () => {
       calls += 1;
-      return { status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(600) };
+      return { status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(600) };
     };
     expect(await runWithRetry([], runner, warnSpy, 60_000)).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(calls).toBe(1);
@@ -596,15 +613,17 @@ describe('hang timeout (bounded wall-clock abort)', () => {
   });
 
   it('hang output does not satisfy the retry masking guard', () => {
-    expect(shouldRetryOnce(hangTimeoutMessage(600))).toBe(false);
+    expect(shouldRetryOnce(hangOutput(600))).toBe(false);
   });
 
-  it('hangTimeoutMessage documents the elapsed bound, the exit code, and no-retry guidance', () => {
-    const msg = hangTimeoutMessage(600);
-    expect(msg).toContain('600s');
-    expect(msg).toContain(String(HANG_TIMEOUT_EXIT_CODE));
-    expect(msg).toContain('no retry');
-    expect(msg).toContain('npx vitest run --project browser tests/<file>');
+  it('renders the bound and the elapsed time as distinct numbers, exit 124 and no-retry guidance', () => {
+    const msg = hangOutput(600);
+    expect(msg).toContain('did not complete within 300s');
+    expect(msg).toContain('aborting (exit 124)');
+    expect(msg).toContain('elapsed 600s (+300s over bound)');
+    expect(msg).toContain('no retry is performed');
+    // The elapsed time is never labelled as the bound (the retired shape).
+    expect(msg).not.toContain('within 600s');
   });
 });
 
@@ -950,9 +969,50 @@ describe('deriveExpectedFiles (pre-flight vitest list)', () => {
   it('fails closed on a collection hang (exit 124)', async () => {
     const runList: VitestListRunner = () => ({
       status: HANG_TIMEOUT_EXIT_CODE,
-      output: listHangMessage(120),
+      output: hangOutput(131, 'vitest list', 120_000),
     });
     await expect(deriveExpectedFiles([], runList, CWD)).rejects.toThrow(/exit 124/);
+  });
+
+  it('reports the measured elapsed time, the bound and the host load on a collection hang', async () => {
+    // Injected clock + contention sample: neither the real clock nor the real
+    // host is read (SA-0MWEURUYL004I470 AC1).
+    const clock = [0, 412_000];
+    let tick = 0;
+    const runList: VitestListRunner = () => ({
+      status: HANG_TIMEOUT_EXIT_CODE,
+      output: 'vitest list timed out',
+    });
+    const err = await deriveExpectedFiles([], runList, CWD, 120_000, {
+      now: () => clock[Math.min(tick++, clock.length - 1)],
+      contention: { load1m: 21.5, cpuCount: 8 },
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(PreflightError);
+    const msg = (err as Error).message;
+    expect(msg).toContain('[hang-timeout] vitest list did not complete within 120s');
+    expect(msg).toContain('elapsed 412s (+292s over bound)');
+    expect(msg).toContain('host load 21.5 over 8 cores');
+    expect(msg).toContain('aborting (exit 124)');
+    // The bound is never rendered from the elapsed time.
+    expect(msg).not.toContain('within 412s');
+    // The pre-flight gets the abbreviated guidance, never browser advice.
+    expect(msg).not.toContain('requestAnimationFrame');
+  });
+
+  it('falls back to an unavailable-load line when the host sample is null', async () => {
+    const clock = [0, 130_000];
+    let tick = 0;
+    const runList: VitestListRunner = () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: '' });
+    const err = await deriveExpectedFiles([], runList, CWD, 120_000, {
+      now: () => clock[Math.min(tick++, clock.length - 1)],
+      contention: null,
+    }).catch((e: unknown) => e);
+
+    const msg = (err as Error).message;
+    expect(msg).toContain('within 120s');
+    expect(msg).toContain('elapsed 130s (+10s over bound)');
+    expect(msg).toContain('host load unavailable (unknown cores)');
   });
 
   it('fails closed on an empty file set', async () => {
@@ -1347,7 +1407,7 @@ describe('runWithRetry (opt-in coverage gate)', () => {
     const warnings: string[] = [];
     const status = await runWithRetry(
       [],
-      () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) }),
+      () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(60) }),
       (m) => warnings.push(m),
       DEFAULT_RUN_TIMEOUT_MS,
       { expectedFiles: expected, readExecutedFiles: readerFor(['tests/a.test.ts']) },
@@ -1578,21 +1638,37 @@ describe('hangDiagnostic', () => {
     const msg = hangDiagnostic(ctx as HangDiagnosticContext);
     expect(msg).toContain('elapsed 300s (+0s over bound)');
   });
+
+  it('renders the pre-flight vitest list stage with unit-style guidance', () => {
+    const ctx = {
+      ...baseCtx,
+      stage: 'vitest list',
+      boundMs: 120_000,
+      elapsedSecs: 131,
+    } as HangDiagnosticContext;
+    const msg = hangDiagnostic(ctx);
+    expect(msg).toContain('[hang-timeout] vitest list did not complete within 120s');
+    expect(msg).toContain('elapsed 131s (+11s over bound)');
+    expect(msg).not.toContain('requestAnimationFrame');
+  });
 });
 
-describe('hangTimeoutMessage / listHangMessage backward compat', () => {
-  it('hangTimeoutMessage prints elapsed time as the bound (deprecated shape)', () => {
-    const msg = hangTimeoutMessage(312);
-    expect(msg).toContain('[hang-timeout]');
-    expect(msg).toContain('did not complete within 312s');
-    expect(msg).toContain('exit 124');
-    expect(msg).toContain('Vitest run did not complete');
+describe('retired elapsed-as-bound hang messages (SA-0MWEURUYL004I470)', () => {
+  it('no longer exports hangTimeoutMessage / listHangMessage', async () => {
+    const runnerModule = await import('../../scripts/vitest-run-with-retry');
+    expect(runnerModule).not.toHaveProperty('hangTimeoutMessage');
+    expect(runnerModule).not.toHaveProperty('listHangMessage');
   });
 
-  it('listHangMessage prints elapsed time in abbreviated form (deprecated)', () => {
-    const msg = listHangMessage(125);
-    expect(msg).toContain('[hang-timeout] vitest list');
-    expect(msg).toContain('did not complete within 125s');
-    expect(msg).toContain('exit 124');
+  it('keeps the documented measured baseline consistent with the unit floor', () => {
+    // The numbers in the file header justify UNIT_FLOOR_MS; if either moves
+    // without the other the rationale is falsified.
+    expect(MEASURED_UNIT_STAGE_SECS.slice()).toEqual([
+      88, 96, 106, 111, 128, 141, 147, 149, 206, 217,
+    ]);
+    const worstMeasuredMs = Math.max(...MEASURED_UNIT_STAGE_SECS) * 1000;
+    expect(UNIT_FLOOR_MS).toBeGreaterThan(2.5 * worstMeasuredMs - 1);
+    expect(UNIT_CEILING_MS).toBeGreaterThan(UNIT_FLOOR_MS);
+    expect(Number.isFinite(UNIT_CEILING_MS)).toBe(true);
   });
 });
