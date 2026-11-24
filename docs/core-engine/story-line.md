@@ -176,6 +176,15 @@ declaration is the manifest-free copy the CSV validator uses, and
 divergence per key (and `createEpisodeResourceProjection` fails closed when
 handed a diverging adapter) rather than silently accepting one.
 
+The Gym **Long Erasure** run is the real-content consumer: its loader derives
+`LongErasureContent.irreversible` from the shipped adapter's declaration
+(`LONG_ERASURE_IRREVERSIBLE_RESOURCES`), filtered to the keys the content
+declares, and `createLongErasureRun`'s engine adapter spreads a
+`createResourceProjection` over the run's resource bag with that declaration.
+The guarantee is therefore exercised by real content — the authored
+`#cost=hull` options still pay, while a grant on `hull` would be refused
+(`tests/story-line/irreversible-policy.test.ts`).
+
 The declared set is threaded through the whole lifecycle:
 
 - `StorylineSystem.resources` reports the keys in force (the adapter's

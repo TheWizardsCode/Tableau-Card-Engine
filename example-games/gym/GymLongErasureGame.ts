@@ -89,6 +89,7 @@
 
 import {
   createDefaultStorylineUiAdapter,
+  createResourceProjection,
   createStorylineSystem,
   isOptionAffordable,
   readResource,
@@ -97,6 +98,8 @@ import {
   type StorylineJournalEntry,
   type StorylineLogEntry,
   type StorylineOption,
+  type StorylineResourceField,
+  type StorylineResourceProjection,
   type StorylineSystem,
   type StorylineUiAdapter,
 } from '@story-line';
@@ -120,6 +123,21 @@ export const LONG_ERASURE_RESOURCES: readonly string[] = [
   'goodwill',
   'charge',
 ];
+
+/**
+ * The resource keys *The Long Erasure* declares **never-restored**.
+ *
+ * Sourced from the shipped content adapter's `irreversibleResources`
+ * declaration, so the authoring vocabulary the CSV validator uses and the
+ * run's resource projection cannot be typed twice. The projection carries the
+ * declaration into the engine seam, where a positive extra effect on one of
+ * these keys is refused (`Extra effect refused: hull is irreversible.`) while a
+ * cost on it still pays. The committed episode manifest's
+ * `resources.irreversible` is the authoritative copy the adapter is audited
+ * against.
+ */
+export const LONG_ERASURE_IRREVERSIBLE_RESOURCES: readonly string[] =
+  LONG_ERASURE_CONTENT_ADAPTER.irreversibleResources ?? [];
 
 /**
  * The starting resource bag of a fresh run.
@@ -185,6 +203,16 @@ export interface LongErasureContent {
   readonly entryCardId: string;
   /** The resource keys the content declares. */
   readonly resources: readonly string[];
+  /**
+   * The declared **never-restored** keys ({@link resources} subset).
+   *
+   * Derived from the shipped content adapter's `irreversibleResources`
+   * declaration and filtered to the keys this content actually declares, so
+   * the run's projection never names a key it cannot carry. The projection
+   * threads the set into the engine seam: a grant on one of these keys is
+   * refused at resolution, a cost on it still pays.
+   */
+  readonly irreversible: readonly string[];
   /** Default pressure clock for runs over this content. */
   readonly clockMax: number;
 }
@@ -379,10 +407,16 @@ export function longErasureContentFromCsv(csvText: string): LongErasureContent {
     });
   }
 
+  const declaredResources =
+    resources.length > 0 ? resources : LONG_ERASURE_RESOURCES;
+
   return {
     cards,
     entryCardId: cards[0].id,
-    resources: resources.length > 0 ? resources : LONG_ERASURE_RESOURCES,
+    resources: declaredResources,
+    irreversible: LONG_ERASURE_IRREVERSIBLE_RESOURCES.filter((key) =>
+      declaredResources.includes(key),
+    ),
     clockMax: DEFAULT_CLOCK_MAX,
   };
 }
@@ -712,6 +746,32 @@ function readOnly(working: WorkingState): LongErasureState {
   return working;
 }
 
+/**
+ * Builds the run's resource seam from the content's declarations.
+ *
+ * The projection **is** the declaration: its field keys are the content's
+ * declared resource set and its `irreversible` option carries the
+ * never-restored keys, so the two can never drift apart. Spreading it into the
+ * engine adapter is what makes the resolution guard see `hull`.
+ */
+function createRunResources(
+  content: LongErasureContent,
+): StorylineResourceProjection<LongErasureState> {
+  const fields: Record<string, StorylineResourceField<LongErasureState>> = {};
+  for (const key of content.resources) {
+    fields[key] = {
+      read: (state) => state.resources[key] ?? 0,
+      apply: (state, delta) => {
+        const working = state as WorkingState;
+        working.resources[key] = readResource(working.resources, key) + delta;
+      },
+    };
+  }
+  return createResourceProjection(fields, {
+    irreversible: content.irreversible,
+  });
+}
+
 /** Builds the engine adapter mapping the generic seams onto a run state. */
 function createRunEngine(
   content: LongErasureContent,
@@ -719,7 +779,7 @@ function createRunEngine(
   const byBaseId = new Map(content.cards.map((card) => [card.id, card]));
 
   return {
-    resources: content.resources,
+    ...createRunResources(content),
     rng: (state) => {
       const working = state as WorkingState;
       const [value, seed] = nextRandom(working.rngSeed);
@@ -731,17 +791,6 @@ function createRunEngine(
       // mechanic is an authored option cost or extra effect. Applying a card's
       // effect is therefore deliberately a no-op.
     },
-    applyResourceDelta: (state, delta) => {
-      const working = state as WorkingState;
-      for (const key of content.resources) {
-        const value = delta[key];
-        if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
-          continue;
-        }
-        working.resources[key] = readResource(working.resources, key) + value;
-      }
-    },
-    getResources: (state) => state.resources,
     appendLog: (state, text) => {
       const working = state as WorkingState;
       working.activityLog.push({ turn: working.beat, text });

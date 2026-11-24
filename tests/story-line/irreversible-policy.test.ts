@@ -18,8 +18,18 @@
  * built by spreading a `createResourceProjection(..., { irreversible })`, so
  * these tests exercise the seam exactly as a game wires it.
  *
+ * The final block replaces the synthetic voyage with the **shipped** Long
+ * Erasure content (CG-0MWUQUJ84005L4MF): its content adapter declares `hull`
+ * irreversible, the run's resource projection carries that declaration into
+ * the engine seam, and a grant authored into the real content is refused
+ * while the real `#cost=hull` paths still pay.
+ *
  * @module
  */
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -29,6 +39,13 @@ import {
   type StorylineOption,
   type StorylineResourceField,
 } from '../../src/story-line';
+import {
+  LONG_ERASURE_IRREVERSIBLE_RESOURCES,
+  chooseOption,
+  createLongErasureRun,
+  longErasureContentFromCsv,
+  type LongErasureContent,
+} from '../../example-games/gym/GymLongErasureGame';
 import {
   addTemplate,
   makeAdapter,
@@ -205,5 +222,105 @@ describe('irreversible grant refused at resolution', () => {
     expect(state.activityLog.map((entry) => entry.text)).toEqual([
       'Extra effect: +25 coins, +1 reputation.',
     ]);
+  });
+});
+
+// ── The shipped Long Erasure content ────────────────────────────
+
+/** Repository root, resolved from this file rather than `process.cwd()`. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+
+/** Repository-relative path of the authored Long Erasure content. */
+const CONTENT_PATH = 'example-games/gym/content/long-erasure.csv';
+
+/** Repository-relative path of the authoritative episode manifest. */
+const MANIFEST_PATH = 'example-games/gym/content/long-erasure-episode.json';
+
+/** Reads a repository-relative UTF-8 file. */
+function readRepoFile(relativePath: string): string {
+  return readFileSync(resolve(REPO_ROOT, relativePath), 'utf-8');
+}
+
+/** The real authored content, loaded through the game's own loader. */
+const CONTENT: LongErasureContent = longErasureContentFromCsv(
+  readRepoFile(CONTENT_PATH),
+);
+
+/**
+ * The real content with the entry card's option cell replaced.
+ *
+ * The shipped content deliberately authors no `#extra=hull` (that is what the
+ * authoring validator enforces), so the runtime refusal is exercised by asking
+ * the **real** content engine to resolve an option that does — the same seam a
+ * violating content file would reach before validation rejects it.
+ */
+function contentWithEntryOptions(options: string): LongErasureContent {
+  return {
+    ...CONTENT,
+    cards: CONTENT.cards.map((card) =>
+      card.id === CONTENT.entryCardId ? { ...card, options } : card,
+    ),
+  };
+}
+
+/** Every activity-log line that reports a refusal. */
+function refusalTexts(state: ReturnType<typeof createLongErasureRun>): string[] {
+  return state.activityLog
+    .map((entry) => entry.text)
+    .filter((text) => text.includes('refused'));
+}
+
+describe('Gym Long Erasure: irreversible hull on the shipped content', () => {
+  it('declares hull irreversible from the adapter, matching the manifest', () => {
+    const manifest = JSON.parse(readRepoFile(MANIFEST_PATH)) as {
+      resources: { irreversible: readonly string[] };
+    };
+
+    // One declaration, three readers: the authoring adapter, the manifest and
+    // the run's projection. None may drift.
+    expect(LONG_ERASURE_IRREVERSIBLE_RESOURCES).toEqual(['hull']);
+    expect(CONTENT.irreversible).toEqual(['hull']);
+    expect(manifest.resources.irreversible).toEqual(
+      LONG_ERASURE_IRREVERSIBLE_RESOURCES,
+    );
+  });
+
+  it('refuses a hull grant authored into the real content, resolving the rest', () => {
+    const content = contentWithEntryOptions(
+      'Claim the plate|le-i-log#extra=hull:1,morale:1',
+    );
+    const state = chooseOption(createLongErasureRun(0, content), 'Claim the plate');
+
+    // The refused key is untouched; the rest of the option (the morale gain
+    // and the successor push) landed, and the guard logged exactly one line.
+    expect(state.resources.hull).toBe(5);
+    expect(state.resources.morale).toBe(6);
+    expect(state.currentCard.id).toBe('le-i-log');
+    expect(refusalTexts(state)).toEqual([
+      'Extra effect refused: hull is irreversible.',
+    ]);
+    expect(state.activityLog.map((entry) => entry.text)).toContain(
+      'Extra effect: +1 morale.',
+    );
+  });
+
+  it('pays an authored hull cost on the real content: it may be spent', () => {
+    // The shipped route to the derelict's locker pays `#cost=hull:1`.
+    let state = createLongErasureRun(0, CONTENT);
+    for (const label of [
+      'Log the erasure',
+      'Transmit the warning',
+      'Push deeper',
+      'Strip the locker',
+    ]) {
+      state = chooseOption(state, label);
+    }
+
+    expect(state.currentCard.id).toBe('le-ii-salvage');
+    expect(state.resources.hull).toBe(4);
+    expect(state.activityLog.map((entry) => entry.text)).toContain(
+      'Cost paid: -1 hull.',
+    );
+    expect(refusalTexts(state)).toEqual([]);
   });
 });
