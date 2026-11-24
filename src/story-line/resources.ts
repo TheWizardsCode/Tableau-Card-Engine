@@ -286,26 +286,59 @@ export function readManifestBounds(
   return issues.length > 0 ? { ok: false, issues } : { ok: true, bounds: read };
 }
 
+/** Options controlling {@link selectDeclaredDelta}. */
+export interface SelectDeclaredDeltaOptions {
+  /**
+   * The declared never-restored keys. A positive delta (a grant) on one of
+   * them is moved into `refused` and never applied; a negative delta (a cost)
+   * still passes, because an irreversible key may be **spent**. Omitted means
+   * "declares none", so every existing caller keeps today's behaviour and
+   * gets an empty `refused` bucket.
+   */
+  readonly irreversible?: Iterable<StorylineResourceKey>;
+}
+
+/** How {@link selectDeclaredDelta} split an authored delta. */
+export interface DeclaredDeltaSelection {
+  /** Declared, non-zero keys to apply, already signed. */
+  readonly delta: Record<StorylineResourceKey, number>;
+  /** Declared keys a grant would have applied but was refused (never applied). */
+  readonly refused: StorylineResourceKey[];
+  /** Undeclared keys carrying a non-zero value (never applied). */
+  readonly ignored: StorylineResourceKey[];
+}
+
 /**
  * Builds a signed delta containing only declared, non-zero keys.
  *
- * Undeclared keys are reported separately (never applied) so the caller can
- * surface an actionable warning instead of silently inventing a resource.
+ * Undeclared keys are reported separately (`ignored`, never applied) so the
+ * caller can surface an actionable warning instead of silently inventing a
+ * resource. A **grant** (sign `1`) on a key declared irreversible is reported
+ * separately again (`refused`, never applied): an irreversible key may be
+ * spent as a cost, never granted back.
  *
  * @param source   Authored delta (cost or extra effect).
  * @param sign     `1` to grant, `-1` to deduct.
  * @param declared The declared resource keys.
+ * @param options  Optional never-restored key declaration.
  */
 export function selectDeclaredDelta(
   source: StorylineResourcesDelta | undefined,
   sign: 1 | -1,
   declared: readonly StorylineResourceKey[],
-): { delta: Record<StorylineResourceKey, number>; ignored: StorylineResourceKey[] } {
+  options: SelectDeclaredDeltaOptions = {},
+): DeclaredDeltaSelection {
   const delta: Record<StorylineResourceKey, number> = {};
+  const refused: StorylineResourceKey[] = [];
   const ignored: StorylineResourceKey[] = [];
-  if (!source) return { delta, ignored };
+  if (!source) return { delta, ignored, refused };
 
   const declaredSet = new Set(declared);
+  // Only a grant can be refused, so a deduction never pays for the set.
+  const irreversibleSet =
+    sign === 1
+      ? new Set(normaliseResourceKeys(options.irreversible ?? []))
+      : undefined;
   for (const [key, value] of Object.entries(source)) {
     if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
       continue;
@@ -314,9 +347,13 @@ export function selectDeclaredDelta(
       ignored.push(key);
       continue;
     }
+    if (irreversibleSet?.has(key)) {
+      refused.push(key);
+      continue;
+    }
     delta[key] = sign * value;
   }
-  return { delta, ignored };
+  return { delta, ignored, refused };
 }
 
 /** How to read and mutate one declared resource on a game's state. */

@@ -92,12 +92,14 @@ export {
   selectDeclaredDelta,
 } from './resources';
 export type {
+  DeclaredDeltaSelection,
   ManifestBoundsRead,
   ManifestResourceBounds,
   ManifestResourceReadIssue,
   ManifestResourceReadReason,
   ManifestStartBagRead,
   ResourceProjectionOptions,
+  SelectDeclaredDeltaOptions,
   StorylineResourceField,
   StorylineResourceKey,
   StorylineResourceProjection,

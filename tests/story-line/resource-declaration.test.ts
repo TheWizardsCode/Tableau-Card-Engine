@@ -649,6 +649,7 @@ describe('resource declaration helpers', () => {
     expect(selectDeclaredDelta({ stores: 2, morale: 0, shields: 1 }, -1, VOYAGE_RESOURCES)).toEqual({
       delta: { stores: -2 },
       ignored: ['shields'],
+      refused: [],
     });
   });
 });

@@ -39,6 +39,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createStorylineSystem,
   isOptionAffordable,
+  selectDeclaredDelta,
   validateStorylineOptions,
   type Condition,
   type StorylineOption,
@@ -528,5 +529,78 @@ describe('validation versus runtime permissiveness (baseline)', () => {
         resources: ['coins', 'reputation', 'hull'],
       }).valid,
     ).toBe(true);
+  });
+});
+
+// ── Irreversible grants are refused at selection ────────────
+
+describe('irreversible grants (G5 refusal at selection)', () => {
+  const DECLARED = ['coins', 'reputation', 'hull'] as const;
+  const IRREVERSIBLE = ['hull'] as const;
+
+  it('moves a positive grant on an irreversible key into refused', () => {
+    const selection = selectDeclaredDelta(
+      { hull: 1, coins: 2 },
+      1,
+      DECLARED,
+      { irreversible: IRREVERSIBLE },
+    );
+
+    expect(selection).toEqual({
+      delta: { coins: 2 },
+      ignored: [],
+      refused: ['hull'],
+    });
+  });
+
+  it('never refuses a deduction: an irreversible key may be spent', () => {
+    const selection = selectDeclaredDelta(
+      { hull: 1, coins: 2 },
+      -1,
+      DECLARED,
+      { irreversible: IRREVERSIBLE },
+    );
+
+    expect(selection).toEqual({
+      delta: { hull: -1, coins: -2 },
+      ignored: [],
+      refused: [],
+    });
+  });
+
+  it('forwards a positive grant on a non-irreversible key', () => {
+    const selection = selectDeclaredDelta(
+      { coins: 3, reputation: 1 },
+      1,
+      DECLARED,
+      { irreversible: IRREVERSIBLE },
+    );
+
+    expect(selection).toEqual({
+      delta: { coins: 3, reputation: 1 },
+      ignored: [],
+      refused: [],
+    });
+  });
+
+  it('reports an undeclared key as ignored, never as refused', () => {
+    const selection = selectDeclaredDelta(
+      { shields: 1 },
+      1,
+      DECLARED,
+      { irreversible: IRREVERSIBLE },
+    );
+
+    expect(selection).toEqual({ delta: {}, ignored: ['shields'], refused: [] });
+  });
+
+  it('declares nothing by default: every declared delta is forwarded, refused is empty', () => {
+    const selection = selectDeclaredDelta({ coins: 1, hull: 2 }, 1, DECLARED);
+
+    expect(selection).toEqual({
+      delta: { coins: 1, hull: 2 },
+      ignored: [],
+      refused: [],
+    });
   });
 });

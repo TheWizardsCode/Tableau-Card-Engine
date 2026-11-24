@@ -164,10 +164,13 @@ The projection also carries a game's **never-restored** keys
 (`createResourceProjection(fields, { irreversible: ['hull'] })` →
 `projection.irreversible`, declaration order preserved, `[]` by default). A
 key declared irreversible may still be **spent** as a cost, but content must
-never grant it back. The episode manifest's `resources.irreversible` is the
-authoritative source: `createEpisodeResourceProjection(manifest, fields)`
-derives the projection's declaration from it, so the engine seam cannot
-disagree with the manifest. The content adapter's `irreversibleResources`
+never grant it back: at resolution time a positive extra effect on it is
+refused — the key is not applied and one activity-log line names it
+(`Extra effect refused: hull is irreversible.`) — while the rest of the option
+(cost, effect, successor push) still resolves. The episode manifest's
+`resources.irreversible` is the authoritative source:
+`createEpisodeResourceProjection(manifest, fields)` derives the projection's
+declaration from it, so the engine seam cannot disagree with the manifest. The content adapter's `irreversibleResources`
 declaration is the manifest-free copy the CSV validator uses, and
 `auditIrreversibleDeclaration({ manifest, adapter, projection })` reports every
 divergence per key (and `createEpisodeResourceProjection` fails closed when
@@ -187,7 +190,7 @@ The declared set is threaded through the whole lifecycle:
 - **`validateStorylineOptions(options, { resources, cardId })`** checks costs,
   extra effects and condition fields against the same set.
 
-Three rules keep the set honest:
+Four rules keep the set honest:
 
 1. **An absent key reads as `0`** — a declared key the state does not
    currently carry is zero (never `undefined`/`NaN`), both in condition
@@ -199,6 +202,10 @@ Three rules keep the set honest:
    is not applied (it reads as `0`, so a positive cost on it is unaffordable)
    and resolution appends a warning line naming the ignored key(s).
    `validateStorylineOptions` reports the same fault ahead of time.
+4. **An irreversible key is never refilled** — a positive extra effect on a
+   key the adapter (or the projection it spreads in) declares `irreversible`
+   is refused, never applied, with one activity-log line naming the key. A
+   cost on that key still pays: it may be spent, never granted.
 
 `coins` / `reputation` stay the **default projection**: omit `resources` (or
 declare the pair) and the shipped behaviour is byte-identical. A game with a
@@ -553,7 +560,10 @@ selected option:
 2. **Cost payment** — the option's `cost` is deducted through the engine
    adapter's resource-mutation seam, in addition to the effect.
 3. **Extra effect** — the option's `extraEffect` gains are applied, also
-   through the resource-mutation seam.
+   through the resource-mutation seam, except a gain on a key the adapter
+   declares irreversible: that key is refused (one `Extra effect refused:
+   <key> is irreversible.` activity-log line) and the remaining gains still
+   apply. A cost on the same key is never refused — it may be spent.
 4. **Deltas** — `coinChange` / `repChange` are *projections*: the change in
    the `coins` / `reputation` keys across all three steps (`0` when the game
    does not declare that key), which keeps every existing consumer — scene,

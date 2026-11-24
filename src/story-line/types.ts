@@ -382,6 +382,20 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
    * never read, paid or applied.
    */
   readonly resources?: readonly StorylineResourceKey[];
+  /**
+   * The declared never-restored keys.
+   *
+   * A key here may still be **spent** as an option cost, but content can never
+   * grant it back: at resolution time a positive extra effect on it is refused
+   * (never applied) and one activity-log line names it
+   * (`Extra effect refused: hull is irreversible.`), while the rest of the
+   * option still resolves.
+   *
+   * Optional and empty by default, so an adapter that declares none keeps the
+   * pre-guard behaviour exactly. A {@link StorylineResourceProjection} carries
+   * this member already, so spreading one into the adapter is enough.
+   */
+  readonly irreversible?: readonly StorylineResourceKey[];
 }
 
 /**

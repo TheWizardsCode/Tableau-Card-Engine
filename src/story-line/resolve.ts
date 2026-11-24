@@ -45,6 +45,7 @@
 import {
   COIN_PROJECTION_KEY,
   REPUTATION_PROJECTION_KEY,
+  normaliseResourceKeys,
   readResource,
   resolveResourceKeys,
   selectDeclaredDelta,
@@ -133,6 +134,12 @@ function applyDelta<TState, TCard extends StorylineCard>(
   );
 }
 
+/** Prefix of the refusal activity-log line for each authored-delta label. */
+const REFUSAL_LABEL: Record<'Cost paid' | 'Extra effect', string> = {
+  'Cost paid': 'Cost refused',
+  'Extra effect': 'Extra effect refused',
+};
+
 /**
  * Applies one authored delta (cost or extra effect) over the declared keys.
  *
@@ -141,6 +148,12 @@ function applyDelta<TState, TCard extends StorylineCard>(
  * the activity log instead of being applied, naming the offending key(s) so a
  * content author can act on it (validation reports the same fault ahead of
  * time with a card id and path).
+ *
+ * A **grant** on a key declared irreversible is refused the same way: the key
+ * is not applied and one activity-log line names it
+ * (`Extra effect refused: hull is irreversible.`), while every other part of
+ * the delta still resolves. A cost on the same key is never refused — an
+ * irreversible key may be spent, just never restored.
  */
 function applyDeclaredDelta<TState, TCard extends StorylineCard>(
   state: TState,
@@ -148,9 +161,12 @@ function applyDeclaredDelta<TState, TCard extends StorylineCard>(
   source: StorylineResourcesDelta,
   sign: 1 | -1,
   declared: readonly StorylineResourceKey[],
+  irreversible: readonly StorylineResourceKey[],
   logLabel: 'Cost paid' | 'Extra effect',
 ): void {
-  const { delta, ignored } = selectDeclaredDelta(source, sign, declared);
+  const { delta, ignored, refused } = selectDeclaredDelta(source, sign, declared, {
+    irreversible,
+  });
   if (Object.keys(delta).length > 0) {
     applyDelta(state, adapter, delta);
     adapter.appendLog(state, `${logLabel}: ${formatDelta(delta)}.`, 'neutral');
@@ -159,6 +175,13 @@ function applyDeclaredDelta<TState, TCard extends StorylineCard>(
     adapter.appendLog(
       state,
       `${logLabel} ignored undeclared resource(s): ${ignored.join(', ')}.`,
+      'neutral',
+    );
+  }
+  for (const key of refused) {
+    adapter.appendLog(
+      state,
+      `${REFUSAL_LABEL[logLabel]}: ${key} is irreversible.`,
       'neutral',
     );
   }
@@ -228,6 +251,9 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   option: StorylineOption<TState>,
 ): StorylineResolution<TCard> {
   const declared = resolveResourceKeys(adapter.resources);
+  // The projection's declaration is the guard's input; a game that declares
+  // none keeps the pre-guard behaviour exactly.
+  const irreversible = normaliseResourceKeys(adapter.irreversible ?? []);
   const before = adapter.getResources(state);
 
   // 1. Apply effect if the option's policy says so.
@@ -237,7 +263,15 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
 
   // 2. Pay the declarative cost — a real payment, independent of policy.
   if (option.cost) {
-    applyDeclaredDelta(state, adapter, option.cost, -1, declared, 'Cost paid');
+    applyDeclaredDelta(
+      state,
+      adapter,
+      option.cost,
+      -1,
+      declared,
+      irreversible,
+      'Cost paid',
+    );
   }
 
   // 3. Apply the declarative extra effect — independent of policy and of the
@@ -249,6 +283,7 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
       option.extraEffect,
       1,
       declared,
+      irreversible,
       'Extra effect',
     );
   }
