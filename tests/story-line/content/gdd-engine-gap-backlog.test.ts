@@ -10,9 +10,11 @@
  *   nearest precedent, and the disposition);
  * - every repository path the section cites exists at this commit, so a renamed
  *   or deleted module cannot leave a stale "why not today" behind;
- * - each entry's disposition is either a filed Worklog item id or an explicit
- *   deferral, and the at-a-glance table, the detail blocks and the disposition
- *   record agree with each other;
+ * - each entry's disposition is either a filed Worklog item id, an explicit
+ *   deferral, or a delivery that names the item which shipped it, and the
+ *   at-a-glance table, the detail blocks and the disposition record agree with
+ *   each other (including on delivery: a `Delivered` entry must say so in all
+ *   three places, and a filed entry must not claim delivery);
  * - the five expected gaps the GDD's scope named are each assessed explicitly;
  * - no entry links the retired `§6` stub anchor.
  *
@@ -196,6 +198,31 @@ describe('GDD §6 engine-gap backlog', () => {
       if (glance.join(' ').includes('Deferred')) {
         expect(recordItem, `${id} glance/detail deferral`).toBeUndefined();
       }
+    }
+  });
+
+  it('keeps a delivery claim in step across the table, the block and the record', () => {
+    const glanceOf = (id: string): string =>
+      (glanceRows.find((row) => row[0]?.includes(id)) ?? []).join(' ');
+
+    const delivered = ENTRY_IDS.filter((id) => glanceOf(id).includes('Delivered'));
+    // G5 (the irreversible-resource policy) is the delivery this guard pins.
+    expect(delivered).toEqual(expect.arrayContaining(['G1', 'G2', 'G5', 'G14']));
+
+    for (const id of delivered) {
+      const record = dispositionRows.find((row) => row[0] === id) ?? [];
+      const disposition = dispositionOf(blocks.get(id) ?? '');
+      expect(record.join(' '), `${id} record delivered`).toContain('Delivered');
+      expect(disposition, `${id} detail delivered`).toContain('**Delivered**');
+      expect(/`CG-[A-Z0-9]+`/.test(disposition), `${id} delivery item`).toBe(true);
+    }
+
+    for (const id of ENTRY_IDS) {
+      if (glanceOf(id).includes('Delivered')) continue;
+      expect(
+        dispositionOf(blocks.get(id) ?? ''),
+        `${id} claims a delivery the table does not`,
+      ).not.toContain('**Delivered**');
     }
   });
 

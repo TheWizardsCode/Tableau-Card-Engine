@@ -6,6 +6,16 @@
  * adapter's declared key set governs which resources a cost or extra effect
  * may name. `coins` / `reputation` remain the default projection.
  *
+ * A key the adapter (or the projection it spreads in) declares
+ * **irreversible** may be **spent**, never **granted**: a `#cost` on it is paid
+ * like any other cost, while a positive `extraEffect` on it is refused — the
+ * key is not applied and one activity-log line names it
+ * (`Extra effect refused: hull is irreversible.`) — and every other part of the
+ * option (cost, the remaining gains, the successor push) still resolves. The
+ * projection's `irreversible` subset is derived from the episode manifest's
+ * authoritative `resources.irreversible`, so the guard and the manifest cannot
+ * disagree.
+ *
  * Resolution order for a selected option:
  *
  * 1. `effectPolicy` — `'apply'` runs the event's intrinsic effect, `'skip'`

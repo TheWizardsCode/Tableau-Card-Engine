@@ -1008,11 +1008,21 @@ engine cannot enforce yet (gap 1 below).
 **The irreversibility rule, stated once.** `hull` is the sole member of
 `manifest.resources.irreversible`, and the model's promise is exactly one
 sentence: **nothing in the content, the beat sheet or the reset loop ever grants
-`hull` back within a run.** That promise is currently enforced by authoring
-discipline and by the fixture test in [§2.8.7](#287-how-the-economy-is-verified),
-because the engine has no notion of an irreversible key (gap 6). The manifest
-validator's `loss-not-irreversible` rule keeps *loss rules* pointed at the right
-key; it cannot stop a writer typing `#extra=hull:1`.
+`hull` back within a run.** The engine now enforces that promise in both
+directions of authorship: `validateStorylineOptions(…, { irreversible })`
+reports a positive `#extra` on a declared irreversible key as
+`irreversible-grant`, and at resolution time the projection's guard refuses the
+grant (the key is not applied, one activity-log line names it
+`Extra effect refused: hull is irreversible.`, and the rest of the option still
+resolves). A `#cost=hull:n` still pays — the key may be spent, never granted
+(G5 delivered, `CG-0MWR0BHH9002OQUZ`). The manifest's
+`resources.irreversible` is the authoritative declaration
+([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6,
+[the story-line reference](../core-engine/story-line.md#declared-resources)).
+The manifest validator's `loss-not-irreversible` rule keeps *loss rules* pointed
+at the right key, and the authoring diagnostic stops a writer typing
+`#extra=hull:1`. The fixture test in
+[§2.8.7](#287-how-the-economy-is-verified) still pins the shipped content.
 
 **Bounds are design bounds, not engine bounds.** A cost is only authored up to a
 value the starting bag plus that key's own authored sources can supply; a gain is
@@ -1034,6 +1044,15 @@ choosing which of two goods to keep.
 | I — The First Unwriting | `stores >= 3` | `stores:1` (log the erasure) or `stores:1` (turn for the muster) | **Keep the record or keep the hold.** At most one store is spent in Act I, so a player who spends it exits on exactly the Act II objective's minimum with *zero slack*: only salvage keeps the check met, and salvage costs hull. |
 | II — The Dead Zone | `hull >= 5` | `hull:1` (strip the locker) for `stores:2` | **Spend the irreversible key to buy the consumable.** Hull is the only key that never comes back; the stores it buys are what keeps the later objectives met. Leaving the locker sealed is the choice that protects the objective and starves the hold. |
 | III — The Core | `morale >= 4` | `charge:2` (unwrite the Loom), `hull:3` (ram the core), or nothing (finish the weave) | **What the crew's morale earns you the right to spend.** The three doors are priced in three different currencies — tempo, the hull itself, and the timeline — and the objective decides whether the crew ending is still a door at all. |
+
+**`hull` is irreversible as an engine guarantee, not a convention.** Every act
+spends hull and none of them grants it back. The declaration lives on
+`manifest.resources.irreversible` (authoritative), the authoring declaration on
+`ContentAdapter.irreversibleResources`; a positive `#extra` on `hull` is now
+refused twice — by `validateStorylineOptions` as the `irreversible-grant`
+diagnostic at authoring time, and by the resolution guard at run time — while a
+`#cost=hull:n` still pays. There is no recovery path within a run
+([§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial)).
 
 **Audited sources and sinks per act** (counted from the shipped content; this is
 the housekeeping check the principle above has to pass). A key that has no sink
@@ -1183,7 +1202,7 @@ the nearest precedent and the filed work item.
 | 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | [G7](#g7) — filed (`CG-0MWR0BI3S008K9Y6`) |
 | 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | [G6](#g6) — deferred to the build epic |
 | 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | [G3](#g3) — filed (`CG-0MWR0BG9H007AFNU`) |
-| 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | `resources.irreversible` is manifest data read only by the manifest validator's `loss-not-irreversible` rule; nothing in `@story-line` knows the concept, so `#extra=hull:1` is legal content. At this commit the rule is enforced by authoring discipline and the fixture test. | [G5](#g5) — filed (`CG-0MWR0BHH9002OQUZ`) |
+| 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | **Delivered** — the concept is threaded through `@story-line`: the resource projection carries an `irreversible` subset (derived from the manifest by `createEpisodeResourceProjection`), `validateStorylineOptions(…, { irreversible })` reports a positive `#extra` on one as `irreversible-grant`, and the resolution guard refuses the grant while a `#cost` on the key still pays. The manifest's `resources.irreversible` is authoritative; the adapter's `irreversibleResources` is audited for drift. | [G5](#g5) — **Delivered** by `CG-0MWR0BHH9002OQUZ` |
 | 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | [G8](#g8) — filed (`CG-0MWR0BIPV0074WLM`); the act-boundary half is [G9](#g9) |
 
 #### 2.8.7 How the economy is verified
@@ -1199,6 +1218,7 @@ and the enforcement is
 | The worked trade rows are valid authored content against the five-key set | `npm run storylines:validate -- --csv tests/fixtures/story-line/gdd-resource-trades.csv --game long-erasure` | `RESULT: VALID` |
 | Each act carries a real cost/gain trade, with the numbers this section prints | `npx vitest run --project unit tests/story-line/content/gdd-resource-model.test.ts` | 12 tests pass; the three trade rows assert `stores:1`/`morale:1`, `hull:1`+`stores:2`, `charge:2`/`#when=charge>=2` |
 | The irreversible key is never granted, and no cost exceeds the start bag plus authored gains | same test file | zero `extraEffect.hull`; every cost ≤ supply |
+| An irreversible key may be spent but never granted, at authoring time and at run time | `npx vitest run --project unit tests/story-line/irreversible-grant.test.ts tests/story-line/irreversible-policy.test.ts tests/story-line/irreversible-declaration.test.ts` | a positive `#extra` on `hull` is `irreversible-grant`; the runtime guard refuses the grant and logs `Extra effect refused: hull is irreversible.`; a `#cost=hull` still pays; no recovery path restores it |
 | The state-gated branch is reachable **and** survivable, and every ending is reachable | same test file (guard with the start bag) | `gated-branch-survivable` and `ending-reachable` green |
 | Bounds hold on the authored content | same test file (authoring-time inequalities) | every cost/gain within the bounds of [§2.8.2](#282-per-key-contract) |
 
@@ -1791,8 +1811,10 @@ and drops `hull 5 → 2`; R4 spends 5 points (10 score points) for `hull 5 → 2
 bought, banked and spent; hull is none of those. The spike measured exactly why
 the difference matters: the run loop refunded every loss at reset, so loss was
 *computed* but never *felt*. The rule for v1 content is therefore absolute — an
-`#extra=hull` is a validation failure, not a balance decision — and it is
-recorded as engine gap [G5](#g5) ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)).
+`#extra=hull` is a validation failure, not a balance decision — and it is now an
+engine guarantee: the `irreversible-grant` authoring diagnostic and the runtime
+guard enforce it ([§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps)
+item 6, [G5](#g5) delivered by `CG-0MWR0BHH9002OQUZ`).
 
 #### 2.10.3 Pacing rules, stated numerically
 
@@ -2850,7 +2872,7 @@ invisible.
 | [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** across the build epic — the schema (ajv-pinned), the pure validator and the `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | **Delivered** — epic `CG-0MWR0BFMW003856N` |
 | [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
 | [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | `createResourceProjection(...).applyResourceDelta` in `src/story-line/resources.ts` forwards every finite delta unbounded; no bounds type, no spill/clamp report | small–medium — `src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) | feature | Filed — `CG-0MWR0BGVG004UE7X` |
-| [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | `resources.irreversible` is read only by a *proposed* manifest rule; `selectDeclaredDelta` filters undeclared keys, so `#extra=hull:1` is legal content | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | Filed — `CG-0MWR0BHH9002OQUZ` |
+| [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | **delivered** — the projection carries the irreversible subset, `validateStorylineOptions` reports `irreversible-grant` and the resolution guard refuses the grant while a cost still pays (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/resolve.ts`) | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | **Delivered** — `CG-0MWR0BHH9002OQUZ` (`src/story-line/resolve.ts`) |
 | [G6](#g6) | Compound / range conditions ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | [§2.2.5](#225-objective) `Objective.check`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 4 | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`) evaluated once (`evaluateCondition`, `src/story-line/resolve.ts`) | small — `Condition` + `evaluateCondition` | task | **Deferred to the build epic** (v1 uses one-clause objectives; two clauses are two scenes) |
 | [G7](#g7) | Surfaced affordability: compile an unaffordable option with its shortfall instead of deleting it | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat) option gating, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3, [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), [§3.6](#36-named-presentation-gaps) B4 | `isOptionAffordable` returns a boolean and `compileStorylineFromEvent` omits the option at draw time; no requirement object reaches the presenter | small — `isOptionAffordable` + the compiled-option shape in `src/story-line/compile.ts` | feature | Filed — `CG-0MWR0BI3S008K9Y6` |
 | [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | `src/ui/index.ts` exports card/hand/pile components and `TokenPileView`, but no component renders a declared resource bag; the spike draws its two-key economy as bespoke text | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | Filed — `CG-0MWR0BIPV0074WLM` |
@@ -2989,24 +3011,38 @@ authored `#extra` and no manifest loss rule can grant it, so the irreversible
 tension dial of [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring)
 cannot be undone by content drift.
 
-**Why the engine cannot do it at this commit.** `resources.irreversible` appears only in
+**Why the engine cannot do it at this commit.** (Recorded as written; see **Delivered since** below.)
+`resources.irreversible` appeared only in
 the proposed manifest rule `loss-not-irreversible`
 ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)), and the manifest
-validator does not exist yet (G2). In the runtime,
-`selectDeclaredDelta` (`src/story-line/resources.ts`) filters **undeclared**
-keys; a declared irreversible key is applied like any other, so `#extra=hull:1`
-is legal content. `src/story-line/content/validate.ts` refuses an undeclared key
-(`unknown-resource-key`) but has no direction rule. At this commit the GDD's
-guard is a fixture test plus authoring discipline
+validator did not exist yet (G2). In the runtime,
+`selectDeclaredDelta` (`src/story-line/resources.ts`) filtered **undeclared**
+keys; a declared irreversible key was applied like any other, so `#extra=hull:1`
+was legal content. `src/story-line/content/validate.ts` refused an undeclared key
+(`unknown-resource-key`) but had no direction rule. The GDD's guard was a fixture
+test plus authoring discipline
 ([§2.8.3](#283-the-economy-by-act)).
+
+**Delivered since.** `resources.irreversible` is now threaded through the
+runtime: `createResourceProjection(fields, { irreversible })` carries the subset
+(`CG-0MWUQS2GW001WDCM`), `createEpisodeResourceProjection` derives it from the
+manifest and `auditIrreversibleDeclaration` reports any divergence with the
+adapter's `irreversibleResources` (`CG-0MWUQQAEW0078270`), and
+`validateStorylineOptions(…, { irreversible })` reports a positive `#extra` on a
+declared key as `irreversible-grant` (`CG-0MWUQSZAN003P0S4`). The runtime guard
+in `src/story-line/resolve.ts` refuses the grant and names it in one
+activity-log line; a `#cost` on the key still pays. The paragraph above records
+why the band was sized as it was, not a current gap.
 
 **Nearest precedent and effort band.** **Small**: the `unknown-resource-key`
 rule (a declarative diagnostic carrying row, column and reason) and the sign
 handling in `selectDeclaredDelta`. One declaration, one validation rule, one
 projection guard.
 
-**Disposition.** **Filed** — `CG-0MWR0BHH9002OQUZ` (`task`, medium, effort `S`).
-Blocked by the GDD epic.
+**Disposition.** **Delivered** — `CG-0MWR0BHH9002OQUZ` (`task`, medium, effort
+`S`), shipped as the projection's `irreversible` subset plus the
+`irreversible-grant` diagnostic and the resolution guard. Blocked by the GDD
+epic; both the epic and the runtime layer it extends are complete.
 
 #### <a id="g6"></a>G6 — Compound and range conditions
 
@@ -3229,7 +3265,7 @@ this backlog reaches.
 | Expected gap | Verdict | Entries | Evidence at this commit |
 |---|---|---|---|
 | Beat-sheet / objective layer | **Confirmed — the build epic's core.** Not one gap but three that ship together: the runtime layer, the manifest contract that describes it and the guard that proves it. | [G1](#g1), [G2](#g2), [G3](#g3) | `src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/content/manifest.ts`, `src/story-line/content/guard.ts` |
-| Arbitrary-resource generalisation follow-through | **Partially landed; the follow-through is real but split.** The declared set, declared-key deltas and `unknown-resource-key` shipped (`src/story-line/resources.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, the irreversibility guarantee, structured affordability and compound conditions. | [G4](#g4), [G5](#g5), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `selectDeclaredDelta` has no direction rule; `Condition` is single-clause |
+| Arbitrary-resource generalisation follow-through | **Mostly landed; the follow-through is real but split.** The declared set, declared-key deltas, `unknown-resource-key` and the irreversibility guarantee shipped (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, structured affordability and compound conditions. | [G4](#g4), [G5](#g5) (delivered), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `Condition` is single-clause; the irreversible subset is enforced by the projection and validate.ts |
 | CSV extension follow-through | **No single missing capability; the remaining work is split two ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped, and the authoring ergonomics landed ([G14](#g14), delivered). Remaining: retire the legacy columns and validate the manifest/CSV agreement. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `CG-0MWQYDC7D003G4ON` delivered the authoring CLI ergonomics |
 | Resource HUD | **Confirmed.** No component renders a declared resource bag; the spike draws its two-key economy by hand. The zone itself is layout data and is not the gap. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/index.ts` (no resource component), `src/ui/TokenPileView.ts` (nearest precedent) |
 | Act/scene transition presentation | **Confirmed, but narrower than first stated.** A camera transition ships (`runSceneTransition`); the banner surface, the outcome→route sequence and any rendered scene boundary do not. | [G9](#g9) | `src/ui/sceneTransition.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json` (no `sceneBanner` zone) |
@@ -3258,10 +3294,10 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | Entry | Worklog item | Type | Priority | Effort | Blocked by | Status at filing |
 |---|---|---|---|---|---|---|
 | G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | **Delivered** — `src/story-line/episode-runner.ts` (epic `CG-0MWR0BAT30015DPQ`) |
-| G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | blocked, scheduled past the GDD close |
+| G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | **Delivered** — manifest schema, validator and `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) |
 | G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | blocked, scheduled past the GDD close |
 | G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
-| G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | blocked, scheduled past the GDD close |
+| G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | **Delivered** — `irreversible` projection + `irreversible-grant` diagnostic + runtime guard |
 | G6 | — | task | — | — | — | **Deferred** — one-clause objectives are the v1 model |
 | G7 | `CG-0MWR0BI3S008K9Y6` | feature | medium | S | GDD epic | blocked, scheduled past the GDD close |
 | G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
@@ -3280,14 +3316,15 @@ record and versioned run state — plus its documentation and step→test map in
 [the story-line reference](../core-engine/story-line.md#episode-runner).
 
 **Out of scope for G1** (matching the epic's own out-of-scope list; none of these
-is marked delivered):
+was delivered *by G1* — G5 has since been delivered by its own item):
 
 - **G3** scene-space guard (`CG-0MWR0BG9H007AFNU`) — the runner emits the exit
   and refusal data the guard needs; proving the invariants is G3's.
 - **G4** resource bounds / spill / clamped loss (`CG-0MWR0BGVG004UE7X`) — the
   ledger records what the seam actually applied; clamping arithmetic is G4's.
 - **G5** irreversible-resource policy (`CG-0MWR0BHH9002OQUZ`) — content-level
-  refusal of `#extra` on irreversible keys is G5's.
+  refusal of `#extra` on irreversible keys is G5's; since delivered (see
+  [§6.6](#66-disposition-record) and G5's own disposition).
 - **G9** act/scene transition presentation (`CG-0MWR0BJBU005TDTT`).
 - **G13** replay adapter — deferred to the game repo.
 - **G7** surfaced affordability (`CG-0MWR0BI3S008K9Y6`) and **G8** resource HUD
@@ -3527,7 +3564,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Episode manifest schema and validator (`storylines:manifest`) | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | [G2](#g2) | medium | `CG-0MWR0BFMW003856N` |
 | Scene-space guard (every exit, every refusal, every ending) | [§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10.4](#2104-failure-and-recovery-per-failure-type) | [G3](#g3) | medium | `CG-0MWR0BG9H007AFNU` |
 | Resource bounds and spill/clamp reporting | [§2.8](#28-resource-model-and-economy) | [G4](#g4) | small–medium | `CG-0MWR0BGVG004UE7X` |
-| Irreversible-resource policy (`hull` is never granted) | [§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | [G5](#g5) | small | `CG-0MWR0BHH9002OQUZ` |
+| Irreversible-resource policy (`hull` is never granted) | [§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | [G5](#g5) | small | `CG-0MWR0BHH9002OQUZ` (delivered) |
 | Surfaced affordability (an unaffordable door is shown, not deleted) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) T5 | [G7](#g7) | small | `CG-0MWR0BI3S008K9Y6` |
 | Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` |
 | Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
