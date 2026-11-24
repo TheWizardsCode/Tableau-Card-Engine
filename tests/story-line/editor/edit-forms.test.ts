@@ -541,6 +541,30 @@ describe('validation errors — attributed inline and the write is blocked', () 
     expect(unknownTarget[0].field).toBe('options');
   });
 
+  it('attributes an irreversible grant to the Options field', () => {
+    const csv = readFileSync(fixture.csvPath, 'utf-8');
+    const start = card(GYM_CONTENT_ADAPTER, csv, 'gym-story-start');
+    const descriptors = buildCardFieldDescriptors(GYM_CONTENT_ADAPTER, start);
+
+    const errors = attributeEditErrors({
+      descriptors,
+      draft: draftFromDescriptors(descriptors),
+      cardId: start.id,
+      errors: [],
+      issues: [
+        {
+          code: 'irreversible-grant',
+          cardId: start.id,
+          resource: 'hull',
+          message: 'extraEffect.hull grants 1 to "hull", which is declared irreversible.',
+        },
+      ],
+    });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ field: 'options', code: 'irreversible-grant' });
+  });
+
   it('attributes a duplicate new-card id to the id field', () => {
     const descriptors = buildNewCardFieldDescriptors(GYM_CONTENT_ADAPTER);
     const draft = draftFromDescriptors(descriptors);

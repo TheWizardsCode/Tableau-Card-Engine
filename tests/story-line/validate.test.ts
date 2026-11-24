@@ -366,6 +366,76 @@ describe('validateStorylineOptions — declared resources', () => {
   });
 });
 
+describe('validateStorylineOptions — irreversible grants', () => {
+  const DECLARED = ['coins', 'reputation', 'hull'] as const;
+
+  it('rejects a positive extra effect on a declared irreversible key', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Patch', effectPolicy: 'apply', extraEffect: { hull: 1 } }],
+      { resources: DECLARED, irreversible: ['hull'], cardId: 'evt-wreck' },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({
+      path: 'options[0].extraEffect.hull',
+      code: 'irreversible-grant',
+      cardId: 'evt-wreck',
+      resource: 'hull',
+    });
+    expect(result.issues[0].message).toContain('hull');
+    expect(result.issues[0].message).toContain('irreversible');
+  });
+
+  it('leaves a zero extra effect alone (only a gain is refused)', () => {
+    expect(
+      validateStorylineOptions(
+        [{ label: 'No-op', effectPolicy: 'apply', extraEffect: { hull: 0 } }],
+        { resources: DECLARED, irreversible: ['hull'] },
+      ).valid,
+    ).toBe(true);
+  });
+
+  it('accepts spending an irreversible key and granting a recoverable one', () => {
+    const result = validateStorylineOptions(
+      [
+        {
+          label: 'Trade',
+          effectPolicy: 'apply',
+          cost: { hull: 1 },
+          extraEffect: { coins: 2 },
+        },
+      ],
+      { resources: DECLARED, irreversible: ['hull'] },
+    );
+    expect(result).toEqual({ valid: true, issues: [] });
+  });
+
+  it('reports nothing extra when no irreversible set is supplied', () => {
+    const hullGain = validateStorylineOptions(
+      [{ label: 'Gain', effectPolicy: 'apply', extraEffect: { hull: 1 } }],
+      { resources: DECLARED },
+    );
+    expect(hullGain.valid).toBe(true);
+
+    // The default projection is unchanged too: a positive `coins` extra effect
+    // is still a gain, never an irreversible one.
+    const coinsGain = validateStorylineOptions([
+      { label: 'Gain', effectPolicy: 'apply', extraEffect: { coins: 1 } },
+    ]);
+    expect(coinsGain.valid).toBe(true);
+  });
+
+  it('keeps the negative rule dominant for an irreversible key', () => {
+    expect(
+      validateStorylineOptions(
+        [{ label: 'Bleed', effectPolicy: 'apply', extraEffect: { hull: -1 } }],
+        { resources: DECLARED, irreversible: ['hull'] },
+      ).issues.map((issue) => issue.code),
+    ).toEqual(['negative-extra-effect']);
+  });
+});
+
 /** A system instance bound to an empty template catalogue + adapter. */
 function makeSystem() {
   const system = createStorylineSystem({ engine: makeAdapter(new Map()) });

@@ -19,6 +19,7 @@
  * | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
  * | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
  * | `missing-column` | The adapter maps a prose column the file's header does not contain. |
+ * | `irreversible-grant` | A `#extra` grants a key the adapter declares irreversible (never restored), so the runtime guard would refuse it. |
  *
  * Informational findings (never fail validation by default):
  *
@@ -62,7 +63,8 @@ export type ContentIssueCode =
   | 'unknown-successor'
   | 'unreachable-card'
   | 'cycle-error'
-  | 'missing-column';
+  | 'missing-column'
+  | 'irreversible-grant';
 
 /** A single hard validation issue. */
 export interface ContentIssue {
@@ -377,13 +379,21 @@ export function validateContentCards(
     const metadata = validateStorylineOptions(options, {
       resources: declared,
       cardId: id,
+      ...(adapter.irreversibleResources === undefined
+        ? {}
+        : { irreversible: adapter.irreversibleResources }),
     });
     for (const issue of metadata.issues) {
       const isResourceKey =
         issue.code === 'unknown-resource-key' ||
         issue.code === 'unknown-condition-field';
+      const code: ContentIssueCode = isResourceKey
+        ? 'unknown-resource-key'
+        : issue.code === 'irreversible-grant'
+          ? 'irreversible-grant'
+          : 'invalid-option';
       issues.push({
-        code: isResourceKey ? 'unknown-resource-key' : 'invalid-option',
+        code,
         cardId: id,
         ...optionContext,
         reason: issue.code,

@@ -27,6 +27,12 @@ export const PROSE_FIXTURES_DIR = join(FIXTURES_DIR, 'prose');
 /** Absolute path of the shipped Gym story-line content. */
 export const GYM_CONTENT_PATH = join(REPO_ROOT, 'example-games/gym/content/storylines.csv');
 
+/** Absolute path of the shipped Long Erasure story-line content. */
+export const LONG_ERASURE_CONTENT_PATH = join(
+  REPO_ROOT,
+  'example-games/gym/content/long-erasure.csv',
+);
+
 /** Absolute path of the committed Gym manifest artefact. */
 export const GYM_MANIFEST_PATH = join(REPO_ROOT, 'example-games/gym/content/storyline-manifest.json');
 

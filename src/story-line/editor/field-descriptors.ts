@@ -498,6 +498,10 @@ function attributeIssue(
       // declared-resources control when the adapter maps no options column.
       if (hasField(descriptors, 'options')) return 'options';
       return hasField(descriptors, 'resources') ? 'resources' : null;
+    case 'irreversible-grant':
+      // A `#extra` grant on a never-restored key is authored in the options
+      // cell, so the fix belongs there.
+      return hasField(descriptors, 'options') ? 'options' : null;
     case 'unknown-successor':
       return issue.target ? fieldForTarget(descriptors, draft, issue.target) : null;
     case 'missing-column': {

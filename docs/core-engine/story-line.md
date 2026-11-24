@@ -187,8 +187,10 @@ The declared set is threaded through the whole lifecycle:
 - **Cost payment** and **extra effects** are applied per declared key, and
   each activity-log line names the key (`Cost paid: -4 stores.`,
   `Extra effect: +1 morale, +2 goodwill.`).
-- **`validateStorylineOptions(options, { resources, cardId })`** checks costs,
-  extra effects and condition fields against the same set.
+- **`validateStorylineOptions(options, { resources, cardId, irreversible })`**
+  checks costs, extra effects and condition fields against the same set, and —
+  when the game's never-restored keys are supplied as `irreversible` — refuses a
+  positive `#extra` on one of them as `irreversible-grant`.
 
 Four rules keep the set honest:
 
@@ -380,7 +382,8 @@ semantic codes (`unknown-resource-key`, `non-positive-cost`,
 `negative-extra-effect`, `unknown-condition-op`, `non-numeric-value`,
 `dangling-conditional-successor`) come from
 [`validateStorylineOptions`](#validation) and are reported on the same row and
-column. The fixture tests live in
+column; `irreversible-grant` (a `#extra` on a declared never-restored key)
+names the key and is reported on the same `options` cell. The fixture tests live in
 [`tests/story-line/content/extended-options.test.ts`](../../tests/story-line/content/extended-options.test.ts).
 
 ### Authored prose: `context`, `#says` and `epilogue`
@@ -587,9 +590,9 @@ scanning every card the engine adapter returns from `getChainScanCards`.
 
 ## Validation
 
-`validateStorylineOptions(options, { knownTemplateIds? })` statically validates
-the **declarative** parts of an option list — `cost`, `extraEffect` and
-`conditionalSuccessors`. It never throws and never mutates the list, and it
+`validateStorylineOptions(options, { knownTemplateIds?, resources?, cardId?, irreversible? })`
+statically validates the **declarative** parts of an option list — `cost`,
+`extraEffect` and `conditionalSuccessors`. It never throws and never mutates the list, and it
 works on any source: options registered with `registerStorylineOptions`,
 options compiled from a CSV `options` encoding, or an option list assembled by
 a game.
@@ -614,6 +617,7 @@ Rules:
 |---|---|
 | `non-positive-cost` | A declared `cost.<key>` equal to zero or negative. |
 | `negative-extra-effect` | A declared `extraEffect.<key>` below zero (extra effects are gains). |
+| `irreversible-grant` | A **positive** `extraEffect.<key>` on a key supplied as `irreversible` (never restored — the runtime guard would refuse the grant). A zero value is not a grant, and a cost on the key is still valid. |
 | `unknown-resource-key` | A `cost.<key>` / `extraEffect.<key>` outside the declared resource set. |
 | `unknown-condition-field` | A condition field outside the declared resource set (the default projection is `coins` / `reputation`). |
 | `unknown-condition-op` | An operator other than `>=`, `<=`, `>`, `<`, `==`. |

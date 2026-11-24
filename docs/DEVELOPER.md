@@ -1746,8 +1746,8 @@ The `resources` column declares the keys a card's attributes may name
 default `coins` / `reputation` projection. `npm run storylines:validate`
 reports a malformed cell or an undeclared key against its **row, column and a
 stable reason** (e.g. `unknown-attribute`, `malformed-cost-pair`,
-`unparseable-condition`, `unknown-resource-key`), so a writer iterates without
-reading engine code. The author CLI accepts the same field
+`unparseable-condition`, `unknown-resource-key`, `irreversible-grant`), so a
+writer iterates without reading engine code. The author CLI accepts the same field
 (`storylines:author -- add-card … --resources "coins,hull"`), and the editor's
 `Options` / `Declared resources` fields carry the syntax in their hints.
 
