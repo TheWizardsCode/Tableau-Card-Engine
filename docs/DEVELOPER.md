@@ -240,6 +240,11 @@ game's thumbnails, icons and audio with no extra step.
   destination is never removed.
 - The composed links are generated artefacts and are gitignored. Drive them
   manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
+- Sibling `path` values are anchored on the **main** checkout, so a build run
+  from a linked worktree (`.worklog/worktrees/<id>/`) composes
+  `<main>/../tce-<game>` — never another item's checkout under
+  `.worklog/worktrees/` (CG-0MWTVP7AI008RAPB). A main-checkout build is
+  unaffected.
 
 Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI.
 
@@ -263,12 +268,15 @@ Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI.
 > no files; `run-tutorial-tests.sh` skips them (and the projects set
 > `passWithNoTests`), so the core's suite stays green without sibling games.
 
-> **`.worklog/worktrees/` layouts:** the sibling lookup is relative to the
-> current project root, so presets resolve from a git worktree exactly as from
-> the main checkout. Because games are sibling checkouts (`../tce-<game>`),
-> a worktree resolves siblings next to itself (`.worklog/worktrees/tce-<game>`);
-> run distribution builds from the main checkout, or symlink siblings beside
-> the worktree.
+> **`.worklog/worktrees/` builds resolve siblings against the main checkout.**
+> A preset's `path` values are sibling repo roots (`../tce-<game>`) relative to
+> the **main** checkout. A build from a linked worktree
+> (`<main>/.worklog/worktrees/<id>/`) therefore still composes and bundles
+> `<main>/../tce-<game>` rather than looking under `.worklog/worktrees/` — so
+> `GAMES_CONFIG=full npm run build` from a worktree works with no symlinks
+> (CG-0MWTVP7AI008RAPB). Detection is conservative: the nearest ancestor
+> holding `.worklog/`, `configs/` and the active preset is the anchor; a
+> main-checkout build is unchanged.
 
 ## Building for Production
 

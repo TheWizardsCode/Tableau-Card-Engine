@@ -403,11 +403,11 @@ describe('dangling composed links (CG-0MWTSRRWU0062OMI)', () => {
     // from the worktree, where it resolves under `.worklog/worktrees/`.
     makeDanglingLink(dest, '../../tce-golf/public/assets/games/golf');
 
-    // The worktree's own sibling resolution (`../tce-golf` from the parent
-    // checkout is `<parent>/.worklog/worktrees/tce-golf`) appears *after* the
-    // link was written — a game worktree created/removed between runs. The raw
-    // target string then matches the planned one, so the old "unchanged" check
-    // kept the dangling link forever.
+    // The worktree's own sibling resolution: `<worktree>/../tce-golf` is
+    // `<root>/.worklog/worktrees/tce-golf` — another item's checkout, or an
+    // absent one. Sibling resolution anchors on the main checkout
+    // (CG-0MWTVP7AI008RAPB), so this extra symlink is only fixture scaffolding:
+    // it keeps `tce-golf` reachable under the old, unanchored path too.
     fs.symlinkSync(path.join(root, 'tce-golf'), path.join(worktree, 'tce-golf'), 'dir');
 
     const report = composeGameAssets({
@@ -555,6 +555,151 @@ describe('tce-game-assets Vite plugin', () => {
       }),
     ).not.toThrow();
     expect(warnings.join('\n')).toContain('[game-assets] skipped asset composition');
+  });
+});
+
+describe('worktree-aware sibling resolution (CG-0MWTVP7AI008RAPB)', () => {
+  /**
+   * A distribution layout in its **canonical** form: preset sibling paths are
+   * `../tce-<game>`, i.e. siblings of the main checkout — never of the
+   * worktree, whose parent is `.worklog/worktrees/`.
+   *
+   * ```text
+   * <parent>/
+   *   tableau-card-engine/            main checkout (.worklog/ + configs/)
+   *     .worklog/worktrees/wl-X/      linked worktree (configs/ only)
+   *   tce-golf/                       canonical sibling game repo
+   * ```
+   */
+  function makeWorktreeLayout(options: {
+    games: string[];
+    /** Write the active preset into the main checkout too (default true). */
+    presetInMain?: boolean;
+  }): { parent: string; main: string; worktree: string } {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-wt-assets-'));
+    tmpDirs.push(parent);
+    const main = path.join(parent, 'tableau-card-engine');
+    const worktree = path.join(main, '.worklog', 'worktrees', 'wl-CG-X');
+
+    for (const root of [main, worktree]) {
+      fs.mkdirSync(path.join(root, 'configs'), { recursive: true });
+      fs.mkdirSync(path.join(root, 'scripts', 'configs'), { recursive: true });
+      fs.mkdirSync(path.join(root, 'public', 'assets'), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, 'scripts', 'configs', 'repo-layout.json'),
+        JSON.stringify({ gameAssets: FIXTURE_OWNERSHIP }, null, 2),
+      );
+    }
+    fs.mkdirSync(path.join(main, '.worklog', 'worktrees'), { recursive: true });
+
+    const games = options.games.map((id) => ({
+      id,
+      path: `../tce-${id}`,
+      scenePath: `src/scenes/${id}Scene.ts`,
+    }));
+    for (const presetRoot of options.presetInMain === false ? [worktree] : [main, worktree]) {
+      fs.writeFileSync(
+        path.join(presetRoot, 'configs', 'preset.json'),
+        JSON.stringify({ games }, null, 2),
+      );
+    }
+
+    for (const id of options.games) {
+      const owned = FIXTURE_OWNERSHIP.find((o) => o.game === id);
+      if (!owned) continue;
+      for (const asset of owned.assets) {
+        const source = path.join(parent, `tce-${id}`, 'public', 'assets', asset);
+        fs.mkdirSync(source, { recursive: true });
+        fs.writeFileSync(path.join(source, 'marker.txt'), `canonical:${id}:${asset}`);
+      }
+    }
+
+    return { parent, main, worktree };
+  }
+
+  it('anchors planGameAssetLinks on the main checkout, not the worktree parent', () => {
+    const { parent, worktree } = makeWorktreeLayout({ games: ['golf'] });
+    // Decoy: another item's game checkout sitting where `<worktree>/../tce-golf`
+    // resolves. Before the fix this is what a worktree build composed.
+    const decoy = path.join(parent, 'tableau-card-engine', '.worklog', 'worktrees', 'tce-golf');
+    for (const asset of ['audio/golf', 'games/golf']) {
+      const source = path.join(decoy, 'public', 'assets', asset);
+      fs.mkdirSync(source, { recursive: true });
+      fs.writeFileSync(path.join(source, 'marker.txt'), `decoy:golf:${asset}`);
+    }
+
+    const plan = planGameAssetLinks({
+      projectRoot: worktree,
+      selectedGames: [{ id: 'golf', path: '../tce-golf' }],
+      ownership: FIXTURE_OWNERSHIP,
+      env: { GAMES_CONFIG: 'preset' },
+    });
+
+    expect(plan.missingGames).toEqual([]);
+    expect(plan.missingAssets).toEqual([]);
+    expect(plan.links.map((l) => l.source).sort()).toEqual([
+      path.join(parent, 'tce-golf', 'public', 'assets', 'audio', 'golf'),
+      path.join(parent, 'tce-golf', 'public', 'assets', 'games', 'golf'),
+    ]);
+    for (const link of plan.links) {
+      expect(link.source).not.toContain(`.worklog${path.sep}worktrees${path.sep}tce-`);
+    }
+  });
+
+  it('composes the canonical sibling assets from a worktree build', () => {
+    const { parent, worktree } = makeWorktreeLayout({ games: ['golf'] });
+
+    const report = composeGameAssets({
+      projectRoot: worktree,
+      env: { GAMES_CONFIG: 'preset' },
+      layoutPath: path.join(worktree, 'scripts', 'configs', 'repo-layout.json'),
+    });
+
+    expect(report.missingGames).toEqual([]);
+    expect(report.linked.map((l) => l.asset).sort()).toEqual(['audio/golf', 'games/golf']);
+    // The link lives in the worktree's own public/assets (the tree Vite copies)
+    // but serves the main checkout's sibling game assets.
+    const composed = path.join(worktree, 'public', 'assets', 'games', 'golf');
+    expect(fs.realpathSync(composed)).toBe(
+      fs.realpathSync(path.join(parent, 'tce-golf', 'public', 'assets', 'games', 'golf')),
+    );
+    expect(fs.readFileSync(path.join(composed, 'marker.txt'), 'utf-8')).toBe(
+      'canonical:golf:games/golf',
+    );
+  });
+
+  it('leaves a main-checkout build resolving exactly as before', () => {
+    const { parent, main } = makeWorktreeLayout({ games: ['golf'] });
+
+    const plan = planGameAssetLinks({
+      projectRoot: main,
+      selectedGames: [{ id: 'golf', path: '../tce-golf' }],
+      ownership: FIXTURE_OWNERSHIP,
+      env: { GAMES_CONFIG: 'preset' },
+    });
+
+    expect(plan.missingGames).toEqual([]);
+    expect(plan.links.map((l) => l.source).sort()).toEqual([
+      path.join(parent, 'tce-golf', 'public', 'assets', 'audio', 'golf'),
+      path.join(parent, 'tce-golf', 'public', 'assets', 'games', 'golf'),
+    ]);
+  });
+
+  it('does not treat a .worklog ancestor without the active preset as the main checkout', () => {
+    // Conservative detection: the ancestor must carry the preset the build
+    // selected, so an unrelated parent holding a `.worklog/` directory cannot
+    // silently redirect sibling resolution.
+    const { worktree } = makeWorktreeLayout({ games: ['golf'], presetInMain: false });
+
+    const plan = planGameAssetLinks({
+      projectRoot: worktree,
+      selectedGames: [{ id: 'golf', path: '../tce-golf' }],
+      ownership: FIXTURE_OWNERSHIP,
+      env: { GAMES_CONFIG: 'preset' },
+    });
+
+    expect(plan.links).toEqual([]);
+    expect(plan.missingGames).toEqual(['golf']);
   });
 });
 

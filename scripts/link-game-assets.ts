@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadGamesConfig, selectConfigPath } from './vite-game-discovery-plugin';
+import { loadGamesConfig, resolveSiblingAnchor, selectConfigPath } from './vite-game-discovery-plugin';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -173,19 +173,31 @@ export const DEFAULT_LAYOUT_PATH = path.join('scripts', 'configs', 'repo-layout.
  * rather than throwing, so a partially-bootstrapped distribution still builds
  * the games it does have.
  *
- * @param options.projectRoot Absolute launcher root.
+ * Sibling `path` values are declared relative to the **main** checkout
+ * (`../tce-<game>`), so they are resolved against
+ * {@link resolveSiblingAnchor} rather than `projectRoot` directly: a build
+ * from a linked worktree (`.worklog/worktrees/<id>/`) must compose the main
+ * checkout's sibling games, not another item's checkout — or none at all
+ * (CG-0MWTVP7AI008RAPB). For a main-checkout build the anchor *is*
+ * `projectRoot`, so behaviour there is unchanged.
+ *
+ * @param options.projectRoot Absolute launcher root (the checkout being built).
  * @param options.selectedGames Selected games (id + sibling `path`).
  * @param options.ownership Per-game asset ownership table.
+ * @param options.env Environment holding `GAMES_CONFIG` (defaults to
+ *   `process.env`) — used only for worktree detection.
  * @returns The plan.
  */
 export function planGameAssetLinks(options: {
   projectRoot: string;
   selectedGames: ReadonlyArray<{ id: string; path: string }>;
   ownership: ReadonlyArray<GameAssetOwnership>;
+  env?: Record<string, string | undefined>;
 }): GameAssetPlan {
   const exists = fs.existsSync;
   const assetsRoot = path.join(options.projectRoot, 'public', 'assets');
   const ownershipByGame = new Map(options.ownership.map((o) => [o.game, o.assets]));
+  const siblingAnchor = resolveSiblingAnchor(options.projectRoot, options.env);
 
   const links: GameAssetLink[] = [];
   const missingGames: string[] = [];
@@ -197,7 +209,7 @@ export function planGameAssetLinks(options: {
       // No declared game-owned assets (e.g. a game with no extra assets).
       continue;
     }
-    const siblingRoot = path.resolve(options.projectRoot, game.path);
+    const siblingRoot = path.resolve(siblingAnchor, game.path);
     if (!exists(siblingRoot)) {
       missingGames.push(game.id);
       continue;
@@ -339,6 +351,7 @@ export function composeGameAssets(options: ComposeGameAssetsOptions): GameAssetC
     projectRoot,
     selectedGames: config.games.map((g) => ({ id: g.id, path: g.path })),
     ownership,
+    env,
   });
 
   const report: GameAssetComposeReport = {
