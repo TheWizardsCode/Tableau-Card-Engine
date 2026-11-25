@@ -76,6 +76,22 @@ const CONTENT: LongErasureContent = longErasureContentFromCsv(
   readRepoFile(CONTENT_PATH),
 );
 
+/** Repository-relative path of the committed episode manifest. */
+const EPISODE_MANIFEST_PATH = 'example-games/gym/content/long-erasure-episode.json';
+
+/** The committed manifest's raw `resources.bounds` block. */
+const MANIFEST_BOUNDS = (
+  JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
+    resources: { bounds: unknown };
+  }
+).resources.bounds;
+
+/** The authored content bounded by the committed manifest (the scene's path). */
+const BOUNDED_CONTENT: LongErasureContent = longErasureContentFromCsv(
+  readRepoFile(CONTENT_PATH),
+  { bounds: MANIFEST_BOUNDS },
+);
+
 /** Options passed to {@link play}. */
 interface PlayOptions {
   readonly seed?: number;
@@ -224,6 +240,9 @@ describe('The Long Erasure: content loading', () => {
     expect(CONTENT.cards[0].id).toBe('le-i-open');
     expect([...CONTENT.resources]).toEqual([...LONG_ERASURE_RESOURCES]);
     expect(CONTENT.clockMax).toBe(DEFAULT_CLOCK_MAX);
+    // Content loaded without a manifest declares no bounds (the pre-bounds
+    // behaviour exactly); the bounded path is asserted below.
+    expect(CONTENT.bounds).toEqual({});
     // Cards carry the narrative columns the run needs.
     for (const card of CONTENT.cards) {
       expect(['I', 'II', 'III', 'Ending']).toContain(card.act);
@@ -251,6 +270,73 @@ describe('The Long Erasure: content loading', () => {
     expect(caughtError(() => longErasureContentFromCsv(''))).toMatchObject({
       code: 'invalid-content',
     });
+  });
+});
+
+describe('The Long Erasure: bounded resources (GDD §2.8, G4)', () => {
+  /** The activity-log lines that record a wasted delta. */
+  function remainderTexts(state: LongErasureState): string[] {
+    return state.activityLog
+      .map((entry) => entry.text)
+      .filter((text) => text.startsWith('Surplus spilled') || text.startsWith('Loss clamped'));
+  }
+
+  it('carries the committed manifest’s bounds on the content', () => {
+    expect(BOUNDED_CONTENT.bounds).toEqual(MANIFEST_BOUNDS);
+    expect(BOUNDED_CONTENT.bounds.morale).toEqual({ min: 0, max: 8 });
+  });
+
+  it('stops a full-key gain at the cap and records the spill', () => {
+    // `Rally the survey crew` grants morale:1; starting at the manifest's
+    // morale maximum means the whole grant is surplus.
+    const state = createLongErasureRun(1, BOUNDED_CONTENT, {
+      resources: { ...DEFAULT_RESOURCES, morale: 8 },
+    });
+
+    const rallied = chooseOption(state, 'Rally the survey crew');
+
+    expect(rallied.resources.morale).toBe(8);
+    expect(remainderTexts(rallied)).toEqual([
+      'Surplus spilled: 1 morale past the 8 cap.',
+    ]);
+  });
+
+  it('clamps a loss at the floor and records the unapplied magnitude', () => {
+    // A morale floor above zero makes a legal (affordable) cost clamp: the
+    // option pays 1 of the 2 below the floor, and the rest is reported.
+    const bounded = longErasureContentFromCsv(readRepoFile(CONTENT_PATH), {
+      bounds: { ...(MANIFEST_BOUNDS as Record<string, unknown>), morale: { min: 2, max: 8 } },
+    });
+    const patched: LongErasureContent = {
+      ...bounded,
+      cards: bounded.cards.map((card) =>
+        card.id === bounded.entryCardId
+          ? { ...card, options: 'Bleed the crew|le-i-log#cost=morale:1' }
+          : card,
+      ),
+    };
+
+    const state = createLongErasureRun(1, patched, {
+      resources: { ...DEFAULT_RESOURCES, morale: 2 },
+    });
+
+    const bled = chooseOption(state, 'Bleed the crew');
+
+    expect(bled.resources.morale).toBe(2);
+    expect(remainderTexts(bled)).toEqual([
+      'Loss clamped: 1 morale below the 2 floor.',
+    ]);
+  });
+
+  it('leaves unbounded content exactly as it was', () => {
+    const state = createLongErasureRun(1, CONTENT, {
+      resources: { ...DEFAULT_RESOURCES, morale: 8 },
+    });
+
+    const rallied = chooseOption(state, 'Rally the survey crew');
+
+    expect(rallied.resources.morale).toBe(9);
+    expect(remainderTexts(rallied)).toEqual([]);
   });
 });
 

@@ -2314,8 +2314,14 @@ compiling and running unchanged (core warns in the activity log instead of
 mutating resources). Resources are **game-declared** — declare the keys on the
 adapter's optional `resources` member (or build the resource seam from
 `createResourceProjection({ … })`), and `coins` / `reputation` stay the default
-projection when nothing is declared. See
-[Declared resources](core-engine/story-line.md#declared-resources).
+projection when nothing is declared. The same projection can carry per-key
+**bounds** (`createResourceProjection(fields, { bounds, onRemainder })`): a gain
+at a key's maximum spills and a loss at its minimum clamps, with the per-key
+`applied` / `spilled` / `clamped` remainder returned from `applyResourceDelta`
+and reported once per call through the hook (omitting `bounds` keeps the old
+unbounded behaviour exactly). See
+[Declared resources](core-engine/story-line.md#declared-resources) and
+[Resource bounds](core-engine/story-line.md#resource-bounds-spill-at-the-cap-clamp-at-the-floor).
 
 ## Build-Time Version Injection
 

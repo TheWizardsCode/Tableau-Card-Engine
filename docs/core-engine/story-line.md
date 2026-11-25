@@ -224,6 +224,61 @@ non-monetary vocabulary can override the default UI adapter's
 `storyUpdateLine` to describe its own currencies — the resolution result
 reports the `coins` / `reputation` projections only.
 
+### Resource bounds: spill at the cap, clamp at the floor
+
+The projection can also carry a game's **bounds** — one inclusive `{ min, max }`
+per declared key, the shape the episode manifest's `resources.bounds` already
+carries:
+
+```ts
+const resources = createResourceProjection<VoyageState>(
+  {
+    hull: { read: (s) => s.hull, apply: (s, d) => { s.hull += d; } },
+    morale: { read: (s) => s.morale, apply: (s, d) => { s.morale += d; } },
+  },
+  {
+    bounds: { hull: { min: 0, max: 5 }, morale: { min: 0, max: 8 } },
+    onRemainder: (report, state) => {
+      for (const entry of report) {
+        if (entry.spilled > 0) log(state, `${entry.spilled} ${entry.key} spilled`);
+        if (entry.clamped > 0) log(state, `${entry.clamped} ${entry.key} clamped`);
+      }
+    },
+  },
+);
+```
+
+A bounded key's delta is clamped to `[min, max]`: a **gain** at the cap is
+applied only up to the cap and the excess is reported as `spilled` (never
+banked, never moved to another key); a **loss** at the floor is applied only
+down to the floor and the unapplied magnitude is reported as `clamped` (never
+applied, never stored as a negative remainder). A delta that is entirely wasted
+calls the field's `apply` not at all. Keys with no `bounds` entry — and any
+projection built without `bounds` — keep the pre-bounds behaviour exactly
+(`applied === delta`, nothing reported), which is the back-compatibility rule.
+
+`applyResourceDelta` returns the remainder: one
+`{ key, applied, spilled, clamped }` entry per declared key, in declaration
+order, zeros for untouched keys, so the report shape never depends on which keys
+moved. The optional `onRemainder(report, state)` hook fires **at most once per
+call**, only when at least one key spilled or clamped, and receives the same
+report the call returns plus the state the delta was applied to. The engine
+reports numbers; the wording — an activity-log line, a HUD note — is the game's.
+
+The seam stays `void`-returning (`StorylineEngineAdapter.applyResourceDelta`),
+so returning the report is legal and no adapter implementation changed; core
+keeps reading resources back through `getResources`.
+
+The Gym **Long Erasure** run is the bounded consumer: `longErasureContentFromCsv`
+reads the committed manifest's `resources.bounds` through the default-free
+`readManifestBounds` (never a hand-copied range literal), carries the result on
+`LongErasureContent.bounds`, and `createLongErasureRun`'s projection clamps and
+spills against it — logging `Surplus spilled: 1 morale past the 8 cap.` /
+`Loss clamped: 1 morale below the 2 floor.` into the run's activity log. The
+GDD's per-key ranges (hull 0–5, morale 0–8, stores 0–6, goodwill 0–5, charge
+0–4) are therefore a runtime guarantee rather than authoring discipline
+(`CG-0MWR0BGVG004UE7X`, GDD §2.8 gap G4).
+
 ### Authoring options in CSV
 
 A writer authors the whole option model in the `options` cell. Each option is a
@@ -1987,6 +2042,13 @@ follows.
   effects on any key, draw-time affordability over declared keys, the
   absent-key/unspecified-key/no-invention rules, the `coins` / `reputation`
   default projection and `createResourceProjection` itself.
+- `tests/story-line/resource-bounds.test.ts` — the bounded projection: a gain
+  past `max` applies only up to the cap and reports the excess as `spilled`, a
+  loss past `min` applies only down to the floor and reports the magnitude as
+  `clamped`, multi-key deltas are independent and keep declaration order, the
+  remainder report covers every declared key, the hook fires once per call (only
+  when something was wasted), and a projection built without `bounds` keeps
+  `applied === delta`.
 - `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state,
   and the display-safe `truncateOutcome()` boundaries (word boundary,
   space-less hard cut, default 80-character budget) that keep the full prose

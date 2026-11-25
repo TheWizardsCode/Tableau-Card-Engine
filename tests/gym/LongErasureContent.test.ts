@@ -48,6 +48,10 @@ import { buildStorylineManifestFromCsv } from '../../src/story-line/content/mani
 import type { ContentCard } from '../../src/story-line/content/types';
 import { validateContentCsv } from '../../src/story-line/content/validate';
 import type { StorylineOption } from '../../src/story-line/types';
+import {
+  LongErasureError,
+  longErasureContentFromCsv,
+} from '../../example-games/gym/GymLongErasureGame';
 
 /** Repository root, resolved from this file rather than `process.cwd()`. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -58,6 +62,9 @@ const CONTENT_PATH = LONG_ERASURE_CONTENT_PATH;
 /** Repository-relative paths of the committed generated artefacts. */
 const MANIFEST_PATH = 'example-games/gym/content/long-erasure-manifest.json';
 const MERMAID_PATH = 'example-games/gym/content/long-erasure-graph.mmd';
+
+/** Repository-relative path of the authoritative episode manifest. */
+const EPISODE_MANIFEST_PATH = 'example-games/gym/content/long-erasure-episode.json';
 
 /** The resource set the content declares on every card. */
 const RESOURCES = ['hull', 'morale', 'stores', 'goodwill', 'charge'] as const;
@@ -476,5 +483,61 @@ describe('The Long Erasure: IP guard', () => {
         [],
       );
     }
+  });
+});
+
+describe('Long Erasure content: resource bounds (GDD §2.8, G4)', () => {
+  /** The committed episode manifest, read as plain data. */
+  const episodeManifest = JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
+    resources: { declared: string[]; bounds: Record<string, { min: number; max: number }> };
+  };
+
+  it('reads every declared key’s bounds from the committed manifest', () => {
+    const content = longErasureContentFromCsv(CSV_TEXT, {
+      bounds: episodeManifest.resources.bounds,
+    });
+
+    // The declared set and the bounded set are the same keys…
+    expect([...content.resources]).toEqual([...episodeManifest.resources.declared]);
+    // …and the ranges are the manifest's, never a hand-copied literal.
+    expect(content.bounds).toEqual(episodeManifest.resources.bounds);
+    expect(content.bounds.hull).toEqual({ min: 0, max: 5 });
+    expect(content.bounds.charge).toEqual({ min: 0, max: 4 });
+  });
+
+  it('declares no bounds when the content is loaded without a manifest', () => {
+    expect(longErasureContentFromCsv(CSV_TEXT).bounds).toEqual({});
+  });
+
+  it('fails closed when the supplied bounds do not cover the declared keys', () => {
+    expect(() =>
+      longErasureContentFromCsv(CSV_TEXT, { bounds: { hull: { min: 0, max: 5 } } }),
+    ).toThrowError(LongErasureError);
+    expect(() =>
+      longErasureContentFromCsv(CSV_TEXT, { bounds: { hull: { min: 0, max: 5 } } }),
+    ).toThrowError(/missing-bounds-entry: morale/);
+  });
+
+  it('fails closed on an inverted range rather than normalising it', () => {
+    const inverted = {
+      ...episodeManifest.resources.bounds,
+      stores: { min: 6, max: 0 },
+    };
+
+    expect(() => longErasureContentFromCsv(CSV_TEXT, { bounds: inverted })).toThrowError(
+      /bounds-inverted: stores/,
+    );
+  });
+
+  it('ignores a bounds entry for a key the content does not declare', () => {
+    const extra = {
+      ...episodeManifest.resources.bounds,
+      shields: { min: 0, max: 3 },
+    };
+
+    const content = longErasureContentFromCsv(CSV_TEXT, { bounds: extra });
+
+    expect(content.resources).not.toContain('shields');
+    expect('shields' in content.bounds).toBe(false);
   });
 });

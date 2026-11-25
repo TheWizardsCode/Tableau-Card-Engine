@@ -994,8 +994,9 @@ when two keys are always spent in the same choice — then they are one key.
 Every key below states the four things a writer needs: where it starts, what it
 can reach, what reads it, and what happens at each bound. Values are the spike's
 starting bag (`DEFAULT_RESOURCES` in
-`example-games/gym/GymLongErasureGame.ts`); bounds are the v1 design bounds the
-engine cannot enforce yet (gap 1 below).
+`example-games/gym/GymLongErasureGame.ts`); bounds are the v1 design bounds,
+**enforced at runtime** by the bounded resource projection ([§2.8.2](#282-per-key-contract),
+[G4](#g4) — delivered).
 
 | Key | Start | Bounds | Sources (authored gains) | Sinks (authored costs) | Gates that read it | At zero | At maximum | Recovery path |
 |---|---|---|---|---|---|---|---|---|
@@ -1024,12 +1025,28 @@ at the right key, and the authoring diagnostic stops a writer typing
 `#extra=hull:1`. The fixture test in
 [§2.8.7](#287-how-the-economy-is-verified) still pins the shipped content.
 
-**Bounds are design bounds, not engine bounds.** A cost is only authored up to a
-value the starting bag plus that key's own authored sources can supply; a gain is
-authored so that the recorded route's peak stays under the cap. Until the engine
-clamps (gap 1), a fixture test asserts those inequalities
-([§2.8.7](#287-how-the-economy-is-verified)) — the model is checked at authoring
-time because it cannot be enforced at runtime. Where the columns above say a surplus *spills* or a loss *clamps*, read "is designed to spill / clamp": the engine applies every delta unclamped until gap 1 closes, so the bound is authoring discipline plus the fixture test, not a runtime guarantee.
+**Bounds are engine bounds.** The ranges above are declared data and the
+runtime enforces them, so a surplus **spills** and a loss **clamps** as written
+rather than as intended. The carrier is `createResourceProjection(fields,
+{ bounds })` (`src/story-line/resources.ts`): a bounded key's delta is applied
+only up to its `max` (the excess is reported as `spilled` and never banked or
+transferred to another key) and only down to its `min` (the unapplied magnitude
+is reported as `clamped` and never applied). Every `applyResourceDelta` call
+returns one `applied` / `spilled` / `clamped` entry per declared key in
+declaration order, and an optional `onRemainder(report, state)` hook fires at
+most once per call — only when something spilled or clamped — so a game can
+record what the bounds wasted (the Long Erasure appends an activity-log line per
+spilled / clamped key).
+
+The bounds are the **caller's** data: the engine hard-codes no key and no range,
+so an arbitrary declared set gets the same semantics. Omitting `bounds` — or a
+key's entry — keeps the pre-bounds behaviour exactly (`applied === delta`, no
+clamping, no reporting), which is the compatibility rule for every game that
+predates this capability. The Long Erasure reads its ranges from the committed
+manifest's `resources.bounds` through the default-free `readManifestBounds`
+read-through, never a hand-copied literal; the authoring-time inequalities below
+remain a useful content check, but the runtime is no longer trusting them
+(G4 delivered, `CG-0MWR0BGVG004UE7X`).
 
 #### 2.8.3 The economy by act
 
@@ -1161,7 +1178,7 @@ is a proposal.
 | Objective check | the manifest's `objective.check`, the same `{field, op, value}` `Condition` shape over declared keys | episode manifest |
 | Irreversibility | `resources.irreversible` in the manifest, checked by the `loss-not-irreversible` rule | episode manifest |
 | Losses | `losses[]` rules applied at scene close through `engine.applyResourceDelta` | episode manifest |
-| Bounds | **nothing** — design bounds, asserted by the fixture test | — (gap 1) |
+| Bounds | `createResourceProjection(fields, { bounds })` — the per-key `{ min, max }` map the projection clamps and spills against | game module, read from the manifest's `resources.bounds` through `readManifestBounds` (e.g. `LongErasureContent.bounds`) |
 
 The declaration is a five-line projection, and the keys cannot drift from the
 accessors because the same object supplies both:
@@ -1197,8 +1214,8 @@ the nearest precedent and the filed work item.
 
 | # | The model needs | Why the engine cannot do it at this commit | Backlog pointer |
 |---|---|---|---|
-| 1 | **Bounds and clamping** — min/max per key, spill at maximum, clamped loss at minimum | `applyResourceDelta` is unbounded and unvalidated (`src/story-line/resources.ts`); a delta is applied as given, so a gain past the cap silently banks and a loss below zero silently goes negative. No spill or clamp is reported anywhere. | [G4](#g4) — filed (`CG-0MWR0BGVG004UE7X`) |
-| 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | **Delivered as data** — `resources.start` / `resources.bounds` are manifest fields (schema-required whenever the block is present), and the validator's `resource-set-mismatch` rule reads them through the default-free `readManifestStartBag` / `readManifestBounds` read-throughs, so the manifest validator no longer needs a game constant to see the start bag. What remains a gap is the *reachability proof* itself: gate reachability belongs to the scene-space guard ([G3](#g3)) and clamping to the bounds belongs to the economy ledger ([G4](#g4)). | [G2](#g2) — **Delivered** by `CG-0MWSJYLZ3005C2V1` (epic `CG-0MWR0BFMW003856N`) |
+| 1 | **Bounds and clamping** — min/max per key, spill at maximum, clamped loss at minimum | **Delivered** — `createResourceProjection(fields, { bounds, onRemainder })` (`src/story-line/resources.ts`) clamps each bounded key's delta to `[min, max]`, applies nothing for a fully wasted delta, returns a per-key `applied` / `spilled` / `clamped` remainder in declaration order and fires `onRemainder` once per call when something spilled or clamped. A gain at the cap spills, a loss at the floor clamps, and neither is banked, transferred or applied below the floor. Bounds are the caller's data (the Long Erasure reads the manifest's `resources.bounds` through `readManifestBounds`); a projection built without bounds behaves exactly as before. | [G4](#g4) — **Delivered** by `CG-0MWR0BGVG004UE7X` |
+| 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | **Delivered as data** — `resources.start` / `resources.bounds` are manifest fields (schema-required whenever the block is present), and the validator's `resource-set-mismatch` rule reads them through the default-free `readManifestStartBag` / `readManifestBounds` read-throughs, so the manifest validator no longer needs a game constant to see the start bag. What remains a gap is the *reachability proof* itself: gate reachability belongs to the scene-space guard ([G3](#g3)), while clamping to the bounds is now delivered by [G4](#g4). | [G2](#g2) — **Delivered** by `CG-0MWSJYLZ3005C2V1` (epic `CG-0MWR0BFMW003856N`) |
 | 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | [G7](#g7) — filed (`CG-0MWR0BI3S008K9Y6`) |
 | 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | [G6](#g6) — deferred to the build epic |
 | 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | [G3](#g3) — filed (`CG-0MWR0BG9H007AFNU`) |
@@ -1220,7 +1237,7 @@ and the enforcement is
 | The irreversible key is never granted, and no cost exceeds the start bag plus authored gains | same test file | zero `extraEffect.hull`; every cost ≤ supply |
 | An irreversible key may be spent but never granted, at authoring time and at run time | `npx vitest run --project unit tests/story-line/irreversible-grant.test.ts tests/story-line/irreversible-policy.test.ts tests/story-line/irreversible-declaration.test.ts` | a positive `#extra` on `hull` is `irreversible-grant`; the runtime guard refuses the grant and logs `Extra effect refused: hull is irreversible.`; a `#cost=hull` still pays; no recovery path restores it |
 | The state-gated branch is reachable **and** survivable, and every ending is reachable | same test file (guard with the start bag) | `gated-branch-survivable` and `ending-reachable` green |
-| Bounds hold on the authored content | same test file (authoring-time inequalities) | every cost/gain within the bounds of [§2.8.2](#282-per-key-contract) |
+| Bounds hold on the authored content, and the runtime enforces them | `npx vitest run --project unit tests/story-line/resource-bounds.test.ts tests/gym/LongErasureContent.test.ts tests/gym/GymLongErasureGame.test.ts` | every cost/gain within the bounds of [§2.8.2](#282-per-key-contract) at authoring time **and** at run time: a gain at the cap spills (`Surplus spilled: 1 morale past the 8 cap.`), a loss at the floor clamps (`Loss clamped: 1 morale below the 2 floor.`) |
 
 What the checks cannot prove — and a reviewer must judge — is the part that
 makes the numbers *felt*: that the Act I store and the Act III crew door are
@@ -2871,7 +2888,7 @@ invisible.
 | [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | **delivered** across the build epic — `src/story-line/episode-runner.ts` charges scene budgets, classifies outcomes from the authored table, routes on ordered totals and records the loss ledger | large — `src/story-line/` itself | epic | **Delivered** — epic `CG-0MWR0BAT30015DPQ` (`src/story-line/episode-runner.ts`) |
 | [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** across the build epic — the schema (ajv-pinned), the pure validator and the `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | **Delivered** — epic `CG-0MWR0BFMW003856N` |
 | [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
-| [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | `createResourceProjection(...).applyResourceDelta` in `src/story-line/resources.ts` forwards every finite delta unbounded; no bounds type, no spill/clamp report | small–medium — `src/rule-engine/EconomyLedger.ts` (constraint-checked deltas) | feature | Filed — `CG-0MWR0BGVG004UE7X` |
+| [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | **delivered** — `createResourceProjection(fields, { bounds, onRemainder })` clamps/spills per declared key, returns a per-key `applied` / `spilled` / `clamped` remainder in declaration order and reports it once per call; the Long Erasure reads the manifest's `resources.bounds` through `readManifestBounds` (`src/story-line/resources.ts`, `example-games/gym/GymLongErasureGame.ts`) | small–medium — the projection's apply seam plus the manifest read-through | feature | **Delivered** — `CG-0MWR0BGVG004UE7X` |
 | [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | **delivered** — the projection carries the irreversible subset, `validateStorylineOptions` reports `irreversible-grant` and the resolution guard refuses the grant while a cost still pays (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/resolve.ts`) | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | **Delivered** — `CG-0MWR0BHH9002OQUZ` (`src/story-line/resolve.ts`) |
 | [G6](#g6) | Compound / range conditions ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | [§2.2.5](#225-objective) `Objective.check`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 4 | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`) evaluated once (`evaluateCondition`, `src/story-line/resolve.ts`) | small — `Condition` + `evaluateCondition` | task | **Deferred to the build epic** (v1 uses one-clause objectives; two clauses are two scenes) |
 | [G7](#g7) | Surfaced affordability: compile an unaffordable option with its shortfall instead of deleting it | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat) option gating, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3, [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), [§3.6](#36-named-presentation-gaps) B4 | `isOptionAffordable` returns a boolean and `compileStorylineFromEvent` omits the option at draw time; no requirement object reaches the presenter | small — `isOptionAffordable` + the compiled-option shape in `src/story-line/compile.ts` | feature | Filed — `CG-0MWR0BI3S008K9Y6` |
@@ -2987,11 +3004,12 @@ enforced: a gain at the cap spills rather than banks, a loss at the floor clamps
 and its unapplied remainder is recorded. Without it the GDD's "surplus spills /
 loss clamps" statements are authoring discipline plus a fixture test.
 
-**Why the engine cannot do it at this commit.**
+**Why the engine cannot do it at this commit.** (Recorded as written; see
+**Delivered since** below.)
 `createResourceProjection(...).applyResourceDelta` in
-`src/story-line/resources.ts` forwards every finite, non-zero delta to the
-game's own `apply` without bounds: nothing clamps, nothing spills and nothing is
-reported. `DEFAULT_RESOURCES` is a value bag, not a bounds declaration. The
+`src/story-line/resources.ts` forwarded every finite, non-zero delta to the
+game's own `apply` without bounds: nothing clamped, nothing spilled and nothing
+was reported. `DEFAULT_RESOURCES` is a value bag, not a bounds declaration. The
 nearest constrained helper, `src/rule-engine/EconomyLedger.ts`, is hard-coded to
 `coins` / `reputation` and offers only `minCoins` / `minReputation` — no
 maximum, no spill, no clamped-loss record, and no other key.
@@ -3001,8 +3019,32 @@ maximum, no spill, no clamped-loss record, and no other key.
 `StorylineResourceProjection` seam. The work is a bounds type, clamp/spill
 arithmetic, a reported remainder and the manifest plumbing shared with G2.
 
-**Disposition.** **Filed** — `CG-0MWR0BGVG004UE7X` (`feature`, medium, effort
-`M`). Blocked by the GDD epic.
+**Disposition.** **Delivered** — `CG-0MWR0BGVG004UE7X` (`feature`, medium,
+effort `M`).
+
+**Delivered since.** `createResourceProjection(fields, { bounds, onRemainder })`
+now clamps every bounded key: `applied = clamp(current + delta, min, max) −
+current`, `spilled = max(0, target − max)`, `clamped = max(0, min − target)`, and
+the field's `apply` is called only when `applied !== 0`, so a fully wasted delta
+mutates nothing. Each call returns a `ResourceRemainderReport` — one entry per
+declared key, in declaration order, zeros for untouched keys — and the optional
+hook fires at most once, only when a key spilled or clamped, carrying that same
+report plus the state it was applied to (so a game can log it). Multi-key deltas
+are applied independently per key; one key's spill never changes another key's
+applied amount, and the arithmetic is pure and synchronous (no RNG, no time), so
+the same state + delta always yields the same report. Bounds are the caller's
+data and the engine reads no manifest file: the Long Erasure derives
+`LongErasureContent.bounds` from the committed manifest's `resources.bounds` via
+`readManifestBounds`, and omitting `bounds` reproduces the pre-G4 behaviour
+exactly (`applied === delta`, nothing reported) so no existing game changes.
+`StorylineEngineAdapter.applyResourceDelta` stays `void`-returning — the report
+rides on the returned value (legal against a `void` seam) and on the hook — so
+no adapter implementation broke. Coverage:
+`tests/story-line/resource-bounds.test.ts` (spill, clamp, independence,
+ordering, the no-bounds path and the hook-fires-once rule),
+`tests/gym/LongErasureContent.test.ts` (bounds read from the committed manifest)
+and `tests/gym/GymLongErasureGame.test.ts` (the activity-log record of a spill
+and of a clamp).
 
 #### <a id="g5"></a>G5 — Irreversible-resource policy
 
@@ -3296,7 +3338,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | **Delivered** — `src/story-line/episode-runner.ts` (epic `CG-0MWR0BAT30015DPQ`) |
 | G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | **Delivered** — manifest schema, validator and `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) |
 | G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | blocked, scheduled past the GDD close |
-| G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
+| G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | **Delivered** — `createResourceProjection(fields, { bounds, onRemainder })` spill/clamp + per-key remainder, with the Long Erasure reading the manifest's `resources.bounds` |
 | G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | **Delivered** — `irreversible` projection + `irreversible-grant` diagnostic + runtime guard |
 | G6 | — | task | — | — | — | **Deferred** — one-clause objectives are the v1 model |
 | G7 | `CG-0MWR0BI3S008K9Y6` | feature | medium | S | GDD epic | blocked, scheduled past the GDD close |

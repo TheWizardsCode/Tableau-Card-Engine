@@ -27,6 +27,17 @@
  * empty by default, so a resolution guard can refuse a grant without a second
  * seam and a game that declares nothing is unchanged.
  *
+ * The declared set may also carry **inclusive per-key bounds**
+ * (`createResourceProjection(fields, { bounds })`), the range the GDD states for
+ * each key. A bounded key's delta is clamped to `[min, max]` at apply time: a
+ * gain at the cap spills (the excess is reported, never banked) and a loss at
+ * the floor clamps (the unapplied magnitude is reported, never applied). Every
+ * call returns a {@link ResourceRemainderReport} — one entry per declared key
+ * in declaration order — and an optional `onRemainder` hook reports the same
+ * report once per call, only when something spilled or clamped. Bounds are the
+ * caller's data: the engine hard-codes no key and no range, and a projection
+ * built without bounds behaves exactly as it did before.
+ *
  * Nothing here depends on Phaser or imports a game module.
  *
  * The module is also the **read-through for the episode manifest's resource
@@ -365,6 +376,39 @@ export interface StorylineResourceField<TState> {
 }
 
 /**
+ * What one declared key's delta actually did, once its bounds were enforced.
+ *
+ * The three amounts are always reported together, so a caller never has to
+ * infer the outcome from the key's value:
+ *
+ * - `applied` — the signed amount handed to the field's `apply` (`0` when the
+ *   whole delta was wasted, in which case `apply` was not called at all).
+ * - `spilled` — the **positive** excess of a gain past the key's `max`. It is
+ *   never banked and never transferred to another key.
+ * - `clamped` — the **positive** magnitude of a loss the key's `min` refused.
+ *   It is never applied and never stored as a negative remainder.
+ */
+export interface ResourceRemainderEntry {
+  /** The declared resource key this entry reports. */
+  readonly key: StorylineResourceKey;
+  /** The signed amount applied to the key (derived from the value read back). */
+  readonly applied: number;
+  /** The unbounded excess of a gain past `max` (`0` when none was wasted). */
+  readonly spilled: number;
+  /** The unapplied magnitude of a loss below `min` (`0` when nothing clamped). */
+  readonly clamped: number;
+}
+
+/**
+ * The remainder of one `applyResourceDelta` call: **one entry per declared
+ * key**, in declaration order, with zeros for the keys the call did not move.
+ *
+ * The shape therefore never depends on which keys moved, so a consumer can
+ * render or log it without first checking which keys are present.
+ */
+export type ResourceRemainderReport = readonly ResourceRemainderEntry[];
+
+/**
  * The resource half of a {@link StorylineEngineAdapter}, built declaratively.
  *
  * Structurally assignable to the adapter's `resources`, `getResources` and
@@ -394,14 +438,27 @@ export interface StorylineResourceProjection<TState> {
   /** Current values of every declared resource (absent reads as `0`). */
   getResources(state: TState): StorylineResources;
   /**
-   * Applies a signed delta. Keys outside the projection, non-finite values and
-   * zero deltas are ignored — the projection never invents a resource.
+   * Applies a signed delta and returns the per-key remainder.
+   *
+   * Keys outside the projection, non-finite values and zero deltas are ignored
+   * — the projection never invents a resource. Each declared key that was
+   * bounded had its delta clamped to `[min, max]`: a gain past the cap is
+   * applied only up to the cap (`spilled` reports the excess) and a loss past
+   * the floor is applied only down to the floor (`clamped` reports the
+   * unapplied magnitude). Keys with no bounds entry apply the delta as given.
+   *
+   * The returned report is legal against the `void`-returning
+   * `StorylineEngineAdapter.applyResourceDelta` seam, so an adapter built by
+   * spreading this projection needs no signature change.
    */
-  applyResourceDelta(state: TState, delta: StorylineResourcesDelta): void;
+  applyResourceDelta(
+    state: TState,
+    delta: StorylineResourcesDelta,
+  ): ResourceRemainderReport;
 }
 
 /** Options controlling {@link createResourceProjection}. */
-export interface ResourceProjectionOptions {
+export interface ResourceProjectionOptions<TState = unknown> {
   /**
    * The declared never-restored keys, in declaration order (a run's
    * `resources.irreversible`, for example). Normalised like every other key
@@ -410,6 +467,37 @@ export interface ResourceProjectionOptions {
    * empty and every existing behaviour unchanged.
    */
   readonly irreversible?: Iterable<StorylineResourceKey>;
+  /**
+   * Inclusive per-key bounds, keyed by declared resource (`{ min, max }` — the
+   * shape the episode manifest's `resources.bounds` already carries, so a game
+   * can pass its manifest's read-through straight in).
+   *
+   * Only the keys named here are bounded. Omitting the option — or a key's
+   * entry — keeps the pre-bounds behaviour exactly: the delta is applied as
+   * given, nothing spills, nothing clamps and nothing is reported.
+   *
+   * Bounds are expected to be validated data (`readManifestBounds` refuses a
+   * missing entry and an inverted range). A malformed entry that still arrives
+   * (an inverted range, a non-finite member) is ignored — the key stays
+   * unbounded rather than making the key unspendable or over-applying.
+   */
+  readonly bounds?: Readonly<Record<StorylineResourceKey, ManifestResourceBounds>>;
+  /**
+   * Called at most once per `applyResourceDelta` call, and only when at least
+   * one key spilled or clamped.
+   *
+   * It receives the **same** {@link ResourceRemainderReport} the call returns
+   * (one entry per declared key, declaration order) and the state the delta was
+   * applied to, so a game can record the remainder — an activity-log line per
+   * spilled / clamped key, for example. Wording is the game's; the engine only
+   * reports the numbers.
+   *
+   * Omitted means "reports nothing", leaving every existing caller unchanged.
+   */
+  readonly onRemainder?: (
+    report: ResourceRemainderReport,
+    state: TState,
+  ) => void;
 }
 
 /**
@@ -426,15 +514,25 @@ export interface ResourceProjectionOptions {
  * order preserved) and defaults to `[]`, so a caller that declares none keeps
  * the pre-existing contract exactly.
  *
+ * The optional `bounds` declaration names the inclusive `{ min, max }` range of
+ * the keys the caller bounded. Omitting it (or a key's entry) keeps the
+ * unbounded behaviour exactly; supplying it turns each bounded key's delta into
+ * a clamped, reported one (see {@link StorylineResourceProjection.applyResourceDelta}).
+ * The optional `onRemainder` hook receives that report once per call, together
+ * with the state, so a game can record what its bounds wasted.
+ *
  * @param fields  One accessor pair per declared resource key.
- * @param options Optional never-restored key declaration.
+ * @param options Optional never-restored key declaration, per-key bounds and
+ *                the remainder hook.
  */
 export function createResourceProjection<TState>(
   fields: Readonly<Record<StorylineResourceKey, StorylineResourceField<TState>>>,
-  options: ResourceProjectionOptions = {},
+  options: ResourceProjectionOptions<TState> = {},
 ): StorylineResourceProjection<TState> {
   const resources = normaliseResourceKeys(Object.keys(fields));
   const irreversible = normaliseResourceKeys(options.irreversible ?? []);
+  const bounds = options.bounds;
+  const onRemainder = options.onRemainder;
 
   return {
     resources,
@@ -446,14 +544,66 @@ export function createResourceProjection<TState>(
       }
       return bag;
     },
-    applyResourceDelta(state: TState, delta: StorylineResourcesDelta): void {
+    applyResourceDelta(
+      state: TState,
+      delta: StorylineResourcesDelta,
+    ): ResourceRemainderReport {
+      const report: ResourceRemainderEntry[] = [];
+      let remainder = false;
+
       for (const key of resources) {
         const value = delta[key];
         if (typeof value !== 'number' || !Number.isFinite(value) || value === 0) {
+          report.push({ key, applied: 0, spilled: 0, clamped: 0 });
           continue;
         }
-        fields[key]?.apply(state, value);
+
+        const range = validBounds(bounds?.[key]);
+        if (range === undefined) {
+          fields[key]?.apply(state, value);
+          report.push({ key, applied: value, spilled: 0, clamped: 0 });
+          continue;
+        }
+
+        // Read-mutate-read: the applied amount is derived from the value the
+        // projection read, never from the authored delta, so a field that also
+        // clamps internally cannot make the report drift.
+        const read = fields[key]?.read(state);
+        const current =
+          typeof read === 'number' && Number.isFinite(read) ? read : 0;
+        const target = current + value;
+        const applied = clamp(target, range.min, range.max) - current;
+        const spilled = Math.max(0, target - range.max);
+        const clamped = Math.max(0, range.min - target);
+
+        // A fully wasted delta mutates nothing: the key is already at the bound
+        // it was pushed past.
+        if (applied !== 0) fields[key]?.apply(state, applied);
+        report.push({ key, applied, spilled, clamped });
+        if (spilled > 0 || clamped > 0) remainder = true;
       }
+
+      if (remainder) onRemainder?.(report, state);
+      return report;
     },
   };
+}
+
+/** A usable inclusive range, or `undefined` when the entry is unusable. */
+function validBounds(
+  entry: ManifestResourceBounds | undefined,
+): ManifestResourceBounds | undefined {
+  if (entry === undefined) return undefined;
+  const { min, max } = entry;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min > max) {
+    return undefined;
+  }
+  return entry;
+}
+
+/** Clamps `value` into `[min, max]`. */
+function clamp(value: number, min: number, max: number): number {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
 }

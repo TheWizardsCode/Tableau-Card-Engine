@@ -24,6 +24,7 @@ import Phaser from 'phaser';
 
 import {
   GymLongErasureScene,
+  LONG_ERASURE_EPISODE_MANIFEST,
   NARRATIVE_PANEL_PAGE_CHARS,
   OPTION_ANCHORS,
   longErasureSceneContent,
@@ -326,6 +327,13 @@ describe('GymLongErasureScene browser test', () => {
 
   it('exposes the four SLL option anchors the layout provides', () => {
     expect(OPTION_ANCHORS).toEqual(['option1', 'option2', 'option3', 'option4']);
+  });
+
+  it('bounds the shipped content with the committed manifest, not a copied literal', () => {
+    const content = longErasureSceneContent();
+
+    expect(LONG_ERASURE_EPISODE_MANIFEST.resources.declared).toEqual([...content.resources]);
+    expect(content.bounds).toEqual(LONG_ERASURE_EPISODE_MANIFEST.resources.bounds);
   });
 
   // ── Authored prose on screen (AC2, AC3, AC4, AC5, AC6) ──

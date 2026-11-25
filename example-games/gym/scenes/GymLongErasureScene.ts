@@ -84,6 +84,7 @@ import { COMMON_SFX_KEYS, SoundManager } from '../../../src/core-engine';
 import type { CommonSfxKey, SoundPlayer } from '../../../src/core-engine';
 import gymLongErasureLayoutJson from '../layouts/gym-long-erasure.layout.json';
 import longErasureCsv from '../content/long-erasure.csv?raw';
+import longErasureEpisodeManifest from '../content/long-erasure-episode.json';
 import {
   LongErasureError,
   availableOptions,
@@ -169,13 +170,25 @@ export function setLongErasureSceneContent(
 }
 
 /**
+ * The committed episode manifest, the authoritative resource declaration.
+ *
+ * The scene reads its `resources.bounds` at content-load time and passes the
+ * block to the loader, so the run's per-key bounds are the manifest's design
+ * bounds rather than a hand-copied range literal (GDD §2.8, G4).
+ */
+export const LONG_ERASURE_EPISODE_MANIFEST = longErasureEpisodeManifest;
+
+/**
  * The content this scene plays (parsed from `content/long-erasure.csv`, the
- * same file the content toolchain validates).
+ * same file the content toolchain validates, bounded by the committed
+ * manifest's `resources.bounds`).
  */
 export function longErasureSceneContent(): LongErasureContent {
   if (contentOverride !== null) return contentOverride;
   if (cachedContent === null) {
-    cachedContent = longErasureContentFromCsv(longErasureCsv);
+    cachedContent = longErasureContentFromCsv(longErasureCsv, {
+      bounds: LONG_ERASURE_EPISODE_MANIFEST.resources.bounds,
+    });
   }
   return cachedContent;
 }

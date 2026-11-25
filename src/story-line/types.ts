@@ -345,6 +345,17 @@ export interface StorylineEngineAdapter<TState, TCard extends StorylineCard> {
    * (or deliberately does not expose resources for mutation) omits it. In
    * that case core leaves the state untouched and appends a warning line to
    * the activity log whenever a cost or extra effect needs applying.
+   *
+   * **A bounded implementation may return a report.** The seam stays
+   * `void`-returning so no adapter breaks, but a TypeScript implementation is
+   * free to return a value (legal against a `void` signature) and
+   * {@link createResourceProjection} does exactly that: it returns a
+   * `ResourceRemainderReport` — one `applied` / `spilled` / `clamped` entry per
+   * declared key, in declaration order — and reports the same object through
+   * its optional `onRemainder` hook whenever a declared bound wasted part of
+   * the delta. Core reads resources back through `getResources` rather than a
+   * return value, so the report is for the game (an activity-log line, a HUD
+   * note): the engine's reporting seam is the hook, not a signature change.
    */
   applyResourceDelta?(state: TState, delta: StorylineResourcesDelta): void;
   /**

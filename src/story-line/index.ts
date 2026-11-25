@@ -99,6 +99,8 @@ export type {
   ManifestResourceReadReason,
   ManifestStartBagRead,
   ResourceProjectionOptions,
+  ResourceRemainderEntry,
+  ResourceRemainderReport,
   SelectDeclaredDeltaOptions,
   StorylineResourceField,
   StorylineResourceKey,

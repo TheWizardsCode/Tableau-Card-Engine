@@ -63,6 +63,27 @@
  * still earns Act III because the finishing choice is played there
  * (CG-0MWNSR376002QBY9).
  *
+ * ## Resource bounds (spill and clamp)
+ *
+ * The run's resource projection is **bounded** by the committed episode
+ * manifest's `resources.bounds` (hull 0–5, morale 0–8, stores 0–6, goodwill
+ * 0–5, charge 0–4), read through the engine's default-free
+ * `readManifestBounds` and carried on {@link LongErasureContent.bounds}. The
+ * engine therefore enforces the GDD's ranges instead of leaving them to
+ * authoring discipline (GDD §2.8, gap G4):
+ *
+ * - A gain that would pass a key's maximum is applied only up to the maximum;
+ *   the excess **spills** and one activity-log line records it
+ *   (`Surplus spilled: 1 morale past the 8 cap.`), so a full hold is a real
+ *   waste rather than a free bank.
+ * - A loss that would pass a key's minimum is applied only down to the
+ *   minimum; the unapplied magnitude **clamps** and is logged
+ *   (`Loss clamped: 1 morale below the 2 floor.`), so a scene designed to cost
+ *   a key cannot silently cost nothing.
+ * - A key with no declared bounds stays unbounded, so content loaded without a
+ *   manifest (a fixture, an alternate authored file) behaves exactly as it did
+ *   before bounds existed.
+ *
  * ## The reset ending
  *
  * The run has no `won` / `lost` flag. {@link LongErasureOutcome} says how
@@ -92,7 +113,9 @@ import {
   createResourceProjection,
   createStorylineSystem,
   isOptionAffordable,
+  readManifestBounds,
   readResource,
+  type ManifestResourceBounds,
   type StorylineCard,
   type StorylineEngineAdapter,
   type StorylineJournalEntry,
@@ -203,6 +226,16 @@ export interface LongErasureContent {
   readonly entryCardId: string;
   /** The resource keys the content declares. */
   readonly resources: readonly string[];
+  /**
+   * The declared **inclusive bounds** per resource key (`{ min, max }`).
+   *
+   * Read from the committed episode manifest's `resources.bounds` through the
+   * engine's default-free `readManifestBounds` read-through — never a
+   * hand-copied range literal, so the run's bounds and the manifest's design
+   * bounds cannot drift. A key with no entry (or content loaded without a
+   * manifest) stays unbounded, which is the pre-bounds behaviour exactly.
+   */
+  readonly bounds: Readonly<Record<string, ManifestResourceBounds>>;
   /**
    * The declared **never-restored** keys ({@link resources} subset).
    *
@@ -347,6 +380,21 @@ function parseClockCost(cardId: string, raw: string | undefined): number {
   return value;
 }
 
+/** Options controlling {@link longErasureContentFromCsv}. */
+export interface LongErasureContentOptions {
+  /**
+   * The raw per-key bounds block to read (`{ hull: { min: 0, max: 5 }, … }`) —
+   * normally the committed episode manifest's `resources.bounds`.
+   *
+   * The block is read through the engine's default-free `readManifestBounds`
+   * read-through, so a missing entry or an inverted range is a loud
+   * `invalid-content` error rather than an invented range. Omitted means "no
+   * bounds declared", which keeps the run's resource seam unbounded exactly as
+   * it was before bounds existed.
+   */
+  readonly bounds?: unknown;
+}
+
 /**
  * Loads {@link LongErasureContent} from the authored CSV text.
  *
@@ -356,12 +404,23 @@ function parseClockCost(cardId: string, raw: string | undefined): number {
  * resource set is the union of every card's `resources` column, preserving
  * declaration order.
  *
+ * When `options.bounds` supplies the committed manifest's `resources.bounds`,
+ * every declared key must carry a usable `{ min, max }` range; the content then
+ * carries those bounds into the run's resource projection, where a gain at the
+ * cap spills and a loss at the floor clamps (GDD §2.8).
+ *
  * @param csvText Raw content CSV (the `?raw` import in the scene, or
  *                `readFileSync` in tests).
+ * @param options Optional per-key bounds to read (see
+ *                {@link LongErasureContentOptions.bounds}).
  * @throws LongErasureError (`code: 'invalid-content'`) for empty content, a
- *         duplicate card id, an unknown act or an invalid clock cost.
+ *         duplicate card id, an unknown act, an invalid clock cost, or bounds
+ *         that do not cover every declared key.
  */
-export function longErasureContentFromCsv(csvText: string): LongErasureContent {
+export function longErasureContentFromCsv(
+  csvText: string,
+  options: LongErasureContentOptions = {},
+): LongErasureContent {
   const contentCards = cardsFromCsv(
     parseCsv(csvText),
     LONG_ERASURE_CONTENT_ADAPTER,
@@ -414,11 +473,38 @@ export function longErasureContentFromCsv(csvText: string): LongErasureContent {
     cards,
     entryCardId: cards[0].id,
     resources: declaredResources,
+    bounds: readContentBounds(declaredResources, options.bounds),
     irreversible: LONG_ERASURE_IRREVERSIBLE_RESOURCES.filter((key) =>
       declaredResources.includes(key),
     ),
     clockMax: DEFAULT_CLOCK_MAX,
   };
+}
+
+/**
+ * Reads the content's per-key bounds from the manifest's raw block.
+ *
+ * Delegates to {@link readManifestBounds}, which fails closed: every declared
+ * key must carry a finite, non-inverted `{ min, max }`. A partial or malformed
+ * block therefore throws (naming each offending key) instead of silently
+ * leaving some keys unbounded — the content and its manifest must agree.
+ *
+ * @param declared The keys the content declares.
+ * @param raw      The raw bounds block (`undefined` means "declare none").
+ */
+function readContentBounds(
+  declared: readonly string[],
+  raw: unknown,
+): Readonly<Record<string, ManifestResourceBounds>> {
+  if (raw === undefined) return {};
+  const read = readManifestBounds(declared, raw);
+  if (read.ok) return read.bounds;
+  throw new LongErasureError(
+    `Long Erasure content: the supplied bounds do not cover the declared resources (${read.issues
+      .map((issue) => `${issue.reason}: ${issue.key}`)
+      .join(', ')}).`,
+    'invalid-content',
+  );
 }
 
 // ── Score table and bands ───────────────────────────────────────
@@ -750,9 +836,16 @@ function readOnly(working: WorkingState): LongErasureState {
  * Builds the run's resource seam from the content's declarations.
  *
  * The projection **is** the declaration: its field keys are the content's
- * declared resource set and its `irreversible` option carries the
- * never-restored keys, so the two can never drift apart. Spreading it into the
- * engine adapter is what makes the resolution guard see `hull`.
+ * declared resource set, its `irreversible` option carries the never-restored
+ * keys and its `bounds` option carries the manifest's per-key design bounds, so
+ * none of the three can drift apart. Spreading it into the engine adapter is
+ * what makes the resolution guard see `hull` — and what makes a gain at a full
+ * key spill (GDD §2.8) instead of banking past its cap.
+ *
+ * The `onRemainder` hook is the game's record of what the bounds wasted: one
+ * activity-log line per spilled / clamped key, so a full hold is a visible
+ * cost rather than a silent one. Wording is this game's; the engine only
+ * reports the numbers.
  */
 function createRunResources(
   content: LongErasureContent,
@@ -769,6 +862,26 @@ function createRunResources(
   }
   return createResourceProjection(fields, {
     irreversible: content.irreversible,
+    bounds: content.bounds,
+    onRemainder: (report, state) => {
+      const working = state as WorkingState;
+      for (const entry of report) {
+        const bounds = content.bounds[entry.key];
+        if (bounds === undefined) continue;
+        if (entry.spilled > 0) {
+          working.activityLog.push({
+            turn: working.beat,
+            text: `Surplus spilled: ${entry.spilled} ${entry.key} past the ${bounds.max} cap.`,
+          });
+        }
+        if (entry.clamped > 0) {
+          working.activityLog.push({
+            turn: working.beat,
+            text: `Loss clamped: ${entry.clamped} ${entry.key} below the ${bounds.min} floor.`,
+          });
+        }
+      }
+    },
   });
 }
 
