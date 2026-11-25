@@ -10,6 +10,8 @@
  * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
  * | Episode manifest shape | `episode-manifest` | `EpisodeManifest`/`Act`/`Scene`/`Beat`/… types, `MANIFEST_VERSION`, `DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH`, `validateEpisodeManifest`, `coveredOutcomes`/`SCENE_OUTCOMES`, its finding/result types, text/JSON reports |
+ * | Route-space guard | `guard` | `evaluateContentGuard`, `evaluateContentGuardCsv`, its report types, `contentGuardToJson`/`formatContentGuardReport` |
+ * | Scene-space guard | `scene-guard` | `enumerateSceneSpace`, `SceneGuardReport`, its exit/refusal shapes, `sceneGuardToJson`/`formatSceneGuardReport` |
  * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports, `storylineEntryCards` |
  * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
@@ -69,6 +71,21 @@ export {
   evaluateContentGuardCsv,
   formatContentGuardReport,
 } from './guard';
+
+export type {
+  SceneGuardBeatRefusal,
+  SceneGuardExploration,
+  SceneGuardOptions,
+  SceneGuardReport,
+  SceneGuardSceneExit,
+} from './scene-guard';
+export {
+  DEFAULT_SCENE_GUARD_MAX_DEPTH,
+  DEFAULT_SCENE_GUARD_MAX_STATES,
+  enumerateSceneSpace,
+  formatSceneGuardReport,
+  sceneGuardToJson,
+} from './scene-guard';
 
 export type {
   ManifestBuildOptions,
