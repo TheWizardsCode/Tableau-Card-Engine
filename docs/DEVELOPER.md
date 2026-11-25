@@ -1623,8 +1623,9 @@ The `tsx` CLIs expose the seams (no Vite loader, no game import):
 ```bash
 npm run storylines:validate                     # validate every shipped content file
 npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
-npm run storylines:guard                        # guard every configured route-space target
+npm run storylines:guard                        # guard every configured route-space and scene-space target
 npm run storylines:guard -- --csv path.csv --game gym --initial coins=3 --json
+npm run storylines:guard -- --manifest example-games/gym/content/long-erasure-episode.json --json
 npm run storylines:ip-scan                      # scan the guarded set for prohibited third-party terms
 npm run storylines:ip-scan -- path.csv          # ad-hoc scan of one candidate file
 npm run storylines:manifest                     # validate the committed Appendix A episode manifest
@@ -1650,15 +1651,21 @@ registry (`DEFAULT_CONTENT_FILES` in `src/story-line/content/adapters.ts`) and
 process **every** file through the adapter it declares — each content file owns
 its own JSON manifest and Mermaid graph — so a second content file cannot escape
 validation or the artefact drift guard. `storylines:guard` instead walks the
-committed target list (`configs/storyline-guard.json`: content path, adapter,
-starting resource bag and ending ids per target) and asserts the three
-route-space invariants — every state-gated branch reaches an ending, every
-ending is reachable, and every choice marked `consequential` keeps its branches
-apart for the minimum rejoin distance. It bounds its search and fails closed
-when a bound is hit; a game-specific mechanic that is not a declared resource
-(e.g. the Long Erasure pressure clock) is outside it. Passing `--csv` selects one file (an
-unregistered file falls back to the format's default artefact path); `--out`
-requires `--csv`. Every CLI exits `0` on success/valid content and `1` on invalid
+committed target list (`configs/storyline-guard.json`: a content path or an
+episode manifest per target, with the CSV target's adapter, starting resource bag
+and ending ids) and asserts the three route-space invariants — every state-gated
+branch reaches an ending, every ending is reachable, and every choice marked
+`consequential` keeps its branches apart for the minimum rejoin distance — plus,
+for a manifest target, the two scene-space invariants: no exhausted close
+classifies as `success`, and every refusal's close reaches a declared ending. It
+bounds its search and fails closed when a bound is hit; a game-specific mechanic
+that is not a declared resource (e.g. the Long Erasure pressure clock) is outside
+the route-space mode and is covered by the scene-space mode instead. `--csv`
+selects one content file (route-space mode) and `--manifest <file>` one episode
+manifest plus the content file it declares (scene-space mode); the two are
+mutually exclusive (an unregistered `--csv` file falls back to the format's
+default artefact path, and `--out` requires `--csv`). Every CLI exits `0` on
+success/valid content and `1` on invalid
 content, unreadable input or artefact drift. `storylines:ip-scan` walks the
 committed guarded set (`configs/storyline-ip-scan.json`: the story-line GDD and
 its fixtures, plus the shipped content and generated artefacts) with the term

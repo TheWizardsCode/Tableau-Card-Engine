@@ -940,6 +940,105 @@ it and keeps its own harness; that is why the committed config passes
 explicit `endings` for the Long Erasure content (its reset ending loops back and
 its clock is not a declared resource).
 
+### Scene-space guard
+
+The route-space guard above walks the **card chain** over declared resources, so
+it cannot see a scene boundary, the scene clock or an outcome table — and the
+clock is deliberately **not** a declared resource, so an exhausted scene is
+invisible to it. The scene-space guard
+([`src/story-line/content/scene-guard.ts`](../../src/story-line/content/scene-guard.ts))
+is the other half: it enumerates the **playable scene space** of an episode
+manifest and its declared content file, and asserts the two invariants the
+beat-sheet design depends on (GDD §2.4 third check, §2.8.6 item 5, §2.10 T3).
+
+`enumerateSceneSpace(manifest, cards, options)` is pure (never mutates, never
+throws) and returns a frozen, JSON-safe `SceneGuardReport`. Outcome and route
+precedence are **delegated** to the runtime's own pure helpers
+(`evaluateSceneCondition`, `classifySceneOutcome`, `selectRoute`,
+`resolveRouteTarget`) and affordability to `isOptionAffordable`, so the
+guard cannot silently diverge from `createEpisodeRunner`.
+
+| Invariant | Meaning |
+|---|---|
+| `no-success-on-exhausted-close` | A scene close triggered by a **refused** beat (its `clockCost` exceeds the clock remaining) must not be classified `success`; that would truncate the player's run behind a success banner. `partial` and `failure` remain legitimate classifications of an exhausted close. |
+| `refusal-reaches-ending` | Every refusal's exhausted close must reach a declared ending — directly or through any reachable state — because a refusal is a failure **with** authored recovery content, never a silent truncation. |
+
+**State tuple.** One explored state is the beat the run is about to enter:
+`(`sceneId`, `beatId`, `clockRemaining`, `pendingChain`, declared resource bag)`. The
+scene clock is reset on scene entry and `pendingChain` cleared, exactly as the
+runner does; each state is expanded once, in this order: **beat entry** (a beat
+whose `clockCost` exceeds `clockRemaining` is recorded as a refusal and becomes
+the close trigger; otherwise the cost is charged) → **choice resolution** (every
+affordable option is taken, branching exhaustively over a candidate set rather
+than drawing the RNG, which is what keeps the enumeration deterministic) →
+**scene close** (the objective is evaluated once against the post-resolution
+bag, the outcome table classifies first-match-wins, the matching `losses[]`
+rules apply, and the route gate reads the post-loss bag) → **routing** (the
+winning route resolves to the next scene — clock reset, chain cleared — or to an
+ending, where the branch stops). `refusal-reaches-ending` runs a bounded
+reachability search from each refusal record, sharing the enumeration's state
+key and truncation flag.
+
+**Bounds and fail-closed truncation.** `maxDepth` (transitions along one route —
+beat and scene entries) and `maxStates` (examined states) default to the CSV
+guard's values (`48` / `20000`). Hitting either sets `exploration.truncated` and
+makes the report **invalid**: the guard fails closed rather than claiming an
+invariant it could not check, and an unproven refusal is never reported as a
+stranding. Resource-neutral cycles terminate through the state key, so a loop
+whose reachable set still contains an ending is an ordinary passing shape. No
+wall clock, RNG or ambient state is read, explored state keys are emitted in a
+fixed order and the JSON key order is fixed, so two runs serialise
+**byte-identical**.
+
+**Resource arithmetic is the engine's current behaviour, unclamped.** Every cost, extra effect
+and loss applies **unclamped and unbounded** through the same declared-delta
+selection the runtime's `applyResourceDelta` seam receives; an undeclared key is
+ignored and an irreversible grant refused. The G4 clamping and spill work
+(`CG-0MWR0BGVG004UE7X`) is what will change this arithmetic, and a unit test
+pins the current unclamped behaviour so that change is a deliberate assertion
+flip.
+
+**JSON shape.** `sceneGuardToJson(report)` (and `manifestGuardToJson(result)` in
+the CLI) emits the existing guard's top-level `valid` plus the scene-space keys,
+in a fixed order:
+
+| Key | Contents |
+|---|---|
+| `episodeId`, `maxDepth`, `maxStates` | Provenance and the effective bounds. |
+| `exploredStateKeys` | Every explored state key, sorted. |
+| `sceneExits` | Per exit: `sceneId`, `ruleId` (the winning outcome rule), `outcome`, `clockRemaining`, `refusalTriggered`, `refusedBeatCardId`. |
+| `beatRefusals` | Per refusal: `sceneId`, `beatCardId`, `clockCost`, `clockRemaining`. |
+| `invariants` | Per invariant: `invariant`, `checked`, `violations`. |
+| `violations` | One record per breach: `invariant`, `cardId`, `sceneId`, `ruleId`, `outcome` plus the invariant's facts (invariant 2 adds `routeId` and the `terminalStates` the search reached) and a human-readable `message`. |
+| `exploration` | `statesVisited`, `truncated`. |
+| `valid` | True only when both bounds held and no invariant is violated. |
+
+**Invocation.** `npm run storylines:guard` guards every configured target in
+[`configs/storyline-guard.json`](../../configs/storyline-guard.json) — both CSV
+(route-space) and manifest (scene-space) targets, including the committed worked
+manifest (`example-games/gym/content/long-erasure-episode.json`), so CI is a
+real check of the beat sheet rather than a vacuous pass. One manifest can be
+guarded ad hoc:
+
+```bash
+npm run storylines:guard
+npm run storylines:guard -- --manifest example-games/gym/content/long-erasure-episode.json
+npm run storylines:guard -- --manifest episode.json --max-depth 64 --max-states 40000 --json
+```
+
+`--manifest <file>` guards one manifest plus the content file the manifest itself
+declares (`manifest.content.file`, adapter from `manifest.content.adapter`); the
+manifest is validated before enumeration and refuses with its first three
+findings when it is not. `--manifest` and `--csv` are **mutually exclusive** — a
+run guards one mode — and the CSV-only flags (`--game`, `--entry`, `--initial`,
+`--endings`, `--min-rejoin`) do not apply to a manifest, which declares its own
+adapter and starting bag.
+
+Exit codes: `0` when every invariant holds, `1` on a violation, a truncated
+search, an unreadable content file, a manifest that fails validation or an
+unknown adapter. In configured-target mode a malformed target is reported on
+stderr and the rest of the batch still runs; any failure makes the run exit `1`.
+
 ### Transactional author API
 
 Every edit is: parse → mutate in memory → validate → write atomically (temp file
@@ -1018,7 +1117,7 @@ gate and the malformed-entry behaviour — is documented in the GDD's
 | npm script | Script | Purpose |
 |---|---|---|
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
-| `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space: gated-branch survival, ending reachability, consequential rejoin distance (`--csv`, `--initial`, `--endings`, `--min-rejoin`, `--json`). |
+| `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space (`--csv`: gated-branch survival, ending reachability, consequential rejoin distance) and the scene space (`--manifest`: no `success` close on an exhausted clock, no refusal strands the run), with `--initial`, `--endings`, `--min-rejoin`, `--max-depth`, `--max-states` and `--json`. |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
 | `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, `add-card --after <card-id>` positional insert, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`, `add-linked-card --link-attr` for the generated link). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |

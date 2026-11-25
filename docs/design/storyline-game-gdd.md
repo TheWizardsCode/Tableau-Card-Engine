@@ -752,14 +752,15 @@ content-compiled list plus `isOptionAffordable`), `resolveStorylineOption`
 second copy of the declared key set at runtime (it reads `storyline.resources`
 and validates the manifest's copy against it).
 
-**Static composition.** Two validators exist at this commit, one per layer; the third is
-the gap this design creates:
+**Static composition.** Four static checks exist at this commit, one per layer; the
+beat-sheet check is the last of them:
 
 | Checker | Covers | Command |
 |---|---|---|
 | Content validator | well-formedness of the CSV: ids, options encoding, unknown successors, prose budgets, declared resource keys | `npm run storylines:validate` |
 | Route-space guard | playability of the chain: every gated branch survivable, every ending reachable, every consequential choice meets the minimum rejoin distance | `npm run storylines:guard` |
 | Manifest validator *(delivered — [G2](#g2))* | totality and consistency of the beat sheet (below) | `npm run storylines:manifest` |
+| Scene-space guard *(delivered — [G3](#g3), `CG-0MWR0BG9H007AFNU`)* | playability of the scene space: no exhausted close classifies as `success`, every refusal's close reaches a declared ending ([reference section](../core-engine/story-line.md#scene-space-guard)) | `npm run storylines:guard -- --manifest <file>` |
 
 The rejoin-distance *number* is pacing design, not structure: the evidence
 recommends **3** for choices marked consequential (the current committed guard
@@ -786,11 +787,15 @@ list this document is written against:
 | `ending-successor` | an ending card's successors, if any, resolve to assigned beats (the reset loop) or are absent |
 
 The beat sheet needs a **third** check the content guard cannot perform, because
-the clock is not a declared resource: a **scene-space guard** that enumerates
-scene exits and beat refusals and asserts two invariants — *no exhausted close
+the clock is not a declared resource: the **scene-space guard** enumerates scene
+exits and beat refusals and asserts two invariants — *no exhausted close
 classifies as `success`*, and *no refusal leads to a state with no reachable
-ending*. It is a gap ([G3](#g3)); until it exists,
-the worked manifest's clock arithmetic is checked by hand
+ending*. **Delivered** by `CG-0MWR0BG9H007AFNU` (see
+[G3](#g3)): run `npm run storylines:guard -- --manifest <file>`, or
+`npm run storylines:guard` to guard the committed worked manifest as well. The
+reference section is
+[the scene-space guard](../core-engine/story-line.md#scene-space-guard); the
+worked manifest's clock arithmetic is no longer checked by hand
 ([Appendix A](#appendix-a-the-episode-manifest-complete-worked-example)).
 
 **What the layer adds to the engine, and what it must not.** Three capabilities
@@ -1218,7 +1223,7 @@ the nearest precedent and the filed work item.
 | 2 | **The start bag and bounds as manifest data** — `resources.start` / `resources.bounds`, so a validator can prove gate reachability from the start | **Delivered as data** — `resources.start` / `resources.bounds` are manifest fields (schema-required whenever the block is present), and the validator's `resource-set-mismatch` rule reads them through the default-free `readManifestStartBag` / `readManifestBounds` read-throughs, so the manifest validator no longer needs a game constant to see the start bag. What remains a gap is the *reachability proof* itself: gate reachability belongs to the scene-space guard ([G3](#g3)), while clamping to the bounds is now delivered by [G4](#g4). | [G2](#g2) — **Delivered** by `CG-0MWSJYLZ3005C2V1` (epic `CG-0MWR0BFMW003856N`) |
 | 3 | **Surfaced affordability** — present the option with its requirement ("2 charge needed") | `#cost` is a draw-time **omission** gate: `isOptionAffordable` returns a boolean (`src/story-line/compile.ts`), and the presenting layer deletes the option. There is no requirement object for a UI to render. Measured cost: 32 of 302 instances hidden, 107 of 197 dead turns gate-collapsed. | [G7](#g7) — filed (`CG-0MWR0BI3S008K9Y6`) |
 | 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | [G6](#g6) — deferred to the build epic |
-| 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | The clock is not a declared resource, so `src/story-line/content/guard.ts` enumerates the chain only; the scene-space guard is a named gap ([§2.4](#24-how-the-beat-sheet-composes-with-story-line)). | [G3](#g3) — filed (`CG-0MWR0BG9H007AFNU`) |
+| 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | **Delivered** — `enumerateSceneSpace(manifest, cards, options)` (`src/story-line/content/scene-guard.ts`) walks the scene/beat/close/routing transitions the runner performs, delegates outcome and route precedence to the runtime's pure helpers, and asserts `no-success-on-exhausted-close` and `refusal-reaches-ending` under the route guard's `maxDepth` / `maxStates` bounds (fail-closed on truncation). The clock is still not a declared resource, which is why the check lives in the manifest-bound guard rather than in `src/story-line/content/guard.ts`. | [G3](#g3) — **Delivered** by `CG-0MWR0BG9H007AFNU` (`npm run storylines:guard -- --manifest <file>`; [reference](../core-engine/story-line.md#scene-space-guard)) |
 | 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | **Delivered** — the concept is threaded through `@story-line`: the resource projection carries an `irreversible` subset (derived from the manifest by `createEpisodeResourceProjection`), `validateStorylineOptions(…, { irreversible })` reports a positive `#extra` on one as `irreversible-grant`, and the resolution guard refuses the grant while a `#cost` on the key still pays. The manifest's `resources.irreversible` is authoritative; the adapter's `irreversibleResources` is audited for drift. | [G5](#g5) — **Delivered** by `CG-0MWR0BHH9002OQUZ` |
 | 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | [G8](#g8) — filed (`CG-0MWR0BIPV0074WLM`); the act-boundary half is [G9](#g9) |
 
@@ -1654,10 +1659,11 @@ consequential, or cut it.
   [G2](#g2), delivered — `CG-0MWSJYV86000ZHM4`). A writer cannot yet create a
   scene from CSV, and this
   section does not describe one.
-- **No scene-space guarantee.** The route-space guard models declared resources
-  only; the pressure clock is not one, so a clock-expiry failure is outside it
-  (engine gap [G3](#g3)). The GDD game keeps its own harness until the scene-space
-  guard exists.
+- **No scene-space guarantee in the game itself.** The route-space guard models declared resources
+  only; the pressure clock is not one, so a clock-expiry failure is outside it.
+  The scene-space guard (engine gap [G3](#g3), delivered — `CG-0MWR0BG9H007AFNU`)
+  now proves the episode's scene exits and refusals at build time; the GDD game
+  still keeps its own harness for the presentation-level checks.
 - **No second choice model.** If a branch cannot be expressed in the `options`
   cell, the answer is a `@story-line` gap filed on
   `CG-0MWPY2ECE002P2NH`, never a parallel format or a hand-edited load path.
@@ -2066,9 +2072,10 @@ the score.
 - **No human playtest.** All numbers are agent-driven structural measurements;
   the recommendation to run one human browser playtest before the act structure
   is frozen still stands.
-- **The scene-space guard does not exist.** Proving that no refusal strands a
-  run requires the guard named as engine gap [G3](#g3); until then, the GDD game
-  keeps its own harness.
+- **The scene-space guard proves structure, not presentation.** The delivered guard
+  ([G3](#g3) — `CG-0MWR0BG9H007AFNU`) proves that no refusal strands a run and
+  that no exhausted close claims `success`; the GDD game still keeps its own
+  harness for the screen-level checks.
 - **The bottom two bands are unreachable on the default spike content** after
   the arc correction (minimum 50). The v1 scope statement must require an early
   terminal so the bands are reachable in play.
@@ -2782,7 +2789,7 @@ profiles; the commands below verify *this document* and the model it specifies.
 |---|---|---|---|
 | Manifest validator | `npm run storylines:manifest -- --manifest <file> --json` | **delivered** — the rules are the table in [§2.4](#24-how-the-beat-sheet-composes-with-story-line) (`CG-0MWSJYV86000ZHM4`) | [G2](#g2) (delivered) |
 | Manifest JSON schema | `schemas/episode-manifest.schema.json` validated with ajv in the unit suite | **delivered** — `CG-0MWSJYAXE001KMRU` | [G2](#g2) (delivered) |
-| Scene-space guard | a `storylines:guard --manifest <file>` mode that enumerates scene exits and refusals | the current guard enumerates the chain only; the clock is not a declared resource, which is why the model adds scene bookkeeping | [G3](#g3) |
+| Scene-space guard | a `storylines:guard --manifest <file>` mode that enumerates scene exits and refusals | **delivered** — the mode asserts `no-success-on-exhausted-close` and `refusal-reaches-ending` over a validated manifest and the content file it declares (`CG-0MWR0BG9H007AFNU`; [reference](../core-engine/story-line.md#scene-space-guard)) | [G3](#g3) (delivered) |
 | Deterministic replay | a transcript replay test asserting identical scene-exit records and score at the same seed | depends on the runner | [G13](#g13) |
 
 ### 5.3 Self-check for the worked manifest
@@ -2887,7 +2894,7 @@ invisible.
 |---|---|---|---|---|---|---|
 | [G1](#g1) | Episode beat-sheet / objective layer: scene budgets, outcome classification, routing, loss ledger | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model)–[§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | **delivered** across the build epic — `src/story-line/episode-runner.ts` charges scene budgets, classifies outcomes from the authored table, routes on ordered totals and records the loss ledger | large — `src/story-line/` itself | epic | **Delivered** — epic `CG-0MWR0BAT30015DPQ` (`src/story-line/episode-runner.ts`) |
 | [G2](#g2) | Episode manifest schema + validator (`storylines:manifest`), including `resources.start` / `resources.bounds` | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) rule table, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 2, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** across the build epic — the schema (ajv-pinned), the pure validator and the `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) | medium — the `content/manifest.ts` + `content/validate.ts` pair | feature | **Delivered** — epic `CG-0MWR0BFMW003856N` |
-| [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | `src/story-line/content/guard.ts` enumerates the card chain over declared resources only; the clock is not a resource and there is no manifest input | medium — `src/story-line/content/guard.ts` (extend) | feature | Filed — `CG-0MWR0BG9H007AFNU` |
+| [G3](#g3) | Scene-space guard: enumerate scene exits and refusals, assert no `success` close on an exhausted clock and no refusal strands the run | [§2.4](#24-how-the-beat-sheet-composes-with-story-line) third check, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 5, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | **delivered** — `src/story-line/content/scene-guard.ts` walks the runner's scene/beat/close/routing transitions under the existing bounds and asserts both invariants; the `storylines:guard --manifest <file>` mode reports them ([reference](../core-engine/story-line.md#scene-space-guard)) | medium — `src/story-line/content/guard.ts` (extended beside it) | feature | **Delivered** — `CG-0MWR0BG9H007AFNU` |
 | [G4](#g4) | Resource bounds: per-key min/max, spill at the cap, clamped loss at the floor, reported remainder | [§2.8](#28-resource-model-and-economy) ranges and spill/clamp rules, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 1 | **delivered** — `createResourceProjection(fields, { bounds, onRemainder })` clamps/spills per declared key, returns a per-key `applied` / `spilled` / `clamped` remainder in declaration order and reports it once per call; the Long Erasure reads the manifest's `resources.bounds` through `readManifestBounds` (`src/story-line/resources.ts`, `example-games/gym/GymLongErasureGame.ts`) | small–medium — the projection's apply seam plus the manifest read-through | feature | **Delivered** — `CG-0MWR0BGVG004UE7X` |
 | [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | **delivered** — the projection carries the irreversible subset, `validateStorylineOptions` reports `irreversible-grant` and the resolution guard refuses the grant while a cost still pays (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/resolve.ts`) | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | **Delivered** — `CG-0MWR0BHH9002OQUZ` (`src/story-line/resolve.ts`) |
 | [G6](#g6) | Compound / range conditions ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | [§2.2.5](#225-objective) `Objective.check`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 4 | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`) evaluated once (`evaluateCondition`, `src/story-line/resolve.ts`) | small — `Condition` + `evaluateCondition` | task | **Deferred to the build epic** (v1 uses one-clause objectives; two clauses are two scenes) |
@@ -2993,8 +3000,11 @@ itself — 955 lines of bounded depth-first enumeration with fail-closed
 truncation reporting. The entry extends its state shape; the bound and reporting
 machinery is reused.
 
-**Disposition.** **Filed** — `CG-0MWR0BG9H007AFNU` (`feature`, medium, effort
-`M`). Blocked by the GDD epic and by G2 (the guard needs a manifest to read).
+**Disposition.** **Delivered** — `CG-0MWR0BG9H007AFNU` (`feature`, medium, effort
+`M`): `src/story-line/content/scene-guard.ts` enumerates the scene space and
+asserts both invariants, and `npm run storylines:guard -- --manifest <file>`
+reports them (the committed worked manifest is a configured target). Reference
+section: [the scene-space guard](../core-engine/story-line.md#scene-space-guard).
 
 #### <a id="g4"></a>G4 — Resource bounds, spill and clamped loss
 
@@ -3337,7 +3347,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 |---|---|---|---|---|---|---|
 | G1 | `CG-0MWR0BAT30015DPQ` | epic | high | L | GDD epic, G2 | **Delivered** — `src/story-line/episode-runner.ts` (epic `CG-0MWR0BAT30015DPQ`) |
 | G2 | `CG-0MWR0BFMW003856N` | feature | high | M | GDD epic | **Delivered** — manifest schema, validator and `storylines:manifest` CLI (`CG-0MWSJYV86000ZHM4`) |
-| G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G3 | `CG-0MWR0BG9H007AFNU` | feature | medium | M | GDD epic, G2 | **Delivered** — `src/story-line/content/scene-guard.ts` + `storylines:guard --manifest`, both invariants with positive controls |
 | G4 | `CG-0MWR0BGVG004UE7X` | feature | medium | M | GDD epic | **Delivered** — `createResourceProjection(fields, { bounds, onRemainder })` spill/clamp + per-key remainder, with the Long Erasure reading the manifest's `resources.bounds` |
 | G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | **Delivered** — `irreversible` projection + `irreversible-grant` diagnostic + runtime guard |
 | G6 | — | task | — | — | — | **Deferred** — one-clause objectives are the v1 model |
@@ -3604,7 +3614,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 |---|---|---|---|---|
 | Beat sheet / objective runtime layer (acts, scenes, budgets, outcomes, routing, ledger) | [§1.3](#13-the-core-loop), [§2.2](#22-the-scene-beat-sheet-data-model) | [G1](#g1) | large | `CG-0MWR0BAT30015DPQ` |
 | Episode manifest schema and validator (`storylines:manifest`) | [§2.2.1](#221-episode-manifest), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | [G2](#g2) | medium | `CG-0MWR0BFMW003856N` |
-| Scene-space guard (every exit, every refusal, every ending) | [§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10.4](#2104-failure-and-recovery-per-failure-type) | [G3](#g3) | medium | `CG-0MWR0BG9H007AFNU` |
+| Scene-space guard (every exit, every refusal, every ending) | [§2.4](#24-how-the-beat-sheet-composes-with-story-line), [§2.10.4](#2104-failure-and-recovery-per-failure-type) | [G3](#g3) | medium | `CG-0MWR0BG9H007AFNU` (delivered) |
 | Resource bounds and spill/clamp reporting | [§2.8](#28-resource-model-and-economy) | [G4](#g4) | small–medium | `CG-0MWR0BGVG004UE7X` |
 | Irreversible-resource policy (`hull` is never granted) | [§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | [G5](#g5) | small | `CG-0MWR0BHH9002OQUZ` (delivered) |
 | Surfaced affordability (an unaffordable door is shown, not deleted) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) T5 | [G7](#g7) | small | `CG-0MWR0BI3S008K9Y6` |
