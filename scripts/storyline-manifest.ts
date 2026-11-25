@@ -40,7 +40,7 @@ import {
   type EpisodeManifestValidationResult,
 } from '../src/story-line/content/episode-manifest';
 import { resolveResourceKeys } from '../src/story-line/resources';
-import { parseArgv } from './storyline-cli-support';
+import { parseArgv, readEpisodeContentBinding } from './storyline-cli-support';
 
 /**
  * Repository-relative path of the committed Appendix A manifest.
@@ -98,41 +98,6 @@ export function parseManifestArgs(
     json: flags.has('json'),
     help: flags.has('help'),
   };
-}
-
-/** The manifest's declared content binding (`content.adapter` / `content.file`). */
-interface ContentBinding {
-  readonly adapter: string;
-  readonly file: string;
-}
-
-/**
- * Reads the manifest's `content` binding.
- *
- * Total: a malformed document yields an error string instead of throwing, so
- * the CLI's diagnostic path never becomes an uncaught exception.
- *
- * @param manifest The parsed manifest document.
- * @returns The binding, or a reviewer-facing diagnostic.
- */
-function readContentBinding(
-  manifest: unknown,
-): ContentBinding | { readonly error: string } {
-  const content =
-    typeof manifest === 'object' && manifest !== null
-      ? (manifest as Record<string, unknown>).content
-      : undefined;
-  if (typeof content !== 'object' || content === null) {
-    return { error: 'manifest declares no content binding (content.adapter / content.file)' };
-  }
-  const { adapter, file } = content as Record<string, unknown>;
-  if (typeof adapter !== 'string' || adapter === '') {
-    return { error: 'manifest content.adapter is missing or not a string' };
-  }
-  if (typeof file !== 'string' || file === '') {
-    return { error: 'manifest content.file is missing or not a string' };
-  }
-  return { adapter, file };
 }
 
 /** The content file's declared resource key set, derived as the guard derives it. */
@@ -230,7 +195,7 @@ export function runStorylineManifestCli(
     return 1;
   }
 
-  const binding = readContentBinding(manifest);
+  const binding = readEpisodeContentBinding(manifest);
   if ('error' in binding) {
     process.stderr.write(`storyline-manifest: ${binding.error} (${manifestPath})\n`);
     return 1;

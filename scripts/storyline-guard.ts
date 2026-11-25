@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Authored-content route-space guard CLI.
+ * Authored-content route-space and scene-space guard CLI.
  *
  * Promotes the Long Erasure playtest harness's route-space enumeration into a
  * CI guard over any story-line content file: it enumerates the **playable**
@@ -10,13 +10,14 @@
  * ```bash
  * npm run storylines:guard                       # every configured target
  * npm run storylines:guard -- --csv a.csv --game gym --initial coins=3
- * npm run storylines:guard -- --csv a.csv --json
+ * npm run storylines:guard -- --manifest episode.json --json
  * ```
  *
  * The no-argument form reads the committed target list
  * (`configs/storyline-guard.json`), so CI runs one command and the content
- * registry of guarded files is data, not code. A `--csv` run is ad-hoc: every
- * option comes from the flags (or its default).
+ * registry of guarded files is data, not code. A target names **exactly one**
+ * input: a `csv` (route-space mode) or a `manifest` (scene-space mode, which
+ * resolves the content file the manifest itself declares).
  *
  * Exit codes: `0` = every invariant holds, `1` = a violation, a content error,
  * an exhausted search bound, or an unreadable/misconfigured target.
@@ -37,22 +38,42 @@ import {
   type ContentGuardOptions,
   type ContentGuardReport,
 } from '../src/story-line/content/guard';
-import { resolveContentAdapter } from '../src/story-line/content/adapters';
+import {
+  CONTENT_ADAPTERS,
+  getContentAdapter,
+  resolveContentAdapter,
+} from '../src/story-line/content/adapters';
+import { cardsFromCsv, parseCsv } from '../src/story-line/content/csv';
+import {
+  validateEpisodeManifest,
+  type EpisodeManifest,
+} from '../src/story-line/content/episode-manifest';
+import {
+  enumerateSceneSpace,
+  formatSceneGuardReport,
+  sceneGuardToJson,
+  type SceneGuardReport,
+} from '../src/story-line/content/scene-guard';
 import type { ContentAdapter } from '../src/story-line/content/types';
-import { parseArgv } from './storyline-cli-support';
+import { resolveResourceKeys } from '../src/story-line/resources';
+import { parseArgv, readEpisodeContentBinding } from './storyline-cli-support';
 
 /** Repository-relative default target list. */
 export const DEFAULT_GUARD_CONFIG_PATH = 'configs/storyline-guard.json';
 
 /** CLI usage text. */
-export const GUARD_USAGE = `Guard authored story-line content against the route-space invariants.
+export const GUARD_USAGE = `Guard authored story-line content against the route-space and scene-space invariants.
 
 Usage:
   npx tsx scripts/storyline-guard.ts [options]
 
+Modes (mutually exclusive):
+  --csv <path>                  Guard one content CSV (route-space mode)
+  --manifest <path>             Guard one episode manifest and the content file
+                                it declares (scene-space mode)
+
 Options:
-  --csv <path>                  Guard one content CSV (default: every configured target)
-  --game <id>                   Content adapter id (default: gym)
+  --game <id>                   Content adapter id, CSV mode only (default: gym)
   --entry <ids>                 Comma-separated entry card ids (default: every root)
   --initial <k=v,...>           Starting resource bag (default: every declared key = 0)
   --min-rejoin <n>              Minimum rejoin distance for marked choices (default: 2)
@@ -67,40 +88,55 @@ Options:
   --json                        Emit the machine-readable report
   --help                        Show this help
 
-Invariants:
+CSV-mode options (--game, --entry, --initial, --min-rejoin, --endings and the two
+column overrides) do not apply to --manifest: a manifest declares its own
+content adapter and starting bag.
+
+Invariants (route space, CSV mode):
   gated-branch-survivable  every #cost / #when gated option reaches an ending
   ending-reachable         every ending is reachable on a playable route
   consequential-rejoin     every choice marked consequential keeps its branches
                            apart for at least --min-rejoin beats
 
+Invariants (scene space, --manifest mode):
+  no-success-on-exhausted-close  no refused beat's exhausted close classifies success
+  refusal-reaches-ending         every refusal's exhausted close reaches a declared ending
+
 Marking is ordinary content data: a "consequential" column names the option
 labels (or "*"), and an "ending" column marks endings (absent: structural
 terminals are the endings).
 
-Exit codes: 0 = all invariants hold, 1 = a violation or unreadable/misconfigured
-content.`;
+Combining --csv and --manifest is rejected: each run guards one mode.
 
-/** One configured guard target (a content file plus its starting state). */
+Exit codes: 0 = all invariants hold, 1 = a violation, a truncated search, or
+an unreadable/misconfigured input (manifest, content or config).`;
+
+/** One configured guard target (a CSV or an episode manifest, plus options). */
 export interface StorylineGuardTarget {
-  /** Repository-relative (or absolute) content CSV path. */
-  readonly csv: string;
-  /** Content adapter id (default `gym`). */
+  /** Repository-relative (or absolute) content CSV path (route-space mode). */
+  readonly csv?: string;
+  /**
+   * Repository-relative (or absolute) episode manifest path (scene-space mode).
+   * The manifest declares its own content adapter and content file.
+   */
+  readonly manifest?: string;
+  /** Content adapter id, CSV mode only (default `gym`). */
   readonly game?: string;
-  /** Explicit entry card ids (default: every root). */
+  /** Explicit entry card ids, CSV mode only (default: every root). */
   readonly entry?: readonly string[];
-  /** Starting resource bag. */
+  /** Starting resource bag, CSV mode only. */
   readonly initial?: Readonly<Record<string, number>>;
-  /** Minimum rejoin distance override. */
+  /** Minimum rejoin distance override, CSV mode only. */
   readonly minRejoin?: number;
-  /** Beats-per-route bound override. */
+  /** Beats-per-route bound override (both modes). */
   readonly maxDepth?: number;
-  /** Explored-state bound override. */
+  /** Explored-state bound override (both modes). */
   readonly maxStates?: number;
-  /** Consequential column override. */
+  /** Consequential column override, CSV mode only. */
   readonly consequentialColumn?: string;
-  /** Ending column override. */
+  /** Ending column override, CSV mode only. */
   readonly endingColumn?: string;
-  /** Explicit ending card ids (default: the ending column / structural terminals). */
+  /** Explicit ending card ids, CSV mode only. */
   readonly endings?: readonly string[];
 }
 
@@ -113,6 +149,7 @@ export interface StorylineGuardConfig {
 /** Parsed guard CLI options. */
 export interface StorylineGuardCliOptions {
   readonly csvPath: string | null;
+  readonly manifestPath: string | null;
   readonly gameId: string | null;
   readonly entryIds: readonly string[] | null;
   readonly initial: Readonly<Record<string, number>> | null;
@@ -167,14 +204,26 @@ function parseIdList(text: string): string[] {
 /**
  * Parses guard CLI argv.
  *
+ * `--csv` and `--manifest` select different guard modes, so passing both is
+ * rejected here (with both mode names in the message) instead of silently
+ * preferring one.
+ *
  * @param argv Raw arguments (without the node/script prefix).
  * @returns The parsed options.
- * @throws Error on a malformed flag value.
+ * @throws Error on a malformed flag value or on a mode combination.
  */
 export function parseStorylineGuardArgs(
   argv: readonly string[],
 ): StorylineGuardCliOptions {
   const { flags } = parseArgv(argv);
+  const csvPath = flags.get('csv') ?? null;
+  const manifestPath = flags.get('manifest') ?? null;
+  if (csvPath !== null && manifestPath !== null) {
+    throw new Error(
+      '--csv (route-space mode) and --manifest (scene-space mode) are mutually ' +
+        'exclusive; pass exactly one of them.',
+    );
+  }
   const idFlag = (key: string): string | null => flags.get(key) ?? null;
   const initial = idFlag('initial');
   const entry = idFlag('entry');
@@ -183,7 +232,8 @@ export function parseStorylineGuardArgs(
   const maxStates = idFlag('max-states');
   const endings = idFlag('endings');
   return {
-    csvPath: idFlag('csv'),
+    csvPath,
+    manifestPath,
     gameId: idFlag('game'),
     entryIds: entry === null ? null : parseIdList(entry),
     initial: initial === null ? null : parseInitialBag(initial),
@@ -249,7 +299,13 @@ function guardOptionsFrom(source: {
   };
 }
 
-/** Loads and minimally validates the committed target list. */
+/**
+ * Loads and minimally validates the committed target list.
+ *
+ * The document shape is checked here (a readable `targets` array); each
+ * target's **input** is resolved per target at guard time, so one malformed
+ * target is reported without aborting the rest of the batch.
+ */
 export function loadGuardConfig(configPath: string): StorylineGuardConfig {
   const absolute = resolve(process.cwd(), configPath);
   let parsed: unknown;
@@ -261,11 +317,6 @@ export function loadGuardConfig(configPath: string): StorylineGuardConfig {
   const targets = (parsed as { targets?: unknown }).targets;
   if (!Array.isArray(targets) || targets.length === 0) {
     throw new Error(`guard config ${configPath} declares no targets.`);
-  }
-  for (const target of targets as StorylineGuardTarget[]) {
-    if (typeof target?.csv !== 'string' || target.csv.trim() === '') {
-      throw new Error(`guard config ${configPath} has a target without a "csv" path.`);
-    }
   }
   return { targets: targets as StorylineGuardTarget[] };
 }
@@ -281,12 +332,177 @@ function guardFile(
   return evaluateContentGuardCsv(csv, adapter, options);
 }
 
-/** Renders a report block for one target. */
+/** The report for one guarded manifest: provenance plus the scene-space report. */
+export interface StorylineGuardManifestResult {
+  /** The manifest path as given (CLI argument or config value). */
+  readonly manifest: string;
+  /** The content file path as the manifest's `content.file` declares it. */
+  readonly content: string;
+  /** The shipped content adapter id the manifest's `content.adapter` names. */
+  readonly adapter: string;
+  /** The scene-space enumeration's report. */
+  readonly report: SceneGuardReport;
+}
+
+/** How many validation findings a refusal message quotes before summarising. */
+const MAX_QUOTED_FINDINGS = 3;
+
+/**
+ * Guards one episode manifest and the content file it declares.
+ *
+ * Loads the manifest, resolves `content.adapter` through the shipped adapter
+ * registry, binds the content file's cards and refuses to enumerate a manifest
+ * that does not validate (the validator owns those defects; the guard never
+ * guesses at a scene space it cannot describe).
+ *
+ * @param manifestPath The manifest path as given on the CLI or in the config.
+ * @param options      Optional bounds (defaults are the guard's own).
+ * @returns The manifest's provenance and its frozen scene-space report.
+ * @throws Error when the manifest/content is unreadable, the adapter is
+ *         unknown, or the manifest fails validation.
+ */
+export function guardManifest(
+  manifestPath: string,
+  options: { readonly maxDepth?: number | null; readonly maxStates?: number | null } = {},
+): StorylineGuardManifestResult {
+  const absoluteManifest = resolve(process.cwd(), manifestPath);
+  let manifestText: string;
+  try {
+    manifestText = readFileSync(absoluteManifest, 'utf-8');
+  } catch (error) {
+    throw new Error(`cannot read manifest ${manifestPath}: ${(error as Error).message}`);
+  }
+  let document: unknown;
+  try {
+    document = JSON.parse(manifestText) as unknown;
+  } catch (error) {
+    throw new Error(`cannot parse manifest ${manifestPath}: ${(error as Error).message}`);
+  }
+
+  const binding = readEpisodeContentBinding(document);
+  if ('error' in binding) {
+    throw new Error(`${binding.error} (${manifestPath})`);
+  }
+  const adapter = getContentAdapter(binding.adapter);
+  if (adapter === undefined) {
+    throw new Error(
+      `unknown content.adapter "${binding.adapter}" in ${manifestPath} ` +
+        `(shipped adapters: ${Object.keys(CONTENT_ADAPTERS).join(', ')})`,
+    );
+  }
+
+  const absoluteContent = resolve(process.cwd(), binding.file);
+  let contentText: string;
+  try {
+    contentText = readFileSync(absoluteContent, 'utf-8');
+  } catch (error) {
+    throw new Error(
+      `cannot read content ${binding.file} declared by ${manifestPath}: ` +
+        `${(error as Error).message}`,
+    );
+  }
+
+  const cards = cardsFromCsv(parseCsv(contentText), adapter);
+  const declaredKeys = cards.flatMap((card) => card.resourceKeys);
+  const validation = validateEpisodeManifest(
+    document,
+    cards,
+    resolveResourceKeys(declaredKeys.length > 0 ? declaredKeys : undefined),
+    adapter,
+  );
+  if (!validation.valid) {
+    const quoted = validation.findings
+      .slice(0, MAX_QUOTED_FINDINGS)
+      .map((finding) => `${finding.code}: ${finding.message}`)
+      .join('; ');
+    const remainder = validation.findings.length - MAX_QUOTED_FINDINGS;
+    throw new Error(
+      `manifest ${manifestPath} fails validation ` +
+        `(${validation.findings.length} finding${validation.findings.length === 1 ? '' : 's'}): ` +
+        `${quoted}${remainder > 0 ? `; +${remainder} more` : ''}`,
+    );
+  }
+
+  const report = enumerateSceneSpace(document as EpisodeManifest, cards, {
+    ...(options.maxDepth === undefined || options.maxDepth === null
+      ? {}
+      : { maxDepth: options.maxDepth }),
+    ...(options.maxStates === undefined || options.maxStates === null
+      ? {}
+      : { maxStates: options.maxStates }),
+    adapter,
+  });
+  return { manifest: manifestPath, content: binding.file, adapter: adapter.gameId, report };
+}
+
+/**
+ * Serialises one guarded manifest as its stable JSON report.
+ *
+ * The provenance keys (`manifest`, `content`, `adapter`) lead and the
+ * scene-space report spreads after them, so the report keeps the existing
+ * top-level `valid` plus per-input detail and adds the scene-space keys
+ * (`invariants`, `sceneExits`, `beatRefusals`, `violations`, `exploration`).
+ * Key order is fixed and no clock is read, so two runs are byte-identical.
+ */
+export function manifestGuardToJson(result: StorylineGuardManifestResult): string {
+  return JSON.stringify(
+    {
+      manifest: result.manifest,
+      content: result.content,
+      adapter: result.adapter,
+      ...(JSON.parse(sceneGuardToJson(result.report)) as Record<string, unknown>),
+    },
+    null,
+    2,
+  );
+}
+
+/** Renders a report block for one CSV target. */
 function renderReport(report: ContentGuardReport, csvPath: string, json: boolean): string {
   return json
     ? `${JSON.stringify({ csv: csvPath, ...JSON.parse(contentGuardToJson(report)) }, null, 2)}`
     : formatContentGuardReport(report, csvPath);
 }
+
+/** One configured target's resolved input (exactly one of the two modes). */
+type ResolvedTargetInput =
+  | { readonly kind: 'csv'; readonly path: string }
+  | { readonly kind: 'manifest'; readonly path: string };
+
+/**
+ * Resolves a target's single input, rejecting a malformed target.
+ *
+ * @throws Error naming both modes when a target names both inputs, and naming
+ *         the expected inputs when it names neither.
+ */
+function resolveTargetInput(target: StorylineGuardTarget): ResolvedTargetInput {
+  const csv = typeof target?.csv === 'string' ? target.csv.trim() : '';
+  const manifest = typeof target?.manifest === 'string' ? target.manifest.trim() : '';
+  if (csv !== '' && manifest !== '') {
+    throw new Error(
+      'target names both "csv" (route-space mode) and "manifest" (scene-space ' +
+        'mode); name exactly one input',
+    );
+  }
+  if (csv === '' && manifest === '') {
+    throw new Error('target names no input; add a "csv" or a "manifest" path');
+  }
+  return csv !== '' ? { kind: 'csv', path: csv } : { kind: 'manifest', path: manifest };
+}
+
+/** A target's label for a batch diagnostic (never throws on a malformed target). */
+function targetLabel(target: StorylineGuardTarget, index: number): string {
+  const csv = typeof target?.csv === 'string' ? target.csv.trim() : '';
+  const manifest = typeof target?.manifest === 'string' ? target.manifest.trim() : '';
+  if (csv !== '') return csv;
+  if (manifest !== '') return manifest;
+  return `target #${index + 1}`;
+}
+
+/** One successfully guarded configured input, in config order. */
+type GuardedTarget =
+  | { readonly kind: 'csv'; readonly csv: string; readonly report: ContentGuardReport }
+  | { readonly kind: 'manifest'; readonly result: StorylineGuardManifestResult };
 
 /**
  * Runs the guard CLI.
@@ -309,13 +525,29 @@ export function runStorylineGuardCli(
     return 0;
   }
 
-  // ── Ad-hoc single-file mode ─────────────────────────────────
+  // ── Ad-hoc single-input modes ───────────────────────────────
   if (opts.csvPath !== null) {
     try {
       const adapter = requireAdapter(opts.gameId ?? 'gym');
       const report = guardFile(opts.csvPath, adapter, guardOptionsFrom(opts));
       process.stdout.write(`${renderReport(report, opts.csvPath, opts.json)}\n`);
       return report.valid ? 0 : 1;
+    } catch (error) {
+      process.stderr.write(`storyline-guard: ${(error as Error).message}\n`);
+      return 1;
+    }
+  }
+
+  if (opts.manifestPath !== null) {
+    try {
+      const result = guardManifest(opts.manifestPath, {
+        maxDepth: opts.maxDepth,
+        maxStates: opts.maxStates,
+      });
+      process.stdout.write(
+        `${opts.json ? manifestGuardToJson(result) : formatSceneGuardReport(result.report, result.manifest)}\n`,
+      );
+      return result.report.valid ? 0 : 1;
     } catch (error) {
       process.stderr.write(`storyline-guard: ${(error as Error).message}\n`);
       return 1;
@@ -331,17 +563,27 @@ export function runStorylineGuardCli(
     return 1;
   }
 
-  const reports: { csv: string; report: ContentGuardReport }[] = [];
+  const guarded: GuardedTarget[] = [];
   let ok = true;
-  for (const target of config.targets) {
+  for (const [index, target] of config.targets.entries()) {
     try {
-      const adapter = requireAdapter(target.game ?? 'gym');
-      const report = guardFile(target.csv, adapter, guardOptionsFrom(target));
-      reports.push({ csv: target.csv, report });
-      if (!report.valid) ok = false;
+      const input = resolveTargetInput(target);
+      if (input.kind === 'csv') {
+        const adapter = requireAdapter(target.game ?? 'gym');
+        const report = guardFile(input.path, adapter, guardOptionsFrom(target));
+        guarded.push({ kind: 'csv', csv: input.path, report });
+        if (!report.valid) ok = false;
+        continue;
+      }
+      const result = guardManifest(input.path, {
+        maxDepth: target.maxDepth ?? null,
+        maxStates: target.maxStates ?? null,
+      });
+      guarded.push({ kind: 'manifest', result });
+      if (!result.report.valid) ok = false;
     } catch (error) {
       process.stderr.write(
-        `storyline-guard: ${target.csv}: ${(error as Error).message}\n`,
+        `storyline-guard: ${targetLabel(target, index)}: ${(error as Error).message}\n`,
       );
       ok = false;
     }
@@ -352,10 +594,21 @@ export function runStorylineGuardCli(
       `${JSON.stringify(
         {
           valid: ok,
-          files: reports.map(({ csv, report }) => ({
-            csv,
-            ...JSON.parse(contentGuardToJson(report)),
-          })),
+          files: guarded.flatMap((entry) =>
+            entry.kind === 'csv'
+              ? [
+                  {
+                    csv: entry.csv,
+                    ...(JSON.parse(contentGuardToJson(entry.report)) as Record<string, unknown>),
+                  },
+                ]
+              : [],
+          ),
+          manifests: guarded.flatMap((entry) =>
+            entry.kind === 'manifest'
+              ? [(JSON.parse(manifestGuardToJson(entry.result)) as Record<string, unknown>)]
+              : [],
+          ),
         },
         null,
         2,
@@ -364,8 +617,10 @@ export function runStorylineGuardCli(
     return ok ? 0 : 1;
   }
 
-  for (const { csv, report } of reports) {
-    process.stdout.write(`${formatContentGuardReport(report, csv)}\n\n`);
+  for (const entry of guarded) {
+    process.stdout.write(
+      `${entry.kind === 'csv' ? formatContentGuardReport(entry.report, entry.csv) : formatSceneGuardReport(entry.result.report, entry.result.manifest)}\n\n`,
+    );
   }
   return ok ? 0 : 1;
 }

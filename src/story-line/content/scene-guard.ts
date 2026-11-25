@@ -1075,7 +1075,9 @@ export function sceneGuardToJson(report: SceneGuardReport): string {
  *
  * A header, one line per invariant (with a `✓`/`✗` marker), every violation,
  * one line per observed scene exit and refusal, the exploration accounting and a
- * PASS/FAIL verdict (a truncation always fails).
+ * PASS/FAIL verdict (a truncation always fails). The verdict carries the
+ * `(scene space)` label so a batch that guards CSV and manifest targets in one
+ * run distinguishes the two verdict lines.
  *
  * @param report       The report to render.
  * @param manifestPath Optional manifest path, printed as a heading.
@@ -1116,6 +1118,6 @@ export function formatSceneGuardReport(
   if (report.exploration.truncated) {
     lines.push('! a depth/state bound cut the enumeration short; the scene space is unproven');
   }
-  lines.push(report.valid ? 'PASS' : 'FAIL');
+  lines.push(report.valid ? 'PASS (scene space)' : 'FAIL (scene space)');
   return lines.join('\n');
 }

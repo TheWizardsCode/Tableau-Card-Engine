@@ -1,9 +1,11 @@
 /**
  * Shared argument handling for the story-line authoring CLIs.
  *
- * Kept in one place so the three `tsx` entry points (`storyline-author.ts`,
- * `storyline-graph.ts`, `validate-storylines.ts`) share identical, predictable
- * parsing without duplicating it three times.
+ * Kept in one place so the `tsx` entry points (`storyline-author.ts`,
+ * `storyline-graph.ts`, `validate-storylines.ts`, `storyline-guard.ts`,
+ * `storyline-manifest.ts`) share identical, predictable parsing without
+ * duplicating it per script, plus the one manifest-input reader the manifest
+ * validator and the scene-space guard both need.
  *
  * @module
  */
@@ -97,6 +99,43 @@ export function nullableFlag(
   if (flags.has(clearKey)) return null;
   const value = flags.get(valueKey);
   return value === undefined ? undefined : value;
+}
+
+/** A manifest's declared content binding (`content.adapter` / `content.file`). */
+export interface EpisodeContentBinding {
+  /** The shipped adapter id that reads the content file. */
+  readonly adapter: string;
+  /** The repository-relative (or absolute) content CSV path. */
+  readonly file: string;
+}
+
+/**
+ * Reads an episode manifest's declared content binding.
+ *
+ * Total: a malformed document yields an error string instead of throwing, so a
+ * CLI's diagnostic path never becomes an uncaught exception.
+ *
+ * @param manifest The parsed manifest document.
+ * @returns The binding, or a reviewer-facing diagnostic.
+ */
+export function readEpisodeContentBinding(
+  manifest: unknown,
+): EpisodeContentBinding | { readonly error: string } {
+  const content =
+    typeof manifest === 'object' && manifest !== null
+      ? (manifest as Record<string, unknown>).content
+      : undefined;
+  if (typeof content !== 'object' || content === null) {
+    return { error: 'manifest declares no content binding (content.adapter / content.file)' };
+  }
+  const { adapter, file } = content as Record<string, unknown>;
+  if (typeof adapter !== 'string' || adapter === '') {
+    return { error: 'manifest content.adapter is missing or not a string' };
+  }
+  if (typeof file !== 'string' || file === '') {
+    return { error: 'manifest content.file is missing or not a string' };
+  }
+  return { adapter, file };
 }
 
 /** Reads a boolean flag (`--flag`, `--flag true`, `--flag false`). */

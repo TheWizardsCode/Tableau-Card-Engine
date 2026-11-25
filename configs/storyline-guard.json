@@ -18,6 +18,9 @@
       "initial": { "hull": 5, "morale": 5, "stores": 4, "goodwill": 0, "charge": 2 },
       "endings": ["le-end-abandon", "le-end-quiet", "le-end-ram", "le-end-reset"],
       "minRejoin": 2
+    },
+    {
+      "manifest": "example-games/gym/content/long-erasure-episode.json"
     }
   ]
 }
