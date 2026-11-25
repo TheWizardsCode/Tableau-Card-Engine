@@ -250,6 +250,17 @@ game's thumbnails, icons and audio with no extra step.
   real-root regression test in `tests/scripts/link-game-assets.test.ts`.
   Composition stays **on** for every `dev` / `build` / `build:electron` /
   `package` run (CG-0MWW6BWZB00968NQ).
+- **Real-root build tests own a snapshot of `public/`.** Opting composition out
+  removes one writer, but the tree is still shared: a concurrent `npm run dev`
+  / `npm run build` in the same checkout can create or remove
+  `public/assets` links while a test build's Vite copy walks it. The tests that
+  build the real project root for their assertions (`tests/electron/`,
+  `tests/vite-transcript-plugin-regression.test.ts`) therefore pin a single
+  `GAMES_CONFIG` preset for the whole file and copy `public/` into a private
+  `mkdtemp` directory (`tests/helpers/public-snapshot.ts`,
+  `createPublicSnapshot()`) passed to Vite as `publicDir`; the snapshot is
+  dereferenced (no reads through the shared tree) and removed in a `finally`
+  (CG-0MWW8D6N6006ZR49).
 - Sibling `path` values are anchored on the **main** checkout, so a build run
   from a linked worktree (`.worklog/worktrees/<id>/`) composes
   `<main>/../tce-<game>` — never another item's checkout under

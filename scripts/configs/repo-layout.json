@@ -75,6 +75,7 @@
       "tests/vite-transcript-plugin-regression.test.ts",
       "tests/helpers/MockFactory.ts",
       "tests/helpers/phaserCanvasPool.ts",
+      "tests/helpers/public-snapshot.ts",
       "tests/helpers/waitForScene.ts",
       "tests/fixtures/layouts/README.md",
       "src/vite-env.d.ts",
