@@ -556,6 +556,222 @@ describe('tce-game-assets Vite plugin', () => {
     ).not.toThrow();
     expect(warnings.join('\n')).toContain('[game-assets] skipped asset composition');
   });
+
+  /**
+   * Full snapshot of a fixture's `public/assets` tree: every path with its kind
+   * and (for symlinks) its raw target, sorted by path. Used to prove an
+   * opt-out hook touches nothing at all.
+   */
+  function snapshotAssetsTree(root: string): Array<{
+    relativePath: string;
+    kind: string;
+    detail: string;
+  }> {
+    const assetsRoot = path.join(root, 'public', 'assets');
+    const entries: Array<{ relativePath: string; kind: string; detail: string }> = [];
+    const walk = (dir: string): void => {
+      for (const name of fs.readdirSync(dir)) {
+        const abs = path.join(dir, name);
+        const stat = fs.lstatSync(abs);
+        const relativePath = path.relative(assetsRoot, abs).split(path.sep).join('/');
+        if (stat.isSymbolicLink()) {
+          entries.push({ relativePath, kind: 'symlink', detail: fs.readlinkSync(abs) });
+        } else if (stat.isDirectory()) {
+          entries.push({ relativePath, kind: 'directory', detail: '' });
+          walk(abs);
+        } else {
+          entries.push({ relativePath, kind: 'file', detail: fs.readFileSync(abs, 'utf-8') });
+        }
+      }
+    };
+    walk(assetsRoot);
+    return entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  }
+
+  /**
+   * Seed the two destructive paths composition owns: a stale link for a game
+   * the preset does not select, and a dangling link the prune pass removes.
+   */
+  function seedDestructiveCompositionState(root: string): void {
+    const assetsRoot = path.join(root, 'public', 'assets');
+    const staleLink = path.join(assetsRoot, 'games', 'lost-cities');
+    fs.mkdirSync(path.dirname(staleLink), { recursive: true });
+    fs.symlinkSync(
+      path.relative(
+        path.dirname(staleLink),
+        path.join(root, 'tce-golf', 'public', 'assets', 'games', 'golf'),
+      ),
+      staleLink,
+      'dir',
+    );
+    const danglingLink = path.join(assetsRoot, 'cards', 'lost-cities');
+    fs.mkdirSync(path.dirname(danglingLink), { recursive: true });
+    fs.symlinkSync('../../tce-gone/public/assets/cards/lost-cities', danglingLink, 'dir');
+  }
+
+  it('compose: false leaves public/assets byte-for-byte untouched at both hooks', () => {
+    // Test isolation (CG-0MWW6BWZB00968NQ): a Vitest-context build must not
+    // create, replace, remove OR prune anything in the shared tree.
+    const root = makeLauncherFixture({ siblings: ['golf', 'main-street'] });
+    seedDestructiveCompositionState(root);
+    const before = snapshotAssetsTree(root);
+
+    const infos: string[] = [];
+    const logger = { info: (m: string) => infos.push(m), warn: (m: string) => infos.push(m) };
+    const plugin = gameAssetsPlugin({
+      projectRoot: root,
+      env: { GAMES_CONFIG: 'preset' },
+      compose: false,
+    });
+
+    (plugin.configResolved as (config: unknown) => void)({ root, logger });
+    (plugin.buildStart as () => void)();
+
+    expect(snapshotAssetsTree(root)).toEqual(before);
+    // The no-op is silent: no composition or prune log line is emitted.
+    expect(infos).toEqual([]);
+  });
+
+  it('composition stays the default: compose: true still composes, removes and prunes', () => {
+    // The opt-out must never become the default. An explicit `compose: true`
+    // (and an omitted option) must perform the full destructive pass.
+    const root = makeLauncherFixture({ siblings: ['golf', 'main-street'] });
+    seedDestructiveCompositionState(root);
+    const plugin = gameAssetsPlugin({
+      projectRoot: root,
+      env: { GAMES_CONFIG: 'preset' },
+      compose: true,
+    });
+
+    (plugin.configResolved as (config: unknown) => void)({
+      root,
+      logger: { info: () => {}, warn: () => {} },
+    });
+
+    const assetsRoot = path.join(root, 'public', 'assets');
+    // Selected games are linked…
+    expect(isSymlink(path.join(assetsRoot, 'games', 'golf'))).toBe(true);
+    expect(isSymlink(path.join(assetsRoot, 'games', 'main-street'))).toBe(true);
+    // …the unselected game's stale link is removed…
+    expect(fs.lstatSync(path.join(assetsRoot, 'games', 'lost-cities'), { throwIfNoEntry: false })).toBeUndefined();
+    // …and the dangling link is pruned.
+    expect(fs.lstatSync(path.join(assetsRoot, 'cards', 'lost-cities'), { throwIfNoEntry: false })).toBeUndefined();
+  });
+});
+
+/**
+ * Isolation contract for automated builds (CG-0MWW8CWPB004TIUF, parent
+ * CG-0MWW6BWZB00968NQ).
+ *
+ * Several unit tests build the **real** project root (real `vite.config.ts`,
+ * real `public/`). Composition is destructive by design (it creates, replaces
+ * and removes links), so when two of those builds pinned different presets
+ * they raced over the shared `public/assets/games` tree: one worker's
+ * `core-only` composition removed `games/main-street` while another worker's
+ * Vite `copyDir` was stats-ing it, aborting the copy with `ENOENT`.
+ *
+ * This test is the **reproduction**: it establishes a `full` baseline inside
+ * the test, then runs a real-root `build()` on the `core-only` preset (the
+ * mutator from the report) and asserts the composed-link set is unchanged. On
+ * the pre-fix behaviour the build removes every `full` link (red); once
+ * Vitest-context builds opt out of composition it mutates nothing (green).
+ * The assertions are on observable filesystem state — no sleeps, no polling,
+ * no retries.
+ */
+describe('real-root build isolation (CG-0MWW6BWZB00968NQ)', () => {
+  /** One entry observed under `public/assets/games/`. */
+  interface ComposedEntry {
+    /** Path relative to `public/assets/games/`, using `/` separators. */
+    relativePath: string;
+    /** `readlink` target for a symlink; a sentinel for a real entry. */
+    target: string;
+  }
+
+  const REAL_GAMES_ASSETS = path.join(REPO_ROOT, 'public', 'assets', 'games');
+  const REAL_ENTRY_SENTINEL = '[not-a-symlink]';
+
+  /**
+   * Snapshot the composed-link set under the real `public/assets/games/`:
+   * one `{ relativePath, target }` entry per link (and a sentinel entry for
+   * every real directory/file), sorted by path so equality is order-blind.
+   */
+  function readComposedLinkSet(): ComposedEntry[] {
+    const entries: ComposedEntry[] = [];
+    const walk = (dir: string): void => {
+      for (const name of fs.readdirSync(dir)) {
+        const abs = path.join(dir, name);
+        const stat = fs.lstatSync(abs);
+        const relativePath = path.relative(REAL_GAMES_ASSETS, abs).split(path.sep).join('/');
+        if (stat.isSymbolicLink()) {
+          // Record the raw link target: a link re-pointed elsewhere is a
+          // mutation even when its resolved contents look the same.
+          entries.push({ relativePath, target: fs.readlinkSync(abs) });
+        } else {
+          entries.push({ relativePath, target: REAL_ENTRY_SENTINEL });
+          if (stat.isDirectory()) walk(abs);
+        }
+      }
+    };
+    if (fs.existsSync(REAL_GAMES_ASSETS)) walk(REAL_GAMES_ASSETS);
+    return entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+  }
+
+  it('a real-root build leaves the composed game-asset link set unchanged', async (ctx) => {
+    const fullPreset = JSON.parse(
+      fs.readFileSync(path.join(REPO_ROOT, 'configs', 'full.json'), 'utf-8'),
+    ) as { games: Array<{ id: string }> };
+
+    // Establish the baseline deterministically *inside* the test, so it cannot
+    // pass trivially on a tree an earlier `core-only` run already stripped.
+    const baseline = composeGameAssets({
+      projectRoot: REPO_ROOT,
+      env: { GAMES_CONFIG: 'full' },
+      layoutPath: REAL_LAYOUT,
+    });
+    if (baseline.missingGames.length === fullPreset.games.length) {
+      ctx.skip(
+        'no sibling game checkouts present (composeGameAssets reports every selected ' +
+          'game under missingGames) — the real-root mutation assertion would be vacuous',
+      );
+      return;
+    }
+
+    const before = readComposedLinkSet();
+
+    // A partially bootstrapped distribution can be present yet compose no
+    // `games/` link (e.g. only audio-only siblings checked out). Assert the
+    // baseline is observable whenever some present game owns a `games/` root,
+    // so an equality check over two empty sets is never mistaken for proof.
+    const ownership = readGameAssetOwnership(REAL_LAYOUT);
+    const presentGamesDirOwners = fullPreset.games
+      .map((game) => game.id)
+      .filter((id) => !baseline.missingGames.includes(id))
+      .filter((id) =>
+        ownership.some((o) => o.game === id && o.assets.some((a) => a.startsWith('games/'))),
+      );
+    if (presentGamesDirOwners.length > 0) expect(before.length).toBeGreaterThan(0);
+
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-real-root-build-'));
+    const previousPreset = process.env.GAMES_CONFIG;
+    // The preset from the bug report: with composition ON this removes every
+    // `full` link the baseline just composed.
+    process.env.GAMES_CONFIG = 'core-only';
+    try {
+      await build({
+        mode: 'development',
+        root: REPO_ROOT,
+        configFile: path.join(REPO_ROOT, 'vite.config.ts'),
+        logLevel: 'silent',
+        build: { outDir, emptyOutDir: true, sourcemap: false },
+      });
+
+      expect(readComposedLinkSet()).toEqual(before);
+    } finally {
+      if (previousPreset === undefined) delete process.env.GAMES_CONFIG;
+      else process.env.GAMES_CONFIG = previousPreset;
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });
 
 describe('worktree-aware sibling resolution (CG-0MWTVP7AI008RAPB)', () => {

@@ -240,13 +240,24 @@ game's thumbnails, icons and audio with no extra step.
   destination is never removed.
 - The composed links are generated artefacts and are gitignored. Drive them
   manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
+- **Test-context builds opt out.** Composition is destructive by design, and
+  several unit tests build the real project root with different presets, so
+  concurrent workers would race over the one shared `public/assets` tree (a
+  `core-only` build removing a link while another worker's Vite `copyDir`
+  stats it → `ENOENT`). `vite.config.ts` therefore passes
+  `compose: !process.env.VITEST`: under Vitest the plugin is a complete no-op
+  (no composition *and* no pruning) and the isolation contract is pinned by a
+  real-root regression test in `tests/scripts/link-game-assets.test.ts`.
+  Composition stays **on** for every `dev` / `build` / `build:electron` /
+  `package` run (CG-0MWW6BWZB00968NQ).
 - Sibling `path` values are anchored on the **main** checkout, so a build run
   from a linked worktree (`.worklog/worktrees/<id>/`) composes
   `<main>/../tce-<game>` — never another item's checkout under
   `.worklog/worktrees/` (CG-0MWTVP7AI008RAPB). A main-checkout build is
   unaffected.
 
-Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI.
+Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI,
+CG-0MWW6BWZB00968NQ.
 
 > **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
 > is the authoritative guide to the preset schema (required and optional

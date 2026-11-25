@@ -23,7 +23,17 @@
  * between config resolution and the copy (a concurrent composition, or a
  * sibling checkout removed mid-build).
  *
- * Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI.
+ * Composition is **on by default** for every real invocation (`npm run dev`,
+ * `npm run build`, `build:electron`, `package`). Automated builds opt out with
+ * {@link GameAssetsPluginOptions.compose} `false`: composition is destructive
+ * (it creates, replaces and removes links), so several test workers building
+ * the real project root with different presets would race over one shared
+ * `public/assets` tree while Vite copies it (CG-0MWW6BWZB00968NQ). Opting out
+ * skips composition *and* dangling-link pruning — a test build must never
+ * mutate that tree.
+ *
+ * Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI,
+ * CG-0MWW6BWZB00968NQ.
  */
 import type { Plugin, ResolvedConfig } from 'vite';
 
@@ -37,6 +47,17 @@ export interface GameAssetsPluginOptions {
   env?: Record<string, string | undefined>;
   /** Layout contract path override (defaults to `scripts/configs/repo-layout.json`). */
   layoutPath?: string;
+  /**
+   * Compose sibling game assets into `public/assets` (default `true`).
+   *
+   * Set to `false` to make the plugin a complete no-op: no composition and no
+   * dangling-link pruning, so a build never mutates the shared
+   * `public/assets` tree. This exists for **test isolation** only — Vitest
+   * builds the real project root and several workers would otherwise race on
+   * the same links (`CG-0MWW6BWZB00968NQ`). Every real dev/build/package run
+   * leaves it unset, so composition stays on.
+   */
+  compose?: boolean;
 }
 
 /** Minimal logger surface used from both hooks. */
@@ -54,8 +75,14 @@ interface PluginLogger {
 export function gameAssetsPlugin(options: GameAssetsPluginOptions = {}): Plugin {
   let projectRoot = options.projectRoot ?? process.cwd();
   let logger: PluginLogger = {};
+  // Default ON: no existing caller changes behaviour. Only an explicit opt-out
+  // (the Vitest wiring in `vite.config.ts`) disables the plugin entirely.
+  const compose = options.compose ?? true;
 
   const syncAssets = (): void => {
+    // A test-context build must leave `public/assets` byte-for-byte untouched:
+    // pruning is a mutation too, so bail out before any filesystem work.
+    if (!compose) return;
     try {
       const report = composeGameAssets({
         projectRoot,
