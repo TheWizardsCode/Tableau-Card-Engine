@@ -75,13 +75,17 @@ export {
 export type {
   SceneGuardBeatRefusal,
   SceneGuardExploration,
+  SceneGuardInvariantName,
+  SceneGuardInvariantSummary,
   SceneGuardOptions,
   SceneGuardReport,
   SceneGuardSceneExit,
+  SceneGuardViolation,
 } from './scene-guard';
 export {
   DEFAULT_SCENE_GUARD_MAX_DEPTH,
   DEFAULT_SCENE_GUARD_MAX_STATES,
+  SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
   enumerateSceneSpace,
   formatSceneGuardReport,
   sceneGuardToJson,

@@ -263,7 +263,7 @@ describe('scene guard lane: the intended violations are recorded as data', () =>
 
     expect(clean.expectedViolations).toEqual([]);
     expect(exhausted.expectedViolations.map((violation) => violation.invariant)).toEqual([
-      'exhausted-close-not-success',
+      'no-success-on-exhausted-close',
     ]);
     expect(strand.expectedViolations.map((violation) => violation.invariant)).toEqual([
       'refusal-reaches-ending',

@@ -63,8 +63,8 @@ export type SceneGuardFixtureName = 'clean' | 'exhausted-success' | 'refusal-str
  * reports violations under the same vocabulary the fixture records.
  */
 export type SceneGuardInvariant =
-  /** No exhausted close may classify `success` (parent AC 2). */
-  | 'exhausted-close-not-success'
+  /** No exhausted close may classify `success` (parent AC 2; the runtime's `no-success-on-exhausted-close`). */
+  | 'no-success-on-exhausted-close'
   /** No refusal may lead to a state with no reachable ending (parent AC 3). */
   | 'refusal-reaches-ending';
 
@@ -117,7 +117,7 @@ export const SCENE_GUARD_FIXTURES: readonly SceneGuardFixtureSpec[] = [
     csvFile: 'exhausted-success.csv',
     expectedViolations: [
       {
-        invariant: 'exhausted-close-not-success',
+        invariant: 'no-success-on-exhausted-close',
         sceneId: 'sg-hall',
         refusedBeatCardId: 'sg-hall-wait',
         winningRuleId: 'hall-held',

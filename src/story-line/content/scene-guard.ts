@@ -57,6 +57,17 @@
  * 4. **Routing.** The winning route resolves to the next beat (scene clock
  *    reset, chain cleared) or an ending (the branch stops).
  *
+ * ## Invariants
+ *
+ * The report carries `invariants` (one `checked` / `violations` accounting per
+ * invariant) and the `violations` themselves, derived from the same scene-exit
+ * records the enumeration produces — no second traversal. The first invariant
+ * is `no-success-on-exhausted-close`: a close triggered by a refused beat must
+ * not be classified `success`, because that silently truncates the player's run
+ * behind a success banner. `partial` and `failure` remain legitimate
+ * classifications of an exhausted close, and a `success` close that follows a
+ * paid beat is not a refusal.
+ *
  * ## Resource arithmetic is the engine's today
  *
  * Every cost / extra effect / loss is applied **unclamped and unbounded**
@@ -114,6 +125,23 @@ export const DEFAULT_SCENE_GUARD_MAX_DEPTH = DEFAULT_GUARD_MAX_DEPTH;
 /** Default bound on the examined states (the CSV guard's). */
 export const DEFAULT_SCENE_GUARD_MAX_STATES = DEFAULT_GUARD_MAX_STATES;
 
+/**
+ * The invariant id: no exhausted close may be classified `success`.
+ *
+ * A beat that cannot be paid is not entered; the scene closes and its outcome
+ * table classifies the close. If that table labels the exhausted close
+ * `success`, the player's run is silently truncated with a success banner — the
+ * invariant this guard reports on. The name is the parent epic's vocabulary and
+ * the control-fixture lane's recorded intent. `partial` and `failure` are
+ * legitimate classifications, so only `success` is a violation.
+ */
+export const SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE =
+  'no-success-on-exhausted-close' as const;
+
+/** The invariant identity a {@link SceneGuardViolation} belongs to. */
+export type SceneGuardInvariantName =
+  | typeof SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE;
+
 /** One observed scene exit, in close order. */
 export interface SceneGuardSceneExit {
   /** The scene that closed. */
@@ -126,6 +154,48 @@ export interface SceneGuardSceneExit {
   readonly clockRemaining: number;
   /** Whether the close was triggered by a refused beat entry. */
   readonly refusalTriggered: boolean;
+  /**
+   * The refused beat's card id when {@link refusalTriggered}, else `null`.
+   * Carried on the exit so a violation can name the exact beat whose entry the
+   * clock could not pay for, without matching a second traversal.
+   */
+  readonly refusedBeatCardId: string | null;
+}
+
+/**
+ * One invariant finding, in the CSV guard's violation JSON shape.
+ *
+ * The required fields mirror `ContentGuardViolation` (`invariant`, `cardId`,
+ * `message`); the scene facts the invariant names are added alongside, so a
+ * consumer of the CSV shape reads the same keys and a scene guard can point at
+ * the exit that broke the rule.
+ */
+export interface SceneGuardViolation {
+  /** The invariant the fault breaks. */
+  readonly invariant: SceneGuardInvariantName;
+  /** The refused beat's content card id (the CSV guard's `cardId` field). */
+  readonly cardId: string;
+  /** The scene that closed on the refusal. */
+  readonly sceneId: string;
+  /** The `outcomeRules[].id` that mislabelled the exhausted close. */
+  readonly ruleId: string;
+  /** The outcome that rule assigned (`success`, the mislabel). */
+  readonly outcome: SceneOutcome;
+  /** Human-readable explanation naming the scene, beat and winning rule. */
+  readonly message: string;
+}
+
+/**
+ * Per-invariant accounting, in the shape the CSV guard's human report prints
+ * per invariant (`✓ name: N checked, M …`).
+ */
+export interface SceneGuardInvariantSummary {
+  /** The invariant identity. */
+  readonly invariant: SceneGuardInvariantName;
+  /** How many scene exits the invariant examined. */
+  readonly checked: number;
+  /** How many of those exited the invariant. */
+  readonly violations: number;
 }
 
 /** One observed beat refusal (the scene-close trigger). */
@@ -160,7 +230,7 @@ export interface SceneGuardExploration {
 
 /** The scene-space enumeration's report (frozen and JSON-safe). */
 export interface SceneGuardReport {
-  /** True when both bounds held (the invariant children add their own findings). */
+  /** True when both bounds held and no invariant is violated. */
   readonly valid: boolean;
   /** The episode id the enumeration walked (provenance in JSON reports). */
   readonly episodeId: string;
@@ -174,6 +244,10 @@ export interface SceneGuardReport {
   readonly sceneExits: readonly SceneGuardSceneExit[];
   /** Every observed beat refusal, in first-observed order. */
   readonly beatRefusals: readonly SceneGuardBeatRefusal[];
+  /** Every invariant with its checked / violation counts. */
+  readonly invariants: readonly SceneGuardInvariantSummary[];
+  /** Every invariant violation, in observed-exit order. */
+  readonly violations: readonly SceneGuardViolation[];
   /** The route-space exploration accounting. */
   readonly exploration: SceneGuardExploration;
 }
@@ -294,6 +368,7 @@ function exitKey(exit: SceneGuardSceneExit): string {
     exit.outcome,
     String(exit.clockRemaining),
     exit.refusalTriggered ? 'refusal' : 'close',
+    exit.refusedBeatCardId ?? '-',
   ].join('|');
 }
 
@@ -417,6 +492,7 @@ function closeAndRoute(
     outcome,
     clockRemaining: state.clockRemaining,
     refusalTriggered,
+    refusedBeatCardId: refusalTriggered ? state.beatId : null,
   });
 
   if (target.kind === 'ending') return { exit, next: null, bag };
@@ -653,14 +729,47 @@ export function enumerateSceneSpace(
   // exit is only ever recorded once; freeze the observed collections.
   exploredStateKeys.sort();
 
+  // Invariant: no exhausted close classifies `success`. Derived from the exit
+  // records the enumeration already produced (the refusal flag and the refused
+  // beat are on the record), so no second traversal is added. An exhausted
+  // close classified `partial` or `failure` is a legitimate authoring choice and
+  // is never flagged.
+  const exhaustedCloses = sceneExits.filter((exit) => exit.refusalTriggered);
+  const violations: SceneGuardViolation[] = exhaustedCloses.flatMap((exit) => {
+    if (exit.outcome !== 'success') return [];
+    const refusedBeatCardId = exit.refusedBeatCardId;
+    if (refusedBeatCardId === null) return []; // unreachable: a refusal names its beat
+    return [
+      Object.freeze({
+        invariant: SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
+        cardId: refusedBeatCardId,
+        sceneId: exit.sceneId,
+        ruleId: exit.ruleId,
+        outcome: exit.outcome,
+        message:
+          `Scene "${exit.sceneId}" closed on the refused beat "${refusedBeatCardId}" and ` +
+          `rule "${exit.ruleId}" classified the exhausted close as success.`,
+      }),
+    ];
+  });
+  const invariants: SceneGuardInvariantSummary[] = [
+    Object.freeze({
+      invariant: SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
+      checked: exhaustedCloses.length,
+      violations: violations.length,
+    }),
+  ];
+
   return Object.freeze({
-    valid: !truncated,
+    valid: !truncated && violations.length === 0,
     episodeId: manifest.id,
     maxStates,
     maxDepth,
     exploredStateKeys: Object.freeze(exploredStateKeys),
     sceneExits: Object.freeze(sceneExits.map((exit) => Object.freeze({ ...exit }))),
     beatRefusals: Object.freeze(beatRefusals.map((refusal) => Object.freeze({ ...refusal }))),
+    invariants: Object.freeze(invariants),
+    violations: Object.freeze(violations),
     exploration: Object.freeze({ statesVisited: visited.size, truncated }),
   });
 }
@@ -673,8 +782,9 @@ export function sceneGuardToJson(report: SceneGuardReport): string {
 /**
  * Renders the human-readable scene-guard report.
  *
- * A header, one line per observed scene exit and refusal, the exploration
- * accounting and a PASS/FAIL verdict (a truncation always fails).
+ * A header, one line per invariant (with a `✓`/`✗` marker), every violation,
+ * one line per observed scene exit and refusal, the exploration accounting and a
+ * PASS/FAIL verdict (a truncation always fails).
  *
  * @param report       The report to render.
  * @param manifestPath Optional manifest path, printed as a heading.
@@ -691,6 +801,15 @@ export function formatSceneGuardReport(
   lines.push(
     `states=${report.exploration.statesVisited} exits=${report.sceneExits.length} refusals=${report.beatRefusals.length}${report.exploration.truncated ? ' (truncated)' : ''}`,
   );
+  for (const summary of report.invariants) {
+    lines.push(
+      `${summary.violations === 0 ? '✓' : '✗'} ${summary.invariant}: ${summary.checked} checked, ` +
+        `${summary.violations} violation${summary.violations === 1 ? '' : 's'}`,
+    );
+  }
+  for (const violation of report.violations) {
+    lines.push(`✗ [${violation.invariant}] ${violation.message}`);
+  }
   for (const exit of report.sceneExits) {
     lines.push(
       `scene exit — ${exit.sceneId}: ${exit.outcome} (${exit.ruleId}), ${exit.clockRemaining} left, ` +
