@@ -1,0 +1,7 @@
+#resources: hull,supply
+id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+sg-hall-open,The Hall Opens,An open door waits at the end of the hall.,Take the door|sg-crossing-open;Wait out the clock|sg-hall-wait,scene-guard-fixture,Scene Guard Fixture,"hull,supply",I,1,,
+sg-hall-wait,The Long Wait,The clock runs while the hall stays shut.,Hold the hall|sg-hall-open;Leave by the side door|sg-rest-open,scene-guard-fixture,Scene Guard Fixture,"hull,supply",I,3,,
+sg-crossing-open,The Crossing,A short crossing with one door out.,Cross to the quiet end|sg-end-quiet,scene-guard-fixture,Scene Guard Fixture,"hull,supply",II,1,,
+sg-rest-open,The Rest,A quiet room with one door out.,Rest and take the quiet end|sg-end-quiet,scene-guard-fixture,Scene Guard Fixture,"hull,supply",II,2,,
+sg-end-quiet,A Quiet End,The run stops here.,,scene-guard-fixture,Scene Guard Fixture,"hull,supply",Ending,0,,"The hall is quiet and the supply is still counted. Nothing else moves."

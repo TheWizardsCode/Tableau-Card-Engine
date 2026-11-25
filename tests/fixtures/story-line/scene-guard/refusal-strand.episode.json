@@ -1,0 +1,87 @@
+{
+  "manifestVersion": 1,
+  "id": "scene-guard-refusal-strand",
+  "title": "Scene Guard Control: Refusal Strand",
+  "content": {
+    "adapter": "long-erasure",
+    "file": "tests/fixtures/story-line/scene-guard/refusal-strand.csv"
+  },
+  "resources": {
+    "declared": ["hull", "supply"],
+    "irreversible": ["hull"],
+    "start": { "hull": 2, "supply": 1 },
+    "bounds": {
+      "hull": { "min": 0, "max": 4 },
+      "supply": { "min": 0, "max": 3 }
+    }
+  },
+  "start": { "act": "sg-act-one", "scene": "sg-hold", "beat": "sg-hold-open" },
+  "endings": ["sg-end-quiet"],
+  "acts": [
+    {
+      "id": "sg-act-one",
+      "title": "The Hold",
+      "order": 1,
+      "entryScene": "sg-hold",
+      "scenes": [
+        {
+          "id": "sg-hold",
+          "title": "The Hold",
+          "objective": {
+            "statement": "Hold the room with supply to spare.",
+            "check": { "field": "supply", "op": ">=", "value": 2 }
+          },
+          "budget": { "clock": 2 },
+          "entryBeat": "sg-hold-open",
+          "beats": [
+            { "cardId": "sg-hold-open", "clockCost": 1 },
+            {
+              "cardId": "sg-hold-wait",
+              "clockCost": 2,
+              "note": "Refusable: entering sg-hold-open leaves 1 of the hold's 2 ticks, so the wait is never affordable."
+            }
+          ],
+          "outcomeRules": [
+            { "id": "hold-spent", "when": { "budget": "exhausted" }, "outcome": "failure" },
+            { "id": "hold-quiet", "outcome": "partial" }
+          ],
+          "routes": [
+            {
+              "id": "hold-to-loop",
+              "on": "*",
+              "to": { "kind": "beat", "act": "sg-act-one", "scene": "sg-loop", "beat": "sg-loop-open" }
+            }
+          ]
+        },
+        {
+          "id": "sg-loop",
+          "title": "The Loop",
+          "objective": {
+            "statement": "Leave the loop with supply to spare.",
+            "check": { "field": "supply", "op": ">=", "value": 2 }
+          },
+          "budget": { "clock": 1 },
+          "entryBeat": "sg-loop-open",
+          "beats": [
+            {
+              "cardId": "sg-loop-open",
+              "clockCost": 2,
+              "note": "Always refused: the loop's clock is 1 tick and the beat costs 2."
+            }
+          ],
+          "outcomeRules": [
+            { "id": "loop-spent", "when": { "budget": "exhausted" }, "outcome": "failure" },
+            { "id": "loop-quiet", "outcome": "partial" }
+          ],
+          "routes": [
+            {
+              "id": "loop-to-hold",
+              "on": "*",
+              "to": { "kind": "beat", "act": "sg-act-one", "scene": "sg-hold", "beat": "sg-hold-open" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
