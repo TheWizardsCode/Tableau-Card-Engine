@@ -240,27 +240,39 @@ game's thumbnails, icons and audio with no extra step.
   destination is never removed.
 - The composed links are generated artefacts and are gitignored. Drive them
   manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
-- **Test-context builds opt out.** Composition is destructive by design, and
-  several unit tests build the real project root with different presets, so
-  concurrent workers would race over the one shared `public/assets` tree (a
-  `core-only` build removing a link while another worker's Vite `copyDir`
-  stats it → `ENOENT`). `vite.config.ts` therefore passes
+- **Composition is on by default.** `gameAssetsPlugin()` composes unless its
+  `compose` option is explicitly `false`; no npm script or environment variable
+  turns it off, so `npm run dev`, `npm run build`, `npm run build:electron` and
+  `npm run package` always compose.
+- **Vitest-context builds run with composition off.** Composition is
+  destructive by design (it creates, replaces and removes links), and several
+  unit tests build the real project root with different presets. With
+  composition on, concurrent workers would mutate the one shared
+  `public/assets` tree while another worker's Vite public-dir copy walks it:
+  Vite's `copyDir` does `readdirSync(dir)` and then `statSync(entry)` per entry,
+  so a link removed between those two calls aborts that build with `ENOENT`
+  (CG-0MWW6BWZB00968NQ). `vite.config.ts` therefore passes
   `compose: !process.env.VITEST`: under Vitest the plugin is a complete no-op
-  (no composition *and* no pruning) and the isolation contract is pinned by a
-  real-root regression test in `tests/scripts/link-game-assets.test.ts`.
-  Composition stays **on** for every `dev` / `build` / `build:electron` /
-  `package` run (CG-0MWW6BWZB00968NQ).
+  (no composition *and* no dangling-link pruning) and the isolation contract is
+  pinned by a real-root regression test in
+  `tests/scripts/link-game-assets.test.ts`. The opt-out defaults to composition
+  **on** and is only ever set by a test context. The race is fixed at its
+  source, not masked: the `ENOENT` is deliberately **not** one of the retryable
+  transient signatures in `scripts/vitest-run-with-retry.ts`.
 - **Real-root build tests own a snapshot of `public/`.** Opting composition out
   removes one writer, but the tree is still shared: a concurrent `npm run dev`
   / `npm run build` in the same checkout can create or remove
   `public/assets` links while a test build's Vite copy walks it. The tests that
   build the real project root for their assertions (`tests/electron/`,
   `tests/vite-transcript-plugin-regression.test.ts`) therefore pin a single
-  `GAMES_CONFIG` preset for the whole file and copy `public/` into a private
-  `mkdtemp` directory (`tests/helpers/public-snapshot.ts`,
-  `createPublicSnapshot()`) passed to Vite as `publicDir`; the snapshot is
-  dereferenced (no reads through the shared tree) and removed in a `finally`
-  (CG-0MWW8D6N6006ZR49).
+  `GAMES_CONFIG` preset for the whole file (`core-only` — see
+  [Real-root Vite builds in tests](#real-root-vite-builds-in-tests)) and copy
+  `public/` into a private `mkdtemp` directory
+  (`tests/helpers/public-snapshot.ts`, `createPublicSnapshot()`) passed to Vite
+  as `publicDir`; the snapshot is dereferenced (no reads through the shared
+  tree) and removed in a `finally` (CG-0MWW8D6N6006ZR49). A real
+  `npm run dev` / `npm run build` is *not* isolated in this way — it composes
+  and copies the shared tree exactly as documented above.
 - Sibling `path` values are anchored on the **main** checkout, so a build run
   from a linked worktree (`.worklog/worktrees/<id>/`) composes
   `<main>/../tce-<game>` — never another item's checkout under
@@ -1468,6 +1480,37 @@ When running `npm run dev`, the dev server exposes `POST /api/transcripts` (via 
 3. **Watcher ignore list** — `server.watch.ignored` in `vite.config.ts` excludes the dev-output trees (`**/data/**`, `**/tmp/**`, `**/results/**`, `**/dist/**`, `**/dist-electron/**` via `DEV_WATCH_IGNORE_PATTERNS`). Vite does **not** consult `.gitignore` for watching, and every new file written into a watched directory previously created a permanently-retained inotify watcher + path strings in the dev server (measured ~10-43 KB/file of unbounded growth), which contributed to dev-server heap OOMs during long sessions/play-throughs.
 
 The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json`, so `scripts/replay.ts` and `scripts/export-transcripts.ts` keep working without modification. The middleware's bounded-input behaviour is unit-tested in `tests/scripts/vite-transcript-plugin.test.ts`, and the watcher-ignore wiring in `tests/scripts/vite-transcript-plugin.test.ts` (config contract).
+
+### Real-root Vite builds in tests
+
+Three files assert on the output of a real Vite `build()` / `createServer()` of
+this repo root: `tests/electron/vite-base-gating.test.ts`,
+`tests/electron/app-icon-build-output.test.ts` and
+`tests/vite-transcript-plugin-regression.test.ts`. Two rules keep them
+deterministic and free of shared state:
+
+1. **One deterministic preset per file — never the caller's `GAMES_CONFIG`.**
+   Each file sets `GAMES_CONFIG=core-only` in `beforeAll` for its whole
+   lifetime and restores the ambient value in `afterAll`, rather than
+   save/restoring around individual builds. `core-only` is the always-available
+   preset (the merged core is sibling-only), and file-scope pinning means the
+   preset cannot differ mid-run, so the graph a test builds never depends on
+   whether the caller exported `full` (the shell runners and every typed
+   `/skill:test` profile do) or a preset of its own.
+2. **A private `public/` snapshot — never the shared repo tree.** Composition is
+   off under Vitest (see [game asset composition](#game-asset-composition)), but
+   a concurrent `npm run dev` / `npm run build` in the same checkout can still
+   create or remove `public/assets` links while a test build's public-dir copy
+   walks it. Each build therefore passes `createPublicSnapshot()`
+   (`tests/helpers/public-snapshot.ts`) as Vite's `publicDir`: an `mkdtemp` copy
+   of `public/` with symlinked content dereferenced into real files (a dangling
+   link is copied as a link), so no assertion reads through the shared tree,
+   and the copy is removed in a `finally`. Assertions about copied files (app
+   icons, the manifest, base-path assets) still run against real content.
+
+Together these make the real-root build tests safe to run alongside each other
+and alongside a developer's own dev server; they change nothing about what a
+real `npm run build` does.
 
 ### Writing unit tests
 

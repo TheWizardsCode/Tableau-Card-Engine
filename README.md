@@ -181,7 +181,12 @@ into `public/assets/` at dev/build time — see
 `scripts/vite-game-assets-plugin.ts` / `scripts/link-game-assets.ts` — so the
 Game Selector and every game load their assets with no extra step. The composed
 links are gitignored and are removed again when a preset that does not select
-the game is used (e.g. the default `core-only`).
+the game is used (e.g. the default `core-only`). Composition is **on by
+default** for every dev/build/package run; Vitest builds skip it so automated
+tests never mutate the shared `public/assets` tree, and the tests that assert on
+real build output read a private snapshot of `public/` instead — so `npm test`
+leaves the tree exactly as it found it (see
+[docs/DEVELOPER.md](docs/DEVELOPER.md#game-asset-composition)).
 
 The same preset drives `npm run build`, `npm run build:electron` and the test
 profiles, so `setup:distribution` is the one prerequisite for any multi-game
