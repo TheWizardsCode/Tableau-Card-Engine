@@ -60,13 +60,34 @@
  * ## Invariants
  *
  * The report carries `invariants` (one `checked` / `violations` accounting per
- * invariant) and the `violations` themselves, derived from the same scene-exit
- * records the enumeration produces — no second traversal. The first invariant
- * is `no-success-on-exhausted-close`: a close triggered by a refused beat must
- * not be classified `success`, because that silently truncates the player's run
- * behind a success banner. `partial` and `failure` remain legitimate
- * classifications of an exhausted close, and a `success` close that follows a
- * paid beat is not a refusal.
+ * invariant) and the `violations` themselves. The first invariant,
+ * `no-success-on-exhausted-close`, is derived from the same scene-exit records
+ * the enumeration produces — no second traversal: a close triggered by a
+ * refused beat must not be classified `success`, because that silently
+ * truncates the player's run behind a success banner. `partial` and `failure`
+ * remain legitimate classifications of an exhausted close, and a `success`
+ * close that follows a paid beat is not a refusal.
+ *
+ * The second invariant, `refusal-reaches-ending`, is the parent's other half
+ * (GDD §2.8.6 item 5, §2.10 T3): a refusal is a failure **with** authored
+ * recovery content, never a silent truncation. The enumeration records one
+ * {@link RefusalRecord} per refusing state — the refusal, the close it
+ * triggered, the route that close took and the state(s) that route opened —
+ * and, once the main enumeration is done, {@link searchRefusalEnding} runs a
+ * bounded search from each record for a `manifest.endings` entry, reusing the
+ * same successor expansion and state key. A refusal whose exhausted close
+ * opens no ending, directly or through any reachable state, is a violation
+ * naming the scene, the refused beat, the winning outcome rule, the route the
+ * close took and the terminal states the search reached instead.
+ *
+ * The search shares the enumeration's bound values **and its single
+ * truncation flag**, so the two invariants can never disagree about whether
+ * the space was fully explored. A bound hit during the search is reported as
+ * `exploration.truncated` (which already makes the report invalid) and the
+ * refusal is left **unproven** rather than reported as a violation — the guard
+ * never claims a stranding it could not establish. A cycle terminates through
+ * the state key, so a loop whose reachable set still contains an ending is an
+ * ordinary passing shape.
  *
  * ## Resource arithmetic is the engine's today
  *
@@ -138,9 +159,24 @@ export const DEFAULT_SCENE_GUARD_MAX_STATES = DEFAULT_GUARD_MAX_STATES;
 export const SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE =
   'no-success-on-exhausted-close' as const;
 
+/**
+ * The invariant id: every refused beat's exhausted close reaches a declared
+ * ending.
+ *
+ * The refusal closes the scene (`budgetExhausted`) and the close routes through
+ * the authored route table (GDD §2.10 T2/T3). If that route — and every
+ * continuation reachable from it — opens no `manifest.endings` entry, the
+ * player's run has no ending at all: the refusal silently truncated it. The
+ * name is the parent epic's vocabulary, the control-fixture lane's recorded
+ * intent and the GDD §2.8.6 item 5 wording.
+ */
+export const SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING =
+  'refusal-reaches-ending' as const;
+
 /** The invariant identity a {@link SceneGuardViolation} belongs to. */
 export type SceneGuardInvariantName =
-  | typeof SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE;
+  | typeof SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE
+  | typeof SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING;
 
 /** One observed scene exit, in close order. */
 export interface SceneGuardSceneExit {
@@ -168,11 +204,22 @@ export interface SceneGuardSceneExit {
  * The required fields mirror `ContentGuardViolation` (`invariant`, `cardId`,
  * `message`); the scene facts the invariant names are added alongside, so a
  * consumer of the CSV shape reads the same keys and a scene guard can point at
- * the exit that broke the rule.
+ * the exit (or the route) that broke the rule. The two invariants carry
+ * different extra facts, so the union discriminates on `invariant`.
  */
-export interface SceneGuardViolation {
+export type SceneGuardViolation =
+  | SceneGuardExhaustedSuccessViolation
+  | SceneGuardRefusalStrandViolation;
+
+/**
+ * A refused beat whose exhausted close was classified `success` (invariant 1).
+ *
+ * The closed scene's run is truncated behind a success banner, so the finding
+ * names the exit that broke the rule.
+ */
+export interface SceneGuardExhaustedSuccessViolation {
   /** The invariant the fault breaks. */
-  readonly invariant: SceneGuardInvariantName;
+  readonly invariant: typeof SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE;
   /** The refused beat's content card id (the CSV guard's `cardId` field). */
   readonly cardId: string;
   /** The scene that closed on the refusal. */
@@ -182,6 +229,37 @@ export interface SceneGuardViolation {
   /** The outcome that rule assigned (`success`, the mislabel). */
   readonly outcome: SceneOutcome;
   /** Human-readable explanation naming the scene, beat and winning rule. */
+  readonly message: string;
+}
+
+/**
+ * A refusal whose exhausted close reaches no declared ending (invariant 2).
+ *
+ * The finding names the refusal, the close and the door the close opened — the
+ * three authored facts a writer edits to give the failure a way out — plus the
+ * states the search actually reached, so the defect is locatable rather than
+ * merely reported.
+ */
+export interface SceneGuardRefusalStrandViolation {
+  /** The invariant the fault breaks. */
+  readonly invariant: typeof SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING;
+  /** The refused beat's content card id (the CSV guard's `cardId` field). */
+  readonly cardId: string;
+  /** The scene that closed on the refusal. */
+  readonly sceneId: string;
+  /** The `outcomeRules[].id` that classified the exhausted close. */
+  readonly ruleId: string;
+  /** The outcome that rule assigned (never `success`, which invariant 1 owns). */
+  readonly outcome: SceneOutcome;
+  /** The `routes[].id` the exhausted close selected (the door it opened). */
+  readonly routeId: string;
+  /**
+   * The distinct scene ids the reachability search reached, in sorted order —
+   * every one of them terminal in the reachability sense, because none of them
+   * opens a route (however indirect) to a declared ending.
+   */
+  readonly terminalStates: readonly string[];
+  /** Human-readable explanation naming the scene, beat, rule, route and states. */
   readonly message: string;
 }
 
@@ -214,8 +292,12 @@ export interface SceneGuardBeatRefusal {
 interface CloseTransition {
   /** The exit record to observe. */
   readonly exit: SceneGuardSceneExit;
+  /** The `routes[].id` the close selected (the door it opened). */
+  readonly routeId: string;
   /** The next state's scene / beat, or `null` when the route opened an ending. */
   readonly next: { readonly sceneId: string; readonly beatId: string } | null;
+  /** The ending card the route opened, or `null` when it opened a scene. */
+  readonly endingCardId: string | null;
   /** The bag after the close's matching `losses[]` rules applied. */
   readonly bag: StorylineResources;
 }
@@ -495,7 +577,9 @@ function closeAndRoute(
     refusedBeatCardId: refusalTriggered ? state.beatId : null,
   });
 
-  if (target.kind === 'ending') return { exit, next: null, bag };
+  if (target.kind === 'ending') {
+    return { exit, routeId: route.id, next: null, endingCardId: target.endingCardId, bag };
+  }
 
   const nextScene = model.scenes.get(target.sceneId as string);
   if (nextScene === undefined) {
@@ -506,9 +590,283 @@ function closeAndRoute(
   }
   return {
     exit,
+    routeId: route.id,
     next: { sceneId: nextScene.id, beatId: target.beatId },
+    endingCardId: null,
     bag,
   };
+}
+
+/**
+ * The state a close's route opens: the scene clock reset, the chain cleared —
+ * exactly what `createEpisodeRunner` does on scene entry (GDD §2.3 step 12).
+ */
+function stateAfterClose(
+  model: EpisodeModel,
+  transition: CloseTransition,
+  next: { readonly sceneId: string; readonly beatId: string },
+): SceneState {
+  return {
+    sceneId: next.sceneId,
+    beatId: next.beatId,
+    clockRemaining: model.scenes.get(next.sceneId)?.budget.clock ?? 0,
+    pendingChain: null,
+    bag: transition.bag,
+  };
+}
+
+/**
+ * The per-enumeration traversal context.
+ *
+ * `truncated` is the **single** truncation flag: the main enumeration and every
+ * per-refusal reachability search share these bound values and set this one
+ * flag, so the report can never claim the space was fully explored (or that it
+ * was not) in two places at once.
+ */
+interface ExpansionContext {
+  readonly model: EpisodeModel;
+  readonly cardById: ReadonlyMap<string, ContentCard>;
+  readonly maxDepth: number;
+  readonly maxStates: number;
+  truncated: boolean;
+}
+
+/**
+ * One observed refusal together with the close it triggered.
+ *
+ * Recorded for every refusing state the enumeration expands, so the reachability
+ * invariant starts from the exhausted close's **own** route resolution (the
+ * delegated `selectRoute` / `resolveRouteTarget` decision) instead of
+ * re-deriving it.
+ */
+interface RefusalRecord {
+  /** The refusal itself (the scene-close trigger). */
+  readonly refusal: SceneGuardBeatRefusal;
+  /** The exit the refusal's close produced (already observed). */
+  readonly exit: SceneGuardSceneExit;
+  /** The `routes[].id` the exhausted close selected. */
+  readonly routeId: string;
+  /** The states that route opened (`[]` when it opened an ending directly). */
+  readonly successors: readonly SceneState[];
+  /** The ending card the route opened directly, or `null`. */
+  readonly endingCardId: string | null;
+}
+
+/** The result of expanding one state (pure: records nothing, mutates nothing). */
+interface StateExpansion {
+  /** The refusal record when the beat entry was refused, else `null`. */
+  readonly refusal: RefusalRecord | null;
+  /** Every close observed by the expansion (the refusal's close first). */
+  readonly exits: readonly SceneGuardSceneExit[];
+  /** Every successor state, in authored transition order. */
+  readonly successors: readonly SceneState[];
+  /** The first ending card the expansion's transitions opened, or `null`. */
+  readonly endingCardId: string | null;
+}
+
+/**
+ * Expands one state into its observed closes and successor states.
+ *
+ * This is the single transition step both traversals share: the main
+ * enumeration (which observes what it returns) and the per-refusal reachability
+ * search (which only reads it), so the two can never walk different scenes.
+ * Outcome and route precedence stay delegated — see the module comment.
+ *
+ * @throws Error when the state, its beat, its content card or a pushed
+ *         successor is not described by the manifest (the validator's defects).
+ */
+function expandState(ctx: ExpansionContext, state: SceneState): StateExpansion {
+  const { model, cardById } = ctx;
+  const scene = model.scenes.get(state.sceneId);
+  if (scene === undefined) {
+    throw new Error(
+      `Scene guard: scene "${state.sceneId}" is not declared by episode ` +
+        `"${model.manifest.id}".`,
+    );
+  }
+  const beat = scene.beats.find((candidate) => candidate.cardId === state.beatId);
+  if (beat === undefined) {
+    throw new Error(
+      `Scene guard: beat "${state.beatId}" is not a beat of scene "${scene.id}".`,
+    );
+  }
+
+  // 1. Beat entry — a refusal records no charge and no options, and the close it
+  //    triggers is the transition the expansion follows.
+  if (beat.clockCost > state.clockRemaining) {
+    const closed = closeAndRoute(model, state, true);
+    const successors =
+      closed.next === null ? [] : [stateAfterClose(model, closed, closed.next)];
+    const refusal: RefusalRecord = {
+      refusal: Object.freeze({
+        sceneId: scene.id,
+        beatCardId: beat.cardId,
+        clockCost: beat.clockCost,
+        clockRemaining: state.clockRemaining,
+      }),
+      exit: closed.exit,
+      routeId: closed.routeId,
+      successors,
+      endingCardId: closed.endingCardId,
+    };
+    return {
+      refusal,
+      exits: [closed.exit],
+      successors,
+      endingCardId: closed.endingCardId,
+    };
+  }
+
+  const charged: SceneState = {
+    ...state,
+    clockRemaining: state.clockRemaining - beat.clockCost,
+  };
+
+  const card = cardById.get(beat.cardId);
+  if (card === undefined) {
+    throw new Error(
+      `Scene guard: beat "${beat.cardId}" in scene "${scene.id}" has no content card in ` +
+        "the guard's card map.",
+    );
+  }
+  const compiledOptions = model.options.get(beat.cardId) ?? [];
+
+  // 2. Choice resolution — an affordable option, or (no options) an immediate
+  //    close with no pending chain, exactly as the runner classifies `none`.
+  const transitions: { readonly bag: StorylineResources; readonly target: string | null }[] = [];
+  for (const option of compiledOptions) {
+    const transition = optionTransition(model, option, charged.bag);
+    if (transition === null) continue;
+    if (transition.targets.length === 0) {
+      transitions.push({ bag: transition.bag, target: null });
+    } else {
+      for (const target of transition.targets) transitions.push({ bag: transition.bag, target });
+    }
+  }
+  if (compiledOptions.length === 0) transitions.push({ bag: charged.bag, target: null });
+
+  // 3./4. Close + route every transition, in authored order.
+  const successors: SceneState[] = [];
+  const exits: SceneGuardSceneExit[] = [];
+  let endingCardId: string | null = null;
+
+  for (const transition of transitions) {
+    const pushed = transition.target;
+    const pushedScene = pushed === null ? undefined : model.assignedScene.get(pushed);
+    const closes =
+      pushed === null || pushedScene === undefined || pushedScene !== scene.id;
+    if (!closes) {
+      // An in-scene beat continues the scene: same clock, no pending chain.
+      successors.push({
+        ...charged,
+        beatId: pushed as string,
+        pendingChain: null,
+        bag: transition.bag,
+      });
+      continue;
+    }
+    if (pushed !== null && pushedScene === undefined && !model.endings.has(pushed)) {
+      throw new Error(
+        `Scene guard: the resolved choice pushed "${pushed}", which is neither a beat ` +
+          `assigned to any scene nor a declared ending of episode "${model.manifest.id}".`,
+      );
+    }
+
+    const closed = closeAndRoute(
+      model,
+      { ...charged, pendingChain: pushed, bag: transition.bag },
+      false,
+    );
+    exits.push(closed.exit);
+    if (endingCardId === null) endingCardId = closed.endingCardId;
+    if (closed.next !== null) successors.push(stateAfterClose(model, closed, closed.next));
+  }
+
+  return { refusal: null, exits, successors, endingCardId };
+}
+
+/**
+ * The outcome of a refusal's reachability query.
+ *
+ * `none` means the query completed and no declared ending is reachable — a
+ * proven stranding; `exhausted` means a bound cut the query short, so the
+ * refusal is **unproven** and never reported as a violation (the shared
+ * `truncated` flag already fails the report).
+ */
+type RefusalEndingSearch =
+  | { readonly status: 'found'; readonly endingId: string }
+  | { readonly status: 'none'; readonly terminalStates: readonly string[] }
+  | { readonly status: 'exhausted' };
+
+/**
+ * Searches from a refusal's exhausted close for a declared ending.
+ *
+ * The search starts at the state(s) the close's **own** route resolution opened
+ * — the delegated `selectRoute` / `resolveRouteTarget` decision, already made by
+ * the enumeration — and expands successors through the same {@link expandState}
+ * step the enumeration uses, keyed by the same {@link stateKey}. So it can never
+ * walk a scene the enumeration would not, and a cycle terminates through state
+ * revisits rather than a bound.
+ *
+ * The search has its own visited set (the main enumeration already visited those
+ * states) but shares the enumeration's bound values and its **single** truncation
+ * flag, so the two invariants can never disagree about whether the scene space
+ * was fully explored.
+ *
+ * @param ctx    The shared traversal context (the search may set `truncated`).
+ * @param record The refusal, its close and the state(s) that close's route opened.
+ * @returns The ending reached, a proven stranding with the states reached
+ *          instead, or `exhausted` when a bound cut the query short.
+ */
+function searchRefusalEnding(
+  ctx: ExpansionContext,
+  record: RefusalRecord,
+): RefusalEndingSearch {
+  if (record.endingCardId !== null) {
+    return { status: 'found', endingId: record.endingCardId };
+  }
+
+  const visited = new Set<string>();
+  const reachedSceneIds = new Set<string>();
+  const stack: { state: SceneState; depth: number }[] = record.successors.map((state) => ({
+    state,
+    depth: 0,
+  }));
+  let exhausted = false;
+
+  while (stack.length > 0) {
+    if (visited.size >= ctx.maxStates) {
+      exhausted = true;
+      break;
+    }
+    const current = stack.pop();
+    if (current === undefined) break;
+    const key = stateKey(current.state, ctx.model.declared);
+    if (visited.has(key)) continue;
+    visited.add(key);
+    reachedSceneIds.add(current.state.sceneId);
+
+    if (current.depth > ctx.maxDepth) {
+      exhausted = true;
+      continue;
+    }
+
+    const expansion = expandState(ctx, current.state);
+    // The transition step is side-effect-free: nothing the search expands is
+    // observed, so the report's exits and refusals stay the enumeration's own.
+    if (expansion.endingCardId !== null) {
+      return { status: 'found', endingId: expansion.endingCardId };
+    }
+    for (let index = expansion.successors.length - 1; index >= 0; index -= 1) {
+      stack.push({ state: expansion.successors[index], depth: current.depth + 1 });
+    }
+  }
+
+  if (exhausted) {
+    ctx.truncated = true;
+    return { status: 'exhausted' };
+  }
+  return { status: 'none', terminalStates: [...reachedSceneIds].sort() };
 }
 
 /**
@@ -517,7 +875,9 @@ function closeAndRoute(
  * Each explored state is expanded once (a revisited state is not re-expanded),
  * so a cyclic scene space terminates through state revisits and a
  * resource-growing cycle terminates at the bounds. See the module comment for
- * the transition model.
+ * the transition model. Once the enumeration is complete, one bounded
+ * reachability search per refusing state establishes the
+ * `refusal-reaches-ending` invariant from the exhausted close's own route.
  *
  * @param manifest The validated episode manifest (never mutated).
  * @param cards    The manifest's content cards, as read through its adapter.
@@ -544,7 +904,6 @@ export function enumerateSceneSpace(
   const seenExits = new Set<string>();
   const beatRefusals: SceneGuardBeatRefusal[] = [];
   const seenRefusals = new Set<string>();
-  let truncated = false;
 
   /** Records one observed scene exit (de-duplicated, first-observed order). */
   const observeExit = (exit: SceneGuardSceneExit): void => {
@@ -583,26 +942,18 @@ export function enumerateSceneSpace(
     },
   ];
 
-  /** Observes a resolved close and pushes its children (none at an ending). */
-  const observeClosed = (transition: CloseTransition, depth: number): void => {
-    observeExit(transition.exit);
-    if (transition.next === null) return;
-    const scene = model.scenes.get(transition.next.sceneId);
-    stack.push({
-      state: {
-        sceneId: transition.next.sceneId,
-        beatId: transition.next.beatId,
-        clockRemaining: scene?.budget.clock ?? 0,
-        pendingChain: null,
-        bag: transition.bag,
-      },
-      depth: depth + 1,
-    });
-  };
+  /**
+   * The traversal context: the model, the card map, the two bound values and
+   * the single truncation flag every traversal shares.
+   */
+  const ctx: ExpansionContext = { model, cardById, maxDepth, maxStates, truncated: false };
+
+  /** Every refusing state the enumeration expanded, in exploration order. */
+  const refusalRecords: RefusalRecord[] = [];
 
   while (stack.length > 0) {
-    if (visited.size >= maxStates) {
-      truncated = true;
+    if (visited.size >= ctx.maxStates) {
+      ctx.truncated = true;
       break;
     }
     const current = stack.pop();
@@ -612,116 +963,22 @@ export function enumerateSceneSpace(
     visited.add(key);
     exploredStateKeys.push(key);
 
-    if (current.depth > maxDepth) {
-      truncated = true;
+    if (current.depth > ctx.maxDepth) {
+      ctx.truncated = true;
       continue;
     }
 
-    const scene = model.scenes.get(current.state.sceneId);
-    if (scene === undefined) {
-      throw new Error(
-        `Scene guard: scene "${current.state.sceneId}" is not declared by episode ` +
-          `"${manifest.id}".`,
-      );
+    const expansion = expandState(ctx, current.state);
+    if (expansion.refusal !== null) {
+      observeRefusal(expansion.refusal.refusal);
+      refusalRecords.push(expansion.refusal);
     }
-    const beat = scene.beats.find((candidate) => candidate.cardId === current.state.beatId);
-    if (beat === undefined) {
-      throw new Error(
-        `Scene guard: beat "${current.state.beatId}" is not a beat of scene "${scene.id}".`,
-      );
-    }
+    for (const exit of expansion.exits) observeExit(exit);
 
-    // 1. Beat entry — refusal first (no charge, no options), and the refusal is
-    //    the close trigger whose continuation this same expansion enumerates.
-    if (beat.clockCost > current.state.clockRemaining) {
-      observeRefusal({
-        sceneId: scene.id,
-        beatCardId: beat.cardId,
-        clockCost: beat.clockCost,
-        clockRemaining: current.state.clockRemaining,
-      });
-      observeClosed(closeAndRoute(model, current.state, true), current.depth);
-      continue;
-    }
-
-    const charged: SceneState = {
-      ...current.state,
-      clockRemaining: current.state.clockRemaining - beat.clockCost,
-    };
-
-    const card = cardById.get(beat.cardId);
-    if (card === undefined) {
-      throw new Error(
-        `Scene guard: beat "${beat.cardId}" in scene "${scene.id}" has no content card in ` +
-          "the guard's card map.",
-      );
-    }
-    const compiledOptions = model.options.get(beat.cardId) ?? [];
-
-    // 2. Choice resolution — an affordable option, or (no options) an immediate
-    //    close with no pending chain, exactly as the runner classifies `none`.
-    const transitions: { readonly bag: StorylineResources; readonly target: string | null }[] = [];
-    for (const option of compiledOptions) {
-      const transition = optionTransition(model, option, charged.bag);
-      if (transition === null) continue;
-      if (transition.targets.length === 0) {
-        transitions.push({ bag: transition.bag, target: null });
-      } else {
-        for (const target of transition.targets) transitions.push({ bag: transition.bag, target });
-      }
-    }
-    if (compiledOptions.length === 0) transitions.push({ bag: charged.bag, target: null });
-
-    // 3./4. Close + route every transition. Push children in reverse so the
-    //       authored order is the exploration order the stack pops in.
-    const children: { state: SceneState; depth: number }[] = [];
-    for (const transition of transitions) {
-      const pushed = transition.target;
-      const pushedScene = pushed === null ? undefined : model.assignedScene.get(pushed);
-      const closes =
-        pushed === null ||
-        pushedScene === undefined ||
-        pushedScene !== scene.id;
-      const pendingChain = pushed === null ? null : pushed;
-      const closingState: SceneState = {
-        ...charged,
-        pendingChain,
-        bag: transition.bag,
-      };
-
-      if (!closes) {
-        // An in-scene beat continues the scene: same clock, no pending chain.
-        children.push({
-          state: { ...charged, beatId: pushed as string, pendingChain: null, bag: transition.bag },
-          depth: current.depth + 1,
-        });
-        continue;
-      }
-      if (pushed !== null && pushedScene === undefined && !model.endings.has(pushed)) {
-        throw new Error(
-          `Scene guard: the resolved choice pushed "${pushed}", which is neither a beat ` +
-            `assigned to any scene nor a declared ending of episode "${manifest.id}".`,
-        );
-      }
-
-      const closed = closeAndRoute(model, closingState, false);
-      observeExit(closed.exit);
-      if (closed.next !== null) {
-        children.push({
-          state: {
-            sceneId: closed.next.sceneId,
-            beatId: closed.next.beatId,
-            clockRemaining: model.scenes.get(closed.next.sceneId)?.budget.clock ?? 0,
-            pendingChain: null,
-            bag: closed.bag,
-          },
-          depth: current.depth + 1,
-        });
-      }
-    }
-
-    for (let index = children.length - 1; index >= 0; index -= 1) {
-      stack.push(children[index]);
+    // Push children in reverse so the authored transition order is the
+    // exploration order the stack pops in.
+    for (let index = expansion.successors.length - 1; index >= 0; index -= 1) {
+      stack.push({ state: expansion.successors[index], depth: current.depth + 1 });
     }
   }
 
@@ -729,13 +986,15 @@ export function enumerateSceneSpace(
   // exit is only ever recorded once; freeze the observed collections.
   exploredStateKeys.sort();
 
-  // Invariant: no exhausted close classifies `success`. Derived from the exit
+  const violations: SceneGuardViolation[] = [];
+
+  // Invariant 1: no exhausted close classifies `success`. Derived from the exit
   // records the enumeration already produced (the refusal flag and the refused
   // beat are on the record), so no second traversal is added. An exhausted
   // close classified `partial` or `failure` is a legitimate authoring choice and
   // is never flagged.
   const exhaustedCloses = sceneExits.filter((exit) => exit.refusalTriggered);
-  const violations: SceneGuardViolation[] = exhaustedCloses.flatMap((exit) => {
+  violations.push(...exhaustedCloses.flatMap((exit) => {
     if (exit.outcome !== 'success') return [];
     const refusedBeatCardId = exit.refusedBeatCardId;
     if (refusedBeatCardId === null) return []; // unreachable: a refusal names its beat
@@ -751,17 +1010,49 @@ export function enumerateSceneSpace(
           `rule "${exit.ruleId}" classified the exhausted close as success.`,
       }),
     ];
+  }));
+
+  // Invariant 2: every refusal's exhausted close reaches a declared ending. One
+  // bounded search per refusing state, started from the close's own route
+  // resolution; a search the bound cut short is unproven (never a violation,
+  // and `truncated` already fails the report).
+  const refusalViolations = refusalRecords.flatMap((record) => {
+    const search = searchRefusalEnding(ctx, record);
+    if (search.status !== 'none') return [];
+    return [
+      Object.freeze({
+        invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+        cardId: record.refusal.beatCardId,
+        sceneId: record.refusal.sceneId,
+        ruleId: record.exit.ruleId,
+        outcome: record.exit.outcome,
+        routeId: record.routeId,
+        terminalStates: Object.freeze(search.terminalStates),
+        message:
+          `Refused beat "${record.refusal.beatCardId}" in scene ` +
+          `"${record.refusal.sceneId}" closed as ${record.exit.outcome} ` +
+          `(rule "${record.exit.ruleId}") and route "${record.routeId}" reaches no declared ` +
+          `ending; the search reached ${search.terminalStates.join(', ')} instead.`,
+      }),
+    ];
   });
+  violations.push(...refusalViolations);
+
   const invariants: SceneGuardInvariantSummary[] = [
     Object.freeze({
       invariant: SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
       checked: exhaustedCloses.length,
-      violations: violations.length,
+      violations: exhaustedCloses.filter((exit) => exit.outcome === 'success').length,
+    }),
+    Object.freeze({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: refusalRecords.length,
+      violations: refusalViolations.length,
     }),
   ];
 
   return Object.freeze({
-    valid: !truncated && violations.length === 0,
+    valid: !ctx.truncated && violations.length === 0,
     episodeId: manifest.id,
     maxStates,
     maxDepth,
@@ -770,7 +1061,7 @@ export function enumerateSceneSpace(
     beatRefusals: Object.freeze(beatRefusals.map((refusal) => Object.freeze({ ...refusal }))),
     invariants: Object.freeze(invariants),
     violations: Object.freeze(violations),
-    exploration: Object.freeze({ statesVisited: visited.size, truncated }),
+    exploration: Object.freeze({ statesVisited: visited.size, truncated: ctx.truncated }),
   });
 }
 

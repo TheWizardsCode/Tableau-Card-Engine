@@ -19,6 +19,13 @@
  *   `bounds.max`, and the G4 clamping work (`CG-0MWR0BGVG004UE7X`) is what will
  *   later change that pin.
  *
+ * It also proves the second invariant, `refusal-reaches-ending` (the parent's
+ * other half, GDD §2.8.6 item 5 / §2.10 T3): a refusal is a failure **with** an
+ * authored way out. The `refusal-strand` control is the positive control, the
+ * `clean` and `exhausted-success` controls plus two inline manifests are the
+ * recovery/false-positive controls, and a tight bound proves the reachability
+ * search fails closed rather than claiming a pass it could not establish.
+ *
  * Everything runs through the lane established by the previous child
  * (`scene-guard-fixtures.ts`) and the shared headless adapter double
  * (`../helpers/episode-fixture.ts`): no game module and no Phaser.
@@ -38,9 +45,11 @@ import {
   DEFAULT_SCENE_GUARD_MAX_DEPTH,
   DEFAULT_SCENE_GUARD_MAX_STATES,
   SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
+  SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
   enumerateSceneSpace,
   formatSceneGuardReport,
   sceneGuardToJson,
+  type SceneGuardRefusalStrandViolation,
   type SceneGuardReport,
   type SceneGuardSceneExit,
 } from '../../../src/story-line/content/scene-guard';
@@ -397,6 +406,7 @@ describe('scene-space guard: no-success-on-exhausted-close', () => {
         checked: 1,
         violations: 0,
       },
+      { invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING, checked: 1, violations: 0 },
     ]);
     expect(Object.keys(report.invariants[0]).sort()).toEqual([
       'checked',
@@ -418,6 +428,7 @@ describe('scene-space guard: no-success-on-exhausted-close', () => {
     );
     expect(report.invariants).toEqual([
       { invariant: expected.invariant, checked: 1, violations: 1 },
+      { invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING, checked: 1, violations: 0 },
     ]);
 
     const [violation] = report.violations;
@@ -501,6 +512,7 @@ describe('scene-space guard: no-success-on-exhausted-close', () => {
     expect(report.violations).toEqual([]);
     expect(report.invariants).toEqual([
       { invariant: SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE, checked: 0, violations: 0 },
+      { invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING, checked: 0, violations: 0 },
     ]);
     expect(report.valid).toBe(true);
   });
@@ -649,5 +661,417 @@ describe('scene-space guard: resource arithmetic', () => {
     });
     // A clamped engine (supply capped at 3) would classify `crossing-quiet`.
     expect(report.sceneExits.some((exit) => exit.ruleId === 'crossing-quiet')).toBe(false);
+  });
+});
+
+// ── Invariant: every refusal reaches an ending ──────────────
+
+/** The refusal-strand violations of a report, narrowed to their own shape. */
+function strandViolations(report: SceneGuardReport): SceneGuardRefusalStrandViolation[] {
+  return report.violations.filter(
+    (violation): violation is SceneGuardRefusalStrandViolation =>
+      violation.invariant === SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+  );
+}
+
+/** A minimal inline content card for the inline fixtures below. */
+function inlineCard(id: string, options: string): ContentCard {
+  return {
+    id,
+    name: id,
+    effect: '',
+    options,
+    storylineId: null,
+    storylineTitle: null,
+    fields: {},
+    resourceKeys: ['hull', 'supply'],
+  };
+}
+
+/**
+ * The GDD's `le-iii-approach` shape (§2.5, Appendix A): the scene's second beat
+ * costs more than the clock it is entered with, so it is refused; the
+ * `{budget: exhausted}` rule classifies the close `failure`, the failure route
+ * applies the `hull-sacrificed` loss and opens the quiet ending. A refusal with
+ * an authored way out, exactly as the GDD's counter-example reads.
+ */
+function leIiiShapeManifest(): EpisodeManifest {
+  return {
+    manifestVersion: 1,
+    id: 'scene-guard-le-iii-approach',
+    title: 'Scene Guard Inline: The Refusal Has A Door',
+    content: { adapter: 'long-erasure', file: 'inline-le-iii-approach.csv' },
+    resources: {
+      declared: ['hull', 'supply'],
+      irreversible: ['hull'],
+      start: { hull: 3, supply: 1 },
+      bounds: { hull: { min: 0, max: 5 }, supply: { min: 0, max: 3 } },
+    },
+    start: { act: 'sg-act', scene: 'sg-core', beat: 'sg-core-open' },
+    endings: ['sg-end-quiet'],
+    acts: [
+      {
+        id: 'sg-act',
+        title: 'The Core',
+        order: 1,
+        entryScene: 'sg-core',
+        scenes: [
+          {
+            id: 'sg-core',
+            title: 'The Core',
+            objective: {
+              statement: 'Reach the core with the crew still behind you.',
+              check: { field: 'supply', op: '>=', value: 1 },
+            },
+            budget: { clock: 5 },
+            entryBeat: 'sg-core-open',
+            beats: [
+              { cardId: 'sg-core-open', clockCost: 3 },
+              { cardId: 'sg-core-approach', clockCost: 3 },
+            ],
+            outcomeRules: [
+              { id: 'core-spent', when: { budget: 'exhausted' }, outcome: 'failure' },
+              { id: 'core-with-you', when: { objective: 'met' }, outcome: 'success' },
+              { id: 'core-crew-gone', outcome: 'partial' },
+            ],
+            routes: [
+              {
+                id: 'core-quiet',
+                on: '*',
+                to: { kind: 'ending', cardId: 'sg-end-quiet' },
+              },
+            ],
+            losses: [
+              {
+                id: 'hull-sacrificed',
+                on: 'failure',
+                field: 'hull',
+                amount: 1,
+                statement: 'Breaking for the core on the last of the watch costs the hull.',
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Inline cards for {@link leIiiShapeManifest}. */
+function leIiiShapeCards(): ContentCard[] {
+  return [
+    inlineCard('sg-core-open', 'Set the charge|sg-core-approach'),
+    inlineCard('sg-core-approach', ''),
+    inlineCard('sg-end-quiet', 'Begin again|sg-core-open'),
+  ];
+}
+
+/**
+ * A scene space whose refusal continuation **loops** back through the refusing
+ * scene before it reaches an ending, plus a reset door on the ending itself.
+ *
+ * `sg-hub`'s refusable beat closes as a failure and routes to `sg-swap`, whose
+ * first option loops back to `sg-hub` (the refusing state, revisited) and whose
+ * second option opens `sg-passage`, which routes to the declared ending. The
+ * search must therefore terminate the loop through the state key — never a
+ * bound — and still find the ending, and the ending's own reset door must never
+ * be entered.
+ */
+function refusalLoopManifest(): EpisodeManifest {
+  const resourceBlock = {
+    declared: ['hull', 'supply'] as string[],
+    irreversible: ['hull'] as string[],
+    start: { hull: 2, supply: 1 },
+    bounds: { hull: { min: 0, max: 4 }, supply: { min: 0, max: 3 } },
+  };
+  return {
+    manifestVersion: 1,
+    id: 'scene-guard-refusal-loop',
+    title: 'Scene Guard Inline: The Refusal Loops Then Ends',
+    content: { adapter: 'long-erasure', file: 'inline-refusal-loop.csv' },
+    resources: resourceBlock,
+    start: { act: 'sg-act', scene: 'sg-hub', beat: 'sg-hub-open' },
+    endings: ['sg-end-quiet'],
+    acts: [
+      {
+        id: 'sg-act',
+        title: 'The Loop',
+        order: 1,
+        entryScene: 'sg-hub',
+        scenes: [
+          {
+            id: 'sg-hub',
+            title: 'The Hub',
+            objective: {
+              statement: 'Leave the hub with supply still in hand.',
+              check: { field: 'supply', op: '>=', value: 1 },
+            },
+            budget: { clock: 2 },
+            entryBeat: 'sg-hub-open',
+            beats: [
+              { cardId: 'sg-hub-open', clockCost: 1 },
+              { cardId: 'sg-hub-deep', clockCost: 2 },
+            ],
+            outcomeRules: [
+              { id: 'hub-spent', when: { budget: 'exhausted' }, outcome: 'failure' },
+              { id: 'hub-met', when: { objective: 'met' }, outcome: 'success' },
+              { id: 'hub-quiet', outcome: 'partial' },
+            ],
+            routes: [
+              {
+                id: 'hub-to-swap',
+                on: '*',
+                to: { kind: 'beat', act: 'sg-act', scene: 'sg-swap', beat: 'sg-swap-open' },
+              },
+            ],
+          },
+          {
+            id: 'sg-swap',
+            title: 'The Swap',
+            objective: {
+              statement: 'Turn the swap into a way out.',
+              check: { field: 'supply', op: '>=', value: 1 },
+            },
+            budget: { clock: 1 },
+            entryBeat: 'sg-swap-open',
+            beats: [{ cardId: 'sg-swap-open', clockCost: 1 }],
+            outcomeRules: [
+              { id: 'swap-met', when: { objective: 'met' }, outcome: 'success' },
+              { id: 'swap-quiet', outcome: 'partial' },
+            ],
+            routes: [{ id: 'swap-chain', on: '*', to: { kind: 'chain' } }],
+          },
+          {
+            id: 'sg-passage',
+            title: 'The Passage',
+            objective: {
+              statement: 'Cross the passage with supply still in hand.',
+              check: { field: 'supply', op: '>=', value: 1 },
+            },
+            budget: { clock: 1 },
+            entryBeat: 'sg-pass-open',
+            beats: [{ cardId: 'sg-pass-open', clockCost: 1 }],
+            outcomeRules: [
+              { id: 'pass-met', when: { objective: 'met' }, outcome: 'success' },
+              { id: 'pass-quiet', outcome: 'partial' },
+            ],
+            routes: [
+              { id: 'pass-to-end', on: '*', to: { kind: 'ending', cardId: 'sg-end-quiet' } },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** Inline cards for {@link refusalLoopManifest}. */
+function refusalLoopCards(): ContentCard[] {
+  return [
+    inlineCard('sg-hub-open', 'Go deeper|sg-hub-deep'),
+    inlineCard('sg-hub-deep', 'Keep waiting|sg-hub-open'),
+    inlineCard('sg-swap-open', 'Loop back|sg-hub-open;Move on|sg-pass-open'),
+    inlineCard('sg-pass-open', ''),
+    // The reset door an ending may carry (the `ending-successor` rule); the
+    // guard stops at an ending and never enters it.
+    inlineCard('sg-end-quiet', 'Begin again|sg-hub-open'),
+  ];
+}
+
+describe('scene-space guard: refusal-reaches-ending', () => {
+  it('reports the invariant with checked and violation counts', () => {
+    const fixture = loadSceneGuardFixture('clean');
+    const report = enumerateSceneSpace(fixture.manifest, fixture.cards);
+
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 1,
+      violations: 0,
+    });
+    expect(Object.keys(report.invariants[1]).sort()).toEqual([
+      'checked',
+      'invariant',
+      'violations',
+    ]);
+  });
+
+  it('passes the clean control, whose refused close routes to a scene and then an ending', () => {
+    const fixture = loadSceneGuardFixture('clean');
+    const report = enumerateSceneSpace(fixture.manifest, fixture.cards);
+
+    // The recovery shape read from the manifest itself: the exhausted close of
+    // `sg-hall` is a failure, that failure's route opens `sg-rest`, and
+    // `sg-rest`'s route opens the declared ending.
+    const exhausted = report.sceneExits.filter((exit) => exit.refusalTriggered);
+    expect(exhausted).toHaveLength(1);
+    expect(exhausted[0]).toMatchObject({
+      sceneId: 'sg-hall',
+      ruleId: 'hall-spent',
+      outcome: 'failure',
+    });
+    const hall = sceneById(fixture.manifest, 'sg-hall');
+    expect(hall.routes.find((route) => route.id === 'hall-to-rest')?.to).toEqual({
+      kind: 'beat',
+      act: 'sg-act-one',
+      scene: 'sg-rest',
+      beat: 'sg-rest-open',
+    });
+    expect(sceneById(fixture.manifest, 'sg-rest').routes.map((route) => route.to)).toEqual([
+      { kind: 'ending', cardId: 'sg-end-quiet' },
+    ]);
+    expect(fixture.manifest.endings).toContain('sg-end-quiet');
+
+    expect(strandViolations(report)).toEqual([]);
+    expect(report.valid).toBe(true);
+    expect(formatSceneGuardReport(report)).toContain(
+      '✓ refusal-reaches-ending: 1 checked, 0 violations',
+    );
+  });
+
+  it('fails the refusal-strand control, naming scene, beat, rule, route and terminal states', () => {
+    const fixture = loadSceneGuardFixture('refusal-strand');
+    const report = enumerateSceneSpace(fixture.manifest, fixture.cards);
+    const expected = fixture.expectedViolations[0];
+
+    expect(report.valid).toBe(false);
+    // The fixture violates this invariant and only this one: its two exhausted
+    // closes are both classified `failure`, so invariant 1 is untouched.
+    expect(report.violations.length).toBeGreaterThan(0);
+    expect(strandViolations(report)).toHaveLength(report.violations.length);
+    expect(report.invariants[0]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
+      checked: 2,
+      violations: 0,
+    });
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 2,
+      violations: 2,
+    });
+
+    const recorded = strandViolations(report).find(
+      (violation) =>
+        violation.sceneId === expected.sceneId &&
+        violation.cardId === expected.refusedBeatCardId,
+    );
+    expect(recorded).toBeDefined();
+    expect(Object.keys(recorded as SceneGuardRefusalStrandViolation).sort()).toEqual([
+      'cardId',
+      'invariant',
+      'message',
+      'outcome',
+      'routeId',
+      'ruleId',
+      'sceneId',
+      'terminalStates',
+    ]);
+    expect(recorded).toEqual(
+      expect.objectContaining({
+        invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+        sceneId: expected.sceneId,
+        cardId: expected.refusedBeatCardId,
+        ruleId: expected.winningRuleId,
+        outcome: 'failure',
+        routeId: 'hold-to-loop',
+        terminalStates: ['sg-hold', 'sg-loop'],
+      }),
+    );
+    // The message names the authored facts a writer edits to open a door.
+    expect(recorded?.message).toContain(expected.sceneId);
+    expect(recorded?.message).toContain(expected.refusedBeatCardId);
+    expect(recorded?.message).toContain(expected.winningRuleId);
+    expect(recorded?.message).toContain('hold-to-loop');
+    expect(recorded?.message).toContain('sg-loop');
+
+    // Both refusing states strand — exactly one violation per refusal.
+    expect(
+      strandViolations(report)
+        .map((violation) => `${violation.sceneId}/${violation.cardId}`)
+        .sort(),
+    ).toEqual(['sg-hold/sg-hold-wait', 'sg-loop/sg-loop-open']);
+
+    // Deterministic: the same inputs serialise byte-identically.
+    expect(sceneGuardToJson(enumerateSceneSpace(fixture.manifest, fixture.cards))).toBe(
+      sceneGuardToJson(report),
+    );
+    const text = formatSceneGuardReport(report);
+    expect(text).toContain('✗ refusal-reaches-ending: 2 checked, 2 violations');
+    expect(text).toContain('FAIL');
+  });
+
+  it('does not flag the exhausted-success control, whose refusal still reaches an ending', () => {
+    const fixture = loadSceneGuardFixture('exhausted-success');
+    const report = enumerateSceneSpace(fixture.manifest, fixture.cards);
+
+    expect(strandViolations(report)).toEqual([]);
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 1,
+      violations: 0,
+    });
+  });
+
+  it('passes the GDD’s le-iii-approach shape: a refused beat closes failure and reaches the ending', () => {
+    const report = enumerateSceneSpace(leIiiShapeManifest(), leIiiShapeCards());
+
+    // The refusal is real and classifies the close `failure`…
+    expect(report.beatRefusals).toEqual([
+      { sceneId: 'sg-core', beatCardId: 'sg-core-approach', clockCost: 3, clockRemaining: 2 },
+    ]);
+    expect(report.sceneExits).toContainEqual({
+      sceneId: 'sg-core',
+      ruleId: 'core-spent',
+      outcome: 'failure',
+      clockRemaining: 2,
+      refusalTriggered: true,
+      refusedBeatCardId: 'sg-core-approach',
+    });
+    // …and the failure route opens the ending, so the refusal has a way out.
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 1,
+      violations: 0,
+    });
+    expect(strandViolations(report)).toEqual([]);
+    expect(report.valid).toBe(true);
+  });
+
+  it('terminates a looping refusal continuation through the state key and still finds the ending', () => {
+    const report = enumerateSceneSpace(refusalLoopManifest(), refusalLoopCards());
+
+    // The loop re-enters the refusing state, which is expanded once: one
+    // refusal, no truncation (the state key terminates it, never a bound).
+    expect(report.beatRefusals).toEqual([
+      { sceneId: 'sg-hub', beatCardId: 'sg-hub-deep', clockCost: 2, clockRemaining: 1 },
+    ]);
+    expect(report.exploration.truncated).toBe(false);
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 1,
+      violations: 0,
+    });
+    expect(strandViolations(report)).toEqual([]);
+    expect(report.valid).toBe(true);
+  });
+
+  it('fails closed when a bound cuts the reachability search short, never claiming a pass', () => {
+    const fixture = loadSceneGuardFixture('refusal-strand');
+    const report = enumerateSceneSpace(fixture.manifest, fixture.cards, { maxStates: 2 });
+
+    // The refusal was observed, but neither traversal could prove where it
+    // leads. The one shared truncation flag makes the report invalid, and the
+    // refusal is left unproven rather than reported as a violation it cannot
+    // establish (the closure of a refusal is a subset of the enumeration's
+    // states, so a search bound hit can only come with a main bound hit).
+    expect(report.beatRefusals).toHaveLength(1);
+    expect(report.exploration.truncated).toBe(true);
+    expect(report.valid).toBe(false);
+    expect(report.invariants[1]).toEqual({
+      invariant: SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+      checked: 1,
+      violations: 0,
+    });
+    expect(strandViolations(report)).toEqual([]);
+    expect(formatSceneGuardReport(report)).toContain('truncated');
   });
 });
