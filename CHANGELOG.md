@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.2.0 (2026-11-25)
+> **Release focus:** This release focuses on making the branching sci-fi story playable end to end, with story scenes now tracking objectives, budgets and outcomes automatically and writers able to add and edit branches in one step. It also tightens gameplay trade-offs through capped resources, unrefillable hull, and visible choice costs, while improving tooltip behaviour and stabilizing builds and tests.
+### Features
+- Tooltips now wait briefly before appearing, so they no longer flash as you sweep the pointer across the board. (CG-0MWNGS2F90049LIG)
+- Edits made in the story-line editor now appear in the Gym demo exactly as authored. (CG-0MWRSOU91003P36J)
+- Play a complete branching sci-fi story where your choices matter and the ending scores the journey you made. (CG-0MWNFV6VU003O3PC)
+- Tooltips now follow your pointer instead of freezing where they first appeared. (CG-0MWPJFAUB002L9L7)
+- Story scenes now track objectives, budgets and outcomes automatically, so branching episodes play consistently. (CG-0MWR0BAT30015DPQ)
+- Designers can now validate episode storylines in one command and catch broken scenes before release. (CG-0MWR0BFMW003856N)
+- Choosing Public Investment now costs coins, making it a real trade-off. (CG-0MWSJ8RJM001IRCJ)
+- A complete design blueprint for the full story-driven card game, so the team can start building it. (CG-0MWNFVLYT003M7XF)
+- Story choices now show their cost right on the button, so no more surprise charges. (CG-0MWRVR4TP001I97I)
+- Writers can now add and edit story branches in one step, without retyping or switching tools. (CG-0MWQYDC7D003G4ON)
+- Resource gains now stop at their cap and losses at their floor, so a full hold is a real cost. (CG-0MWR0BGVG004UE7X)
+- Hull can no longer be refilled by content, keeping the tension dial a real, unrefundable cost. (CG-0MWR0BHH9002OQUZ)
+### Bug Fixes
+- Flaky tests that pass on retry no longer block releases. (CG-0MWEHG69O005VM17)
+- The secret Sabotage the Loom path can now be completed instead of always running out of time. (CG-0MWNSQQBD006PMFT)
+- Builds no longer fail from stale asset links when switching game presets or working in a worktree. (CG-0MWTSRRWU0062OMI)
+- Abandoning the voyage early now scores lower, so your epilogue reflects the journey you actually made. (CG-0MWNSR376002QBY9)
+- Test runs are now reliable, so a failed test means a real problem, not a random glitch. (CG-0MWW6BWZB00968NQ)
+- Test artifacts no longer block your finished changes from reaching dev. (CG-0MWR14107005F5LL)
+- Full-preset builds run from worktrees now load the correct game assets instead of missing or wrong ones. (CG-0MWTVP7AI008RAPB)
+> [Play the alpha release](https://thewizardscode.github.io/Tableau-Card-Engine/). Provide feedback in [Discord](https://discord.gg/gUKQTFkzQ4)
+
 ## v0.1.24 (2026-11-13)
 > **Release focus:** This release focuses on tightening development workflow reliability, ensuring pushes only pass with a full test run against the exact commit and fixing stale checks and worktree cache issues. It also improves the card game experience with draggable hand reordering and smoother deck-to-hand animations, alongside documentation and export fixes.
 ### Features
