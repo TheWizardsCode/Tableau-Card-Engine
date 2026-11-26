@@ -6,9 +6,22 @@
  * author API (`src/story-line/content/author.ts`):
  *
  * - `add-card`     appends a new card row (correct column count, no duplicate
- *                  id) and validates the resulting content.
- * - `update-card`  edits an existing card (name, effect, options encoding,
- *                  story-line id/title and game columns).
+ *                  id) and validates the resulting content. `--after
+ *                  <card-id>` inserts the row directly after that card's row
+ *                  instead, so CSV reading order can track narrative order.
+ * - `add-linked-card` appends a new card **and** links it in from an existing
+ *                  card in one transaction: the predecessor gains an option
+ *                  pointing at the new card, and only the combined candidate
+ *                  is validated — so a forward reference is authored in one
+ *                  step instead of backwards from its target. `--link-attr`
+ *                  authors `#cost` / `#extra` / `#when` / `#says` metadata on
+ *                  the generated option.
+ * - `add-option`   appends **one** option to an existing card's `options`
+ *                  cell without retyping the options already there, and
+ *                  validates the resulting content.
+ * - `update-card`  edits an existing card (name, effect, context/epilogue
+ *                  prose, options encoding, story-line id/title and game
+ *                  columns).
  *
  * A card's choice-ness is authored **only** through `--options`; the removed
  * legacy choice/link flags (`--has-choices`, `--accept-next`,
@@ -17,7 +30,10 @@
  *
  * Every edit is built and validated **in memory** first; an invalid result
  * leaves the content file byte-identical and exits non-zero. `--dry-run`
- * prints the candidate content without writing it.
+ * prints the candidate content without writing it. Prose is authored through
+ * the dedicated `--context` / `--epilogue` flags and is checked against the
+ * adopted prose budget: an over-budget paragraph is reported as a
+ * `prose-budget` warning on stderr and never blocks the write.
  *
  * ```bash
  * npm run storylines:author -- add-card --id evt-x --name "X" --effect "…" \
@@ -25,6 +41,14 @@
  *   --storyline-title "X Arc"
  * npm run storylines:author -- update-card --id evt-x --storyline-id storyline-y
  * npm run storylines:author -- add-card --id evt-z --name "Z" --dry-run
+ * npm run storylines:author -- add-card --id evt-z --name "Z" \
+ *   --after evt-x --storyline-id storyline-x
+ * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
+ *   --link-from evt-x --link-label "Take the branch" --storyline-id storyline-x
+ * npm run storylines:author -- add-linked-card --id evt-branch --name "Branch" \
+ *   --link-from evt-x --link-attr cost=coins:2 --storyline-id storyline-x
+ * npm run storylines:author -- add-option --id evt-x --label "Ask after the road" \
+ *   --target evt-y --attr cost=coins:2
  * ```
  *
  * Runs under `tsx`; nothing here imports a game or Phaser.
@@ -41,9 +65,13 @@ import {
 } from '../src/story-line/content/adapters';
 import {
   addContentCard,
+  addLinkedContentCard,
+  addOptionToContentCard,
   applyContentEditToFile,
   updateContentCard,
   type AddContentCardSpec,
+  type AddLinkedCardSpec,
+  type AddOptionContentCardSpec,
   type ContentEditResult,
   type UpdateContentCardSpec,
 } from '../src/story-line/content/author';
@@ -51,12 +79,20 @@ import {
   nullableFlag,
   parseArgv,
 } from './storyline-cli-support';
+import { PROSE_FIELD_SPECS } from '../src/story-line/content/prose';
+
+/** The adopted prose budgets, rendered for the usage text (one source of truth). */
+const PROSE_BUDGETS = PROSE_FIELD_SPECS.map(
+  (spec) => `${spec.field} ${spec.budget}`,
+).join(', ');
 
 /** CLI usage text. */
 export const AUTHOR_USAGE = `Transactional story-line content authoring.
 
 Usage:
   npx tsx scripts/storyline-author.ts add-card [options]
+  npx tsx scripts/storyline-author.ts add-linked-card [options]
+  npx tsx scripts/storyline-author.ts add-option [options]
   npx tsx scripts/storyline-author.ts update-card [options]
 
 Common options:
@@ -68,24 +104,68 @@ Common options:
 
 add-card options:
   --id <id> --name <name> [--effect <text>] [--options <encoding>]
-  [--storyline-id <id>] [--storyline-title <title>]
+  [--context <text>] [--epilogue <text>]
+  [--storyline-id <id>] [--storyline-title <title>] [--resources <keys>]
+  [--after <card-id>]        Insert the new row after that card's row
+                             (default: append at the end of the file)
+
+add-linked-card options (add-card options, plus):
+  --link-from <card-id>      Predecessor that gains the option (required)
+  --link-label <label>       Option label (default: the new card's name)
+  --link-attr <name=value>   Attribute for the generated link (repeatable),
+                             e.g. --link-attr cost=coins:2
+                             --link-attr extra=reputation:+1
+
+add-option options (append one option without retyping the cell):
+  --id <card-id>             Existing card that gains the option (required)
+  --label <label>            Option label, unique on that card (required)
+  --target <card-id>         Successor card id; omit for a terminal option
+  --attr <name=value>        Option attribute (repeatable); the leading # is
+                             optional, e.g. --attr cost=coins:2
+                             --attr extra=reputation:+1
 
 update-card options:
   --id <id> [--name <name>] [--effect <text>]
   [--options <encoding> | --clear-options]
+  [--context <text> | --clear-context]
+  [--epilogue <text> | --clear-epilogue]
   [--storyline-id <id> | --clear-storyline]
   [--storyline-title <title>]
+  [--resources <keys> | --clear-resources]
 
-Choice nodes are authored only through --options (label|target;label2|target2).
+Choice nodes are authored through --options (label|target;label2|target2), which
+replaces the cell, or add-option, which appends one entry.
+A positional insert or append (--after) never silently re-points a story-line's
+entry card: the entry is the first member in file order with no incoming link,
+and an edit that would move the entry (or leave a member unreachable from it) is
+refused, naming both cards, instead of written.
+Declared resources (--resources "coins,hull") are the keys the option
+#cost/#extra/#when attributes may name. A file may instead declare them once
+for every row in a leading "#resources: coins,hull" line before the header; a
+blank --resources inherits that declaration, a non-blank one overrides it.
+Prose is authored only through
+--context / --epilogue; the mapped columns are refused as --field keys.
+Prose is validated against its adopted budget (${PROSE_BUDGETS} characters):
+over-budget prose is reported as a warning on stderr and never blocks the edit.
 
 Exit codes: 0 = applied (or dry-run valid), 1 = refused (invalid usage/content).`;
 
 /** Parsed author CLI invocation. */
 export type AuthorCliOptions =
   | { readonly command: 'add-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddContentCardSpec }
+  | { readonly command: 'add-linked-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddLinkedCardSpec }
+  | { readonly command: 'add-option'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: AddOptionContentCardSpec }
   | { readonly command: 'update-card'; readonly csvPath: string; readonly gameId?: string; readonly dryRun: boolean; readonly spec: UpdateContentCardSpec }
   | { readonly command: 'help' }
   | { readonly error: string };
+
+/** The commands the author CLI accepts. */
+const AUTHOR_COMMANDS = [
+  'add-card',
+  'add-linked-card',
+  'add-option',
+  'update-card',
+] as const;
 
 /**
  * Legacy choice/link flags that no longer exist.
@@ -108,10 +188,17 @@ const REMOVED_CHOICE_FLAGS = [
  * @returns The parsed invocation.
  */
 export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
-  const { flags, positionals, fieldPairs } = parseArgv(argv);
+  const { flags, positionals, fieldPairs, attributeValues, linkAttributeValues } =
+    parseArgv(argv);
   if (flags.has('help')) return { command: 'help' };
   if (flags.has('field-error')) {
     return { error: `--field expects <column=value>, got "${flags.get('field-error')}"` };
+  }
+  if (flags.has('attr-error')) {
+    return { error: '--attr expects <name=value>, e.g. --attr cost=coins:2' };
+  }
+  if (flags.has('link-attr-error')) {
+    return { error: '--link-attr expects <name=value>, e.g. --link-attr cost=coins:2' };
   }
   const removedFlag = REMOVED_CHOICE_FLAGS.find((flag) => flags.has(flag));
   if (removedFlag !== undefined) {
@@ -120,8 +207,13 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
     };
   }
   const command = positionals[0];
-  if (command !== 'add-card' && command !== 'update-card') {
-    return { error: 'expected a command: add-card | update-card' };
+  if (
+    command !== 'add-card' &&
+    command !== 'add-linked-card' &&
+    command !== 'add-option' &&
+    command !== 'update-card'
+  ) {
+    return { error: `expected a command: ${AUTHOR_COMMANDS.join(' | ')}` };
   }
 
   const csvPath = resolve(process.cwd(), flags.get('csv') ?? DEFAULT_CONTENT_PATH);
@@ -131,31 +223,99 @@ export function parseAuthorCliArgs(argv: readonly string[]): AuthorCliOptions {
   const fields: Record<string, string> = {};
   for (const [column, value] of fieldPairs) fields[column] = value;
 
+  if (linkAttributeValues.length > 0 && command !== 'add-linked-card') {
+    return {
+      error:
+        '--link-attr describes the option add-linked-card generates on the predecessor; use --attr for an add-option attribute',
+    };
+  }
+
   const optionalText = (key: string): string | undefined => flags.get(key);
 
-  if (command === 'add-card') {
+  if (command === 'add-card' || command === 'add-linked-card') {
     const spec: AddContentCardSpec = {
       id: flags.get('id') ?? '',
       name: flags.get('name') ?? '',
       effect: optionalText('effect'),
+      context: optionalText('context'),
+      epilogue: optionalText('epilogue'),
       options: optionalText('options'),
       storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
       storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
+      resources: optionalText('resources'),
+      after: optionalText('after'),
       fields,
     };
-    return { command, csvPath, gameId, dryRun, spec };
+    if (command === 'add-card') return { command, csvPath, gameId, dryRun, spec };
+
+    const linkLabel = optionalText('link-label');
+    const linkFrom: AddLinkedCardSpec['linkFrom'] = {
+      id: flags.get('link-from') ?? '',
+      ...(linkLabel !== undefined ? { label: linkLabel } : {}),
+      ...(linkAttributeValues.length > 0
+        ? { attributes: linkAttributeValues }
+        : {}),
+    };
+    return { command, csvPath, gameId, dryRun, spec: { card: spec, linkFrom } };
+  }
+
+  if (command === 'add-option') {
+    if (fieldPairs.length > 0) {
+      return {
+        error: 'add-option appends one option and takes no --field columns; use update-card for card columns',
+      };
+    }
+    return {
+      command,
+      csvPath,
+      gameId,
+      dryRun,
+      spec: {
+        id: flags.get('id') ?? '',
+        label: flags.get('label') ?? '',
+        target: optionalText('target'),
+        ...(attributeValues.length > 0 ? { attributes: attributeValues } : {}),
+      },
+    };
   }
 
   const spec: UpdateContentCardSpec = {
     id: flags.get('id') ?? '',
     name: optionalText('name'),
     effect: optionalText('effect'),
+    context: nullableFlag(flags, 'context', 'clear-context'),
+    epilogue: nullableFlag(flags, 'epilogue', 'clear-epilogue'),
     options: nullableFlag(flags, 'options', 'clear-options'),
     storylineId: nullableFlag(flags, 'storyline-id', 'clear-storyline'),
     storylineTitle: nullableFlag(flags, 'storyline-title', 'clear-storyline-title'),
+    resources: nullableFlag(flags, 'resources', 'clear-resources'),
     fields,
   };
   return { command, csvPath, gameId, dryRun, spec };
+}
+
+/**
+ * Renders the candidate content's non-fatal warnings, one CLI line each.
+ *
+ * The prose budgets are warnings, never refusals: the edit is applied and the
+ * writer is told which field ran long (the same `prose-budget` warning the
+ * editor and `storylines:validate` report). The lines are written to
+ * **stderr** so the candidate CSV `--dry-run` prints on stdout stays
+ * machine-readable.
+ *
+ * @param result The applied (or dry-run) content edit.
+ * @returns One line per warning; empty when the content has none.
+ */
+export function formatAuthorWarnings(
+  result: ContentEditResult,
+): readonly string[] {
+  const warnings = result.validation?.warnings ?? [];
+  return warnings.map((warning) => {
+    const location = warning.row === undefined ? '' : ` row ${warning.row}`;
+    const column =
+      warning.column === undefined ? '' : `, column "${warning.column}"`;
+    return `storyline-author: warning [${warning.code}]${location}${column}: ${warning.message}`;
+  });
 }
 
 /**
@@ -185,10 +345,18 @@ export function runStorylineAuthorCli(
     return 1;
   }
 
-  const mutate = (csv: string): ContentEditResult =>
-    parsed.command === 'add-card'
-      ? addContentCard(csv, adapter, parsed.spec)
-      : updateContentCard(csv, adapter, parsed.spec);
+  const mutate = (csv: string): ContentEditResult => {
+    switch (parsed.command) {
+      case 'add-card':
+        return addContentCard(csv, adapter, parsed.spec);
+      case 'add-linked-card':
+        return addLinkedContentCard(csv, adapter, parsed.spec);
+      case 'add-option':
+        return addOptionToContentCard(csv, adapter, parsed.spec);
+      case 'update-card':
+        return updateContentCard(csv, adapter, parsed.spec);
+    }
+  };
 
   const result = applyContentEditToFile({
     contentPath: parsed.csvPath,
@@ -201,6 +369,11 @@ export function runStorylineAuthorCli(
     process.stderr.write('storyline-author: refusing to write — validation failed:\n');
     for (const error of result.errors) process.stderr.write(`  - ${error}\n`);
     return 1;
+  }
+
+  // Non-fatal warnings (prose budgets) are reported, never fatal.
+  for (const line of formatAuthorWarnings(result)) {
+    process.stderr.write(`${line}\n`);
   }
 
   if (parsed.dryRun) {

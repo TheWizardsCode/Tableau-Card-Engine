@@ -27,7 +27,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadGamesConfig, selectConfigPath } from './vite-game-discovery-plugin';
+import { loadGamesConfig, resolveSiblingAnchor, selectConfigPath } from './vite-game-discovery-plugin';
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -74,12 +74,37 @@ export interface GameAssetComposeReport {
   unchanged: GameAssetLink[];
   /** Stale link destinations removed (game no longer selected). */
   removed: string[];
+  /**
+   * Destinations removed because the link's target no longer exists (see
+   * {@link pruneDanglingComposedLinks}).
+   */
+  prunedDangling: string[];
   /** Destinations left untouched because they are not symlinks we own. */
   skipped: Array<{ dest: string; reason: string }>;
   /** Selected games with no composed assets (see {@link GameAssetPlan}). */
   missingGames: string[];
   /** Selected but absent asset roots (see {@link GameAssetPlan}). */
   missingAssets: GameAssetLink[];
+}
+
+/** Outcome of one dangling-link prune pass. */
+export interface DanglingLinkPruneReport {
+  /** Destinations removed because the link's target no longer exists. */
+  pruned: string[];
+  /** Owned destinations inspected (links and non-links alike). */
+  checked: number;
+}
+
+/** Options accepted by {@link pruneDanglingComposedLinks}. */
+export interface PruneDanglingOptions {
+  /** Absolute launcher repo root (where `configs/` and `public/` live). */
+  projectRoot: string;
+  /** Layout contract path (defaults to `scripts/configs/repo-layout.json`). */
+  layoutPath?: string;
+  /** Classify actions without touching the filesystem. */
+  dryRun?: boolean;
+  /** Sink for human-readable progress (defaults to a no-op). */
+  log?: (line: string) => void;
 }
 
 /** Options accepted by {@link composeGameAssets}. */
@@ -148,19 +173,31 @@ export const DEFAULT_LAYOUT_PATH = path.join('scripts', 'configs', 'repo-layout.
  * rather than throwing, so a partially-bootstrapped distribution still builds
  * the games it does have.
  *
- * @param options.projectRoot Absolute launcher root.
+ * Sibling `path` values are declared relative to the **main** checkout
+ * (`../tce-<game>`), so they are resolved against
+ * {@link resolveSiblingAnchor} rather than `projectRoot` directly: a build
+ * from a linked worktree (`.worklog/worktrees/<id>/`) must compose the main
+ * checkout's sibling games, not another item's checkout — or none at all
+ * (CG-0MWTVP7AI008RAPB). For a main-checkout build the anchor *is*
+ * `projectRoot`, so behaviour there is unchanged.
+ *
+ * @param options.projectRoot Absolute launcher root (the checkout being built).
  * @param options.selectedGames Selected games (id + sibling `path`).
  * @param options.ownership Per-game asset ownership table.
+ * @param options.env Environment holding `GAMES_CONFIG` (defaults to
+ *   `process.env`) — used only for worktree detection.
  * @returns The plan.
  */
 export function planGameAssetLinks(options: {
   projectRoot: string;
   selectedGames: ReadonlyArray<{ id: string; path: string }>;
   ownership: ReadonlyArray<GameAssetOwnership>;
+  env?: Record<string, string | undefined>;
 }): GameAssetPlan {
   const exists = fs.existsSync;
   const assetsRoot = path.join(options.projectRoot, 'public', 'assets');
   const ownershipByGame = new Map(options.ownership.map((o) => [o.game, o.assets]));
+  const siblingAnchor = resolveSiblingAnchor(options.projectRoot, options.env);
 
   const links: GameAssetLink[] = [];
   const missingGames: string[] = [];
@@ -172,7 +209,7 @@ export function planGameAssetLinks(options: {
       // No declared game-owned assets (e.g. a game with no extra assets).
       continue;
     }
-    const siblingRoot = path.resolve(options.projectRoot, game.path);
+    const siblingRoot = path.resolve(siblingAnchor, game.path);
     if (!exists(siblingRoot)) {
       missingGames.push(game.id);
       continue;
@@ -216,6 +253,69 @@ function createSymlink(dest: string, source: string): void {
 }
 
 /**
+ * Remove composed links whose target no longer exists.
+ *
+ * A composed link carries a **relative** target, so it is only valid for the
+ * checkout layout it was written in. Two routine situations leave it dangling:
+ *
+ *  - the link was written in the parent checkout and the tree was then used
+ *    from a worktree (`.worklog/worktrees/<id>/`), where the same relative
+ *    target resolves one or more directories too shallow; and
+ *  - the sibling game checkout the link points at was removed (a game worktree
+ *    pruned between runs, or a repo deleted from the distribution).
+ *
+ * A dangling link is fatal to a build: Vite stats every entry of the public
+ * dir while copying it, so one missing target aborts `npm run build` with
+ * `ENOENT`. The old "is the raw target correct?" check could not see this: a
+ * link pointing at a *lexically* correct path that does not resolve was
+ * classified `unchanged` and left in place forever.
+ *
+ * This pass is deliberately conservative — it only ever removes **symlinks**
+ * at destinations the composition owns (`gameAssets` in the layout contract).
+ * Real files and directories are never touched, and a link that resolves is
+ * left alone.
+ *
+ * @param options See {@link PruneDanglingOptions}.
+ * @returns The prune report.
+ */
+export function pruneDanglingComposedLinks(
+  options: PruneDanglingOptions,
+): DanglingLinkPruneReport {
+  const { projectRoot } = options;
+  const log = options.log ?? ((): void => {});
+  const layoutPath = options.layoutPath ?? path.join(projectRoot, DEFAULT_LAYOUT_PATH);
+  const dryRun = options.dryRun === true;
+
+  const ownership = readGameAssetOwnership(layoutPath);
+  const assetsRoot = path.join(projectRoot, 'public', 'assets');
+  const report: DanglingLinkPruneReport = { pruned: [], checked: 0 };
+
+  for (const owned of ownership) {
+    for (const asset of owned.assets) {
+      const dest = path.join(assetsRoot, asset);
+      const existing = fs.lstatSync(dest, { throwIfNoEntry: false });
+      if (!existing) continue;
+      report.checked += 1;
+      if (!existing.isSymbolicLink()) continue;
+      // `existsSync` follows the link: false means the target is gone (or the
+      // link loops), which is exactly the dangling case Vite chokes on.
+      if (fs.existsSync(dest)) continue;
+      if (!dryRun) fs.unlinkSync(dest);
+      report.pruned.push(dest);
+    }
+  }
+
+  if (report.pruned.length) {
+    log(
+      `[game-assets] pruned ${report.pruned.length} dangling composed link(s)` +
+        (dryRun ? ' (dry run)' : '') +
+        '.',
+    );
+  }
+  return report;
+}
+
+/**
  * Compose the selected games' assets into the launcher's `public/assets`.
  *
  * Idempotent: an existing correct symlink is left untouched; a symlink to the
@@ -223,6 +323,12 @@ function createSymlink(dest: string, source: string): void {
  * clobbered (reported under `skipped`). Asset roots belonging to games that are
  * *not* selected are removed when they are symlinks, so switching from `full`
  * to `core-only` leaves the launcher clean.
+ *
+ * Dangling links are pruned on every pass
+ * (see {@link pruneDanglingComposedLinks}) — a composed link carries a
+ * relative target, so a tree that moved into a worktree, or whose sibling game
+ * checkout was removed, would otherwise leave a link Vite's public-dir copy
+ * aborts on.
  *
  * @param options See {@link ComposeGameAssetsOptions}.
  * @returns The composition report.
@@ -245,6 +351,7 @@ export function composeGameAssets(options: ComposeGameAssetsOptions): GameAssetC
     projectRoot,
     selectedGames: config.games.map((g) => ({ id: g.id, path: g.path })),
     ownership,
+    env,
   });
 
   const report: GameAssetComposeReport = {
@@ -252,10 +359,23 @@ export function composeGameAssets(options: ComposeGameAssetsOptions): GameAssetC
     replaced: [],
     unchanged: [],
     removed: [],
+    prunedDangling: [],
     skipped: [],
     missingGames: plan.missingGames,
     missingAssets: plan.missingAssets,
   };
+
+  // ── Prune dangling links first ───────────────────────────────────────────
+  // A link can be *lexically* correct and still dangle (the target was removed
+  // or the tree moved into a worktree), so validate resolution before deciding
+  // a link is `unchanged`. Removing it here also makes the create/refresh pass
+  // below recreate a selected game's link in one go.
+  report.prunedDangling = pruneDanglingComposedLinks({
+    projectRoot,
+    layoutPath,
+    dryRun,
+    log,
+  }).pruned;
   if (plan.missingAssets.length) {
     log(
       `[game-assets] ${plan.missingAssets.length} declared asset root(s) absent in sibling games; skipping.`,
@@ -320,7 +440,7 @@ export function composeGameAssets(options: ComposeGameAssetsOptions): GameAssetC
   log(
     `[game-assets] linked ${report.linked.length}, replaced ${report.replaced.length}, ` +
       `unchanged ${report.unchanged.length}, removed ${report.removed.length}, ` +
-      `skipped ${report.skipped.length}.` +
+      `pruned ${report.prunedDangling.length}, skipped ${report.skipped.length}.` +
       (dryRun ? ' (dry run)' : ''),
   );
   return report;

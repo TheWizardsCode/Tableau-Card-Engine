@@ -64,8 +64,10 @@ npm run setup:distribution -- --dir ..  # Clone core + sibling game repos (full 
 GAMES_CONFIG=full npm run dev           # Run all games + Gym (after setup:distribution)
 npm run monte-carlo  # Run Main Street Monte Carlo harness via vite-node (JSON + CSV; needs the tce-main-street sibling)
 npm run storylines:validate  # Validate story-line content through the content adapter (default: Gym)
+npm run storylines:manifest  # Validate an episode manifest against its content file (default: the committed Appendix A manifest)
 npm run storylines:graph     # Regenerate the committed manifest/Mermaid artefacts (-- --check to guard drift)
-npm run storylines:author    # Transactional content edits (add-card / update-card; --dry-run supported)
+npm run storylines:ip-scan   # Scan the guarded set (GDD + content + artefacts) for prohibited third-party terms
+npm run storylines:author    # Transactional content edits (add-card / add-option / add-linked-card / update-card; --dry-run supported)
 npm run storylines:editor    # Story-line editor: viewer + guided editing (local dev tool; -- --content/--adapter)
 npm run tf:generate  # Generate ToneForge audio artifacts into build/tf-synths/
 npm run build:electron   # Electron-mode Vite build (relative base, file://-safe) for the desktop launcher
@@ -413,8 +415,9 @@ Main Street's business card placement uses a **two-step click pattern** (CG-0MSX
 Use `TooltipManager` from `@ui` for contextual information on hover. Supports two rendering modes: **DOM mode** (HTML overlay over the canvas) and **Phaser mode** (game-object containers rendered within the scene).
 
 - **Gym scene:** `GymTooltipScene` — `example-games/gym/scenes/GymTooltipScene.ts`
-- **Key APIs:** `TooltipManager`, `setTooltips()`/`getTooltips()` from SettingsStore
+- **Key APIs:** `TooltipManager` (`delayMs` / `touchDelayMs` hover-intent delays, `inputType` on `show()`), `setTooltips()`/`getTooltips()` from SettingsStore
 - **When to use:** Add tooltips to interactive elements (cards, buttons, zones) to explain their function without cluttering the UI. Toggle between modes at runtime via the settings store.
+- **Hover intent:** opt into `delayMs` (plus a shorter `touchDelayMs` for press-and-hold) so a pointer sweep no longer flashes overlay text; `0` keeps today's immediate show, and `hide()`/`destroy()`/the tooltips-off toggle cancel a pending show.
 
 ### 12. Grid and Pathfinding with SpatialRules
 

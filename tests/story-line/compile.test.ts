@@ -16,13 +16,18 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { createStorylineSystem } from '../../src/story-line';
+import {
+  createStorylineSystem,
+  isOptionAffordable,
+  type StorylineEngineAdapter,
+} from '../../src/story-line';
 import {
   makeAdapter,
   makeCard,
   makeState,
   type TemplateMap,
   type TestCard,
+  type TestState,
 } from './helpers';
 
 /** A system instance bound to an empty template catalogue + adapter. */
@@ -321,6 +326,41 @@ describe('draw-time condition filtering', () => {
 });
 
 // ── AC3: draw-time cost filtering ───────────────────────────
+
+describe('draw-time cost filtering over declared resources', () => {
+  it('gates on a declared key that is not a projection key', () => {
+    const map: TemplateMap = new Map();
+    const engine: StorylineEngineAdapter<TestState, TestCard> = {
+      ...makeAdapter(map),
+      resources: ['coins', 'reputation', 'hull'],
+      getResources: (state) => ({
+        coins: state.coins,
+        reputation: state.reputation,
+        hull: (state as TestState & { hull: number }).hull,
+      }),
+    };
+    const system = createStorylineSystem({ engine });
+    const state = Object.assign(makeState(), { hull: 4 });
+    system.registerStorylineOptions('evt-hull-cost', [
+      { label: 'Patch', effectPolicy: 'apply', cost: { hull: 4 } },
+      { label: 'Overhaul', effectPolicy: 'apply', cost: { hull: 5 } },
+    ]);
+
+    expect(
+      system.getStorylineOptions(makeCard({ id: 'evt-hull-cost' }), state).map((o) => o.label),
+    ).toEqual(['Patch']);
+  });
+
+  it('treats a cost on an undeclared key as unpayable and an unspecified key as unconstrained', () => {
+    const declared = ['coins', 'reputation', 'hull'];
+    expect(isOptionAffordable({ cost: { hull: 2 } }, { hull: 3 }, declared)).toBe(true);
+    expect(isOptionAffordable({ cost: { hull: 2 } }, { hull: 1 }, declared)).toBe(false);
+    // No declaration → the default coins/reputation projection, so `hull` is unknown.
+    expect(isOptionAffordable({ cost: { hull: 2 } }, { hull: 3 })).toBe(false);
+    // Specified keys gate; unspecified declared keys never constrain.
+    expect(isOptionAffordable({ cost: { hull: 2 } }, { hull: 2, coins: 0 }, declared)).toBe(true);
+  });
+});
 
 describe('draw-time cost filtering', () => {
   it('omits an option whose coin cost exceeds the balance', () => {

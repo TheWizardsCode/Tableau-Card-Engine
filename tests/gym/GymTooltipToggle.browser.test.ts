@@ -9,8 +9,19 @@ import { afterEach, describe, expect, it } from 'vitest';
 import Phaser from 'phaser';
 import { GymTooltipScene } from '../../example-games/gym/scenes/GymTooltipScene';
 import { GYM_TOOLTIP_KEY } from '../../example-games/gym/GymRegistry';
+import { TOOLTIP_DEMO_HOVER_DELAY_MS } from '../../example-games/gym/scenes/GymConstants';
 import { GAME_W, GAME_H } from '../../src/ui';
 import { waitForScene } from '../helpers/waitForScene';
+
+/**
+ * Advance the scene's real Phaser clock deterministically, so the demo's
+ * hover-intent dwell elapses without any real-time sleep.
+ */
+function advanceSceneClock(scene: Phaser.Scene, byMs: number): void {
+  const clock = scene.time;
+  clock.preUpdate(clock.now, 0);
+  clock.update(clock.now + byMs, byMs);
+}
 
 describe('GymTooltipScene toggle button (Disable/Enable)', () => {
   let game: Phaser.Game | null = null;
@@ -159,6 +170,31 @@ describe('GymTooltipScene toggle button (Disable/Enable)', () => {
     ) as Phaser.GameObjects.Container | undefined;
   }
 
+  it('delays the Phaser-mode tooltip by the configured dwell', async () => {
+    const scene = await bootScene();
+
+    // Switch to Phaser GameObject rendering mode.
+    const phaserButton = scene.children.list.find(
+      (c) => c instanceof Phaser.GameObjects.Text && c.text === '[ Phaser Mode ]',
+    ) as Phaser.GameObjects.Text | undefined;
+    expect(phaserButton).toBeDefined();
+    phaserButton!.emit('pointerdown');
+
+    const demoCards = (scene as unknown as { demoCards: Phaser.GameObjects.Container[] })
+      .demoCards;
+    expect(demoCards.length).toBeGreaterThan(0);
+    const cardBg = demoCards[0].getAt(0) as Phaser.GameObjects.Rectangle;
+
+    cardBg.emit('pointermove', { x: 300, y: 300 });
+
+    // Nothing is rendered before the dwell elapses.
+    expect(findPhaserTooltipContainer(scene)).toBeUndefined();
+
+    advanceSceneClock(scene, TOOLTIP_DEMO_HOVER_DELAY_MS);
+
+    expect(findPhaserTooltipContainer(scene)).toBeDefined();
+  }, 10000);
+
   it('clamps Phaser-mode tooltips inside the game canvas at every edge', async () => {
     const scene = await bootScene();
 
@@ -182,6 +218,10 @@ describe('GymTooltipScene toggle button (Disable/Enable)', () => {
 
     for (const point of corners) {
       cardBg.emit('pointermove', point);
+
+      // The demo opts into a hover-intent dwell, so advance the clock instead
+      // of sleeping in real time.
+      advanceSceneClock(scene, TOOLTIP_DEMO_HOVER_DELAY_MS);
 
       const container = findPhaserTooltipContainer(scene);
       expect(container, `tooltip container at ${JSON.stringify(point)}`).toBeDefined();

@@ -1,0 +1,26 @@
+{
+  "targets": [
+    {
+      "csv": "tests/fixtures/story-line/gdd-worked-examples.csv",
+      "game": "gym",
+      "initial": { "coins": 3, "reputation": 1 },
+      "minRejoin": 2
+    },
+    {
+      "csv": "example-games/gym/content/storylines.csv",
+      "game": "gym",
+      "initial": { "coins": 100 },
+      "minRejoin": 2
+    },
+    {
+      "csv": "example-games/gym/content/long-erasure.csv",
+      "game": "long-erasure",
+      "initial": { "hull": 5, "morale": 5, "stores": 4, "goodwill": 0, "charge": 2 },
+      "endings": ["le-end-abandon", "le-end-quiet", "le-end-ram", "le-end-reset"],
+      "minRejoin": 2
+    },
+    {
+      "manifest": "example-games/gym/content/long-erasure-episode.json"
+    }
+  ]
+}

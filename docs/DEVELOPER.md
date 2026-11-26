@@ -228,10 +228,59 @@ game's thumbnails, icons and audio with no extra step.
 - Composition is idempotent; an existing correct link is untouched, a real
   file at a destination is never clobbered, and links for games the preset no
   longer selects are removed (so `core-only` leaves the tree clean).
+- A composed link's **relative** target is only valid for the checkout layout
+  it was written in, and Vite stats every public-dir entry while copying it —
+  so a single link whose target no longer resolves would abort
+  `npm run build` with `ENOENT`. Composition therefore prunes **dangling**
+  `gameAssets` links on every pass (and again at `buildStart`, before the
+  copy): a tree used from `.worklog/worktrees/<id>/`, or one whose sibling
+  game checkout was removed, heals itself instead of failing the build.
+  Dangling links are reported as `prunedDangling` in the composition report /
+  `--json` output; a link that resolves is never touched and a real file at a
+  destination is never removed.
 - The composed links are generated artefacts and are gitignored. Drive them
   manually with `npx tsx scripts/link-game-assets.ts [--dry-run] [--json]`.
+- **Composition is on by default.** `gameAssetsPlugin()` composes unless its
+  `compose` option is explicitly `false`; no npm script or environment variable
+  turns it off, so `npm run dev`, `npm run build`, `npm run build:electron` and
+  `npm run package` always compose.
+- **Vitest-context builds run with composition off.** Composition is
+  destructive by design (it creates, replaces and removes links), and several
+  unit tests build the real project root with different presets. With
+  composition on, concurrent workers would mutate the one shared
+  `public/assets` tree while another worker's Vite public-dir copy walks it:
+  Vite's `copyDir` does `readdirSync(dir)` and then `statSync(entry)` per entry,
+  so a link removed between those two calls aborts that build with `ENOENT`
+  (CG-0MWW6BWZB00968NQ). `vite.config.ts` therefore passes
+  `compose: !process.env.VITEST`: under Vitest the plugin is a complete no-op
+  (no composition *and* no dangling-link pruning) and the isolation contract is
+  pinned by a real-root regression test in
+  `tests/scripts/link-game-assets.test.ts`. The opt-out defaults to composition
+  **on** and is only ever set by a test context. The race is fixed at its
+  source, not masked: the `ENOENT` is deliberately **not** one of the retryable
+  transient signatures in `scripts/vitest-run-with-retry.ts`.
+- **Real-root build tests own a snapshot of `public/`.** Opting composition out
+  removes one writer, but the tree is still shared: a concurrent `npm run dev`
+  / `npm run build` in the same checkout can create or remove
+  `public/assets` links while a test build's Vite copy walks it. The tests that
+  build the real project root for their assertions (`tests/electron/`,
+  `tests/vite-transcript-plugin-regression.test.ts`) therefore pin a single
+  `GAMES_CONFIG` preset for the whole file (`core-only` — see
+  [Real-root Vite builds in tests](#real-root-vite-builds-in-tests)) and copy
+  `public/` into a private `mkdtemp` directory
+  (`tests/helpers/public-snapshot.ts`, `createPublicSnapshot()`) passed to Vite
+  as `publicDir`; the snapshot is dereferenced (no reads through the shared
+  tree) and removed in a `finally` (CG-0MWW8D6N6006ZR49). A real
+  `npm run dev` / `npm run build` is *not* isolated in this way — it composes
+  and copies the shared tree exactly as documented above.
+- Sibling `path` values are anchored on the **main** checkout, so a build run
+  from a linked worktree (`.worklog/worktrees/<id>/`) composes
+  `<main>/../tce-<game>` — never another item's checkout under
+  `.worklog/worktrees/` (CG-0MWTVP7AI008RAPB). A main-checkout build is
+  unaffected.
 
-Related work item: CG-0MUKYCG9L00587FA.
+Related work items: CG-0MUKYCG9L00587FA, CG-0MWTSRRWU0062OMI,
+CG-0MWW6BWZB00968NQ.
 
 > **Full reference:** [Config-Driven Game Catalogue](dev/game-configuration.md)
 > is the authoritative guide to the preset schema (required and optional
@@ -253,12 +302,15 @@ Related work item: CG-0MUKYCG9L00587FA.
 > no files; `run-tutorial-tests.sh` skips them (and the projects set
 > `passWithNoTests`), so the core's suite stays green without sibling games.
 
-> **`.worklog/worktrees/` layouts:** the sibling lookup is relative to the
-> current project root, so presets resolve from a git worktree exactly as from
-> the main checkout. Because games are sibling checkouts (`../tce-<game>`),
-> a worktree resolves siblings next to itself (`.worklog/worktrees/tce-<game>`);
-> run distribution builds from the main checkout, or symlink siblings beside
-> the worktree.
+> **`.worklog/worktrees/` builds resolve siblings against the main checkout.**
+> A preset's `path` values are sibling repo roots (`../tce-<game>`) relative to
+> the **main** checkout. A build from a linked worktree
+> (`<main>/.worklog/worktrees/<id>/`) therefore still composes and bundles
+> `<main>/../tce-<game>` rather than looking under `.worklog/worktrees/` — so
+> `GAMES_CONFIG=full npm run build` from a worktree works with no symlinks
+> (CG-0MWTVP7AI008RAPB). Detection is conservative: the nearest ancestor
+> holding `.worklog/`, `configs/` and the active preset is the anchor; a
+> main-checkout build is unchanged.
 
 ## Building for Production
 
@@ -818,12 +870,18 @@ The repository root includes a `.pi/test-config.json` file that overrides the de
 per-command test timeout for the implement skill and the audit skill's test runner:
 
 ```json
-{"timeoutPerCommand": 1500}
+{"timeoutPerCommand": 3000}
 ```
 
 - **`timeoutPerCommand`** — maximum seconds per test-suite command (default 600 if absent).
-  TCE's full suite takes 18–21 minutes, so this is set to 1500 s (25 min) to prevent premature
-timeout kills.
+  TCE's full suite takes 18–21 minutes, so this is set to 3000 s (50 min) so a legitimately
+  slow stage on a contended host is never truncated by the outer per-command timeout. The
+  value is the **sum of the worst-case inner stage bounds plus a margin** (SA-0MWEURUYL004I470):
+  unit ceiling 1200 s + browser 1200 s + two `vitest list` pre-flights 240 s = 2640 s of stage
+  bounds, plus ~60 s of terminology/env pre-checks and orchestration ⇒ ~2700 s worst case,
+  leaving ~300 s of margin. The previous 1500 s had **zero** slack (300 + 1200 = 1500), so a
+  raised unit bound would have been silently truncated; raise this value in the same change as
+  any inner bound so the outer `suite_timeout` notice never masks an inner result.
 
 **Why is `.pi/test-config.json` tracked by git?**
 
@@ -1329,18 +1387,66 @@ required: a `spawnSync` with a `timeout` hangs forever if the child ignores
 SIGTERM, which would defeat the whole point against a genuinely hung
 process. When the bound elapses the runner exits with code **124**
 (`HANG_TIMEOUT_EXIT_CODE`, the conventional GNU-timeout exit code; vitest
-itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic
-with re-run guidance. Hangs are **never retried** — a genuine hang must
-surface, not be masked. `scripts/run-ci-tests.sh` sets the bounds
-explicitly: 5 minutes for the unit stage, 20 minutes for the browser stage
-(`--timeout-ms <n>`, default 10 minutes in the runner itself). The browser
-bound is deliberately generous — 115 files at ~7-8s each runs ~13-15 minutes
-nominal, and concurrent full-suite runs from parallel worktrees can stretch
-it further — while a true hang never completes and is still bounded. (The
-bound was raised from 15 to 20 minutes once the browser suite grew to 115
-files and normal run-to-run variance straddled the old 15-minute limit,
-risking an abort of an otherwise green stage.) Under `set -euo pipefail` the
-124 exit aborts the gate instead of stalling it indefinitely.
+itself only ever exits 0 or 1) after printing a `[hang-timeout]` diagnostic.
+Hangs are **never retried** — a genuine hang must surface, not be masked.
+
+**The diagnostic distinguishes a hang from host contention**
+(SA-0MWEURUYL004I470). Every `[hang-timeout]` block now reports, in the same
+message: the aborted **stage** (`--project unit` / `--project browser` / the
+pre-flight `vitest list`), the configured **bound**, the **elapsed** wall time,
+the **delta** over the bound, and the host **load average** at abort plus the
+**core count** — e.g.
+
+```
+[hang-timeout] unit did not complete within 600s — aborting (exit 124).
+elapsed 1312s (+712s over bound)
+host load 38.4 over 16 cores
+```
+
+A load average far above the core count means the host was contended (retry
+once it is quiet); a load near zero with a large overrun points at a genuine
+hang. The guidance is stage-appropriate: a browser-stage abort explains the
+starved `requestAnimationFrame` / undestroyed `Phaser.Game` failure mode, while
+a unit-stage abort points at a synchronous loop in test/engine code (vitest's
+`testTimeout` cannot preempt synchronous JS). All three hang messages (run
+abort, pre-flight `vitest list` abort, coverage-preflight fallback) share one
+builder (`hangDiagnostic`), so stage/bound/elapsed/load render identically and
+the bound is never presented as the elapsed time. The coverage-preflight
+fallback (`deriveExpectedFiles`) times the collection around its own attempts
+and samples the load at abort, so a `vitest list` hang reports the same five
+facts — measured elapsed wall time and host load included — instead of echoing
+the bound back as if it were the elapsed time.
+
+**Unit bound is hybrid and load-aware.** Measured green unit stages (worst
+first): 217, 206, 149, 147, 141, 128, 111, 106, 96, 88 s — the worst was 72 %
+of the old fixed 300 s bound, so a merely busy host could abort a green stage
+(the original incident: three concurrent suites on 16 cores at load 35–42).
+The unit bound is therefore derived, not pinned: a **static floor of 600 s**
+(2.8× the worst measured stage) scaled by the sampled 1-minute load average
+per core, `factor = clamp((load1m / cpuCount) / 0.75, 1, 2)`, clamped to a
+**finite ceiling of 1200 s**:
+
+| Load per core | Bound |
+| --- | --- |
+| ≤ 0.75 | 600 s (floor) |
+| 1.0 | 800 s |
+| ≥ 1.5 (e.g. 24 load on 16 cores) | 1200 s (ceiling) |
+
+`scripts/run-ci-tests.sh` therefore does **not** pass `--timeout-ms` for the
+unit stage (the runner sizes its own bound) and **does** pin the browser stage
+at 20 minutes (`--timeout-ms 1200000`, equal to the hybrid ceiling). The
+browser bound is deliberately generous — 115 files at ~7-8 s each runs ~13–15
+minutes nominal, and concurrent full-suite runs from parallel worktrees can
+stretch it further — while a true hang never completes and is still bounded
+by the finite ceiling. (The browser bound was raised from 15 to 20 minutes once
+the suite grew to 115 files and normal run-to-run variance straddled the old
+15-minute limit.) An explicit `--timeout-ms` always wins **verbatim** over the
+computed bound, so a small CI host can pin its own number; on Windows (where
+`os.loadavg()` is meaningless) the sampler reports load as unavailable and the
+600 s floor applies. The bound is computed once before the stage starts (to
+size it) from one injectable `sampleHostContention` seam, and sampled again at
+abort for the diagnostic. Under `set -euo pipefail` the 124 exit aborts the
+gate instead of stalling it indefinitely.
 
 Diagnosing a hang: `[hang-timeout]` in the output identifies the stage;
 re-run the suspected file(s) in isolation via
@@ -1374,6 +1480,37 @@ When running `npm run dev`, the dev server exposes `POST /api/transcripts` (via 
 3. **Watcher ignore list** — `server.watch.ignored` in `vite.config.ts` excludes the dev-output trees (`**/data/**`, `**/tmp/**`, `**/results/**`, `**/dist/**`, `**/dist-electron/**` via `DEV_WATCH_IGNORE_PATTERNS`). Vite does **not** consult `.gitignore` for watching, and every new file written into a watched directory previously created a permanently-retained inotify watcher + path strings in the dev server (measured ~10-43 KB/file of unbounded growth), which contributed to dev-server heap OOMs during long sessions/play-throughs.
 
 The on-disk contract is unchanged: transcripts land at `data/transcripts/<gameType>/<gameType>-<ISO-timestamp>.json`, so `scripts/replay.ts` and `scripts/export-transcripts.ts` keep working without modification. The middleware's bounded-input behaviour is unit-tested in `tests/scripts/vite-transcript-plugin.test.ts`, and the watcher-ignore wiring in `tests/scripts/vite-transcript-plugin.test.ts` (config contract).
+
+### Real-root Vite builds in tests
+
+Three files assert on the output of a real Vite `build()` / `createServer()` of
+this repo root: `tests/electron/vite-base-gating.test.ts`,
+`tests/electron/app-icon-build-output.test.ts` and
+`tests/vite-transcript-plugin-regression.test.ts`. Two rules keep them
+deterministic and free of shared state:
+
+1. **One deterministic preset per file — never the caller's `GAMES_CONFIG`.**
+   Each file sets `GAMES_CONFIG=core-only` in `beforeAll` for its whole
+   lifetime and restores the ambient value in `afterAll`, rather than
+   save/restoring around individual builds. `core-only` is the always-available
+   preset (the merged core is sibling-only), and file-scope pinning means the
+   preset cannot differ mid-run, so the graph a test builds never depends on
+   whether the caller exported `full` (the shell runners and every typed
+   `/skill:test` profile do) or a preset of its own.
+2. **A private `public/` snapshot — never the shared repo tree.** Composition is
+   off under Vitest (see [game asset composition](#game-asset-composition)), but
+   a concurrent `npm run dev` / `npm run build` in the same checkout can still
+   create or remove `public/assets` links while a test build's public-dir copy
+   walks it. Each build therefore passes `createPublicSnapshot()`
+   (`tests/helpers/public-snapshot.ts`) as Vite's `publicDir`: an `mkdtemp` copy
+   of `public/` with symlinked content dereferenced into real files (a dangling
+   link is copied as a link), so no assertion reads through the shared tree,
+   and the copy is removed in a `finally`. Assertions about copied files (app
+   icons, the manifest, base-path assets) still run against real content.
+
+Together these make the real-root build tests safe to run alongside each other
+and alongside a developer's own dev server; they change nothing about what a
+real `npm run build` does.
 
 ### Writing unit tests
 
@@ -1546,26 +1683,214 @@ the generic story-line fields (`id`, `name`, `effect`, `options`, storyline
 id/title); every other column is carried as a game column. Core ships the Gym
 adapter as the default.
 
-Three `tsx` CLIs expose the seams (no Vite loader, no game import):
+The `tsx` CLIs expose the seams (no Vite loader, no game import):
 
 ```bash
-npm run storylines:validate                     # validate the Gym content
+npm run storylines:validate                     # validate every shipped content file
 npm run storylines:validate -- --csv path.csv --json --fail-on-cycle
-npm run storylines:graph                        # rewrite the Gym artefacts
-npm run storylines:graph -- --format json --check   # drift guard
+npm run storylines:guard                        # guard every configured route-space and scene-space target
+npm run storylines:guard -- --csv path.csv --game gym --initial coins=3 --json
+npm run storylines:guard -- --manifest example-games/gym/content/long-erasure-episode.json --json
+npm run storylines:ip-scan                      # scan the guarded set for prohibited third-party terms
+npm run storylines:ip-scan -- path.csv          # ad-hoc scan of one candidate file
+npm run storylines:manifest                     # validate the committed Appendix A episode manifest
+npm run storylines:manifest -- --manifest path/to/episode.json --json
+npm run storylines:manifest -- --manifest m.json --content other.csv
+npm run storylines:graph                        # rewrite every shipped content artefact
+npm run storylines:graph -- --format json --check   # drift guard over every artefact
 npm run storylines:author -- add-card --id evt-x --name "X" --dry-run
+npm run storylines:author -- add-option --id evt-x --label "Ask after the road" --target evt-y
+npm run storylines:author -- add-linked-card --id evt-y --name "Y" --link-from evt-x
+npm run storylines:author -- add-linked-card --id evt-y --name "Y" --link-from evt-x \
+  --link-attr cost=coins:2
 npm run storylines:author -- update-card --id evt-x --storyline-id storyline-x
 npm run storylines:editor                       # open the local graph editor
 npm run storylines:editor -- --help             # editor flags
 ```
 
-Every CLI supports `--help` and `--game <adapter-id>` (default `gym`), and exits
-`0` on success/valid content and `1` on invalid content, unreadable input or
-artefact drift. The author API validates before writing and writes atomically;
-`--dry-run` prints the candidate and writes nothing. The committed Gym
-artefacts (`example-games/gym/content/storyline-manifest.json` and
-`storyline-graph.mmd`) are validated against
+Every CLI supports `--help`; the content CLIs also support `--game <adapter-id>`
+(default `gym`), while `storylines:manifest` reads the adapter from the
+manifest's own `content.adapter`. With no
+`--csv`, `storylines:validate` and `storylines:graph` walk the shipped content
+registry (`DEFAULT_CONTENT_FILES` in `src/story-line/content/adapters.ts`) and
+process **every** file through the adapter it declares — each content file owns
+its own JSON manifest and Mermaid graph — so a second content file cannot escape
+validation or the artefact drift guard. `storylines:guard` instead walks the
+committed target list (`configs/storyline-guard.json`: a content path or an
+episode manifest per target, with the CSV target's adapter, starting resource bag
+and ending ids) and asserts the three route-space invariants — every state-gated
+branch reaches an ending, every ending is reachable, and every choice marked
+`consequential` keeps its branches apart for the minimum rejoin distance — plus,
+for a manifest target, the two scene-space invariants: no exhausted close
+classifies as `success`, and every refusal's close reaches a declared ending. It
+bounds its search and fails closed when a bound is hit; a game-specific mechanic
+that is not a declared resource (e.g. the Long Erasure pressure clock) is outside
+the route-space mode and is covered by the scene-space mode instead. `--csv`
+selects one content file (route-space mode) and `--manifest <file>` one episode
+manifest plus the content file it declares (scene-space mode); the two are
+mutually exclusive (an unregistered `--csv` file falls back to the format's
+default artefact path, and `--out` requires `--csv`). Every CLI exits `0` on
+success/valid content and `1` on invalid
+content, unreadable input or artefact drift. `storylines:ip-scan` walks the
+committed guarded set (`configs/storyline-ip-scan.json`: the story-line GDD and
+its fixtures, plus the shipped content and generated artefacts) with the term
+list in `tests/fixtures/story-line/ip-prohibited-terms.json`; it exits `1` on a
+prohibited term (named with its file, line and term), an unreadable target or a
+malformed term list. Naming paths on the command line scans exactly those files
+(an ad-hoc pre-commit check). `storylines:manifest` validates one **episode
+manifest** (the beat sheet, GDD §2.2) against its content file: it resolves the
+manifest's `content.adapter` through the shipped adapter registry, binds
+`content.file` (or `--content <path>`) plus the content file's declared resource
+key set, runs the GDD §2.4 validator and prints the exact finding path. `--json`
+emits a stable report (`valid`, `manifestId`, `manifest`, `content`, `adapter`,
+`counts`, `rules`, `findings`) with a fixed key order and no timestamp, so two
+runs over the same input are byte-identical. With no `--manifest` it validates
+the committed Appendix A manifest
+(`example-games/gym/content/long-erasure-episode.json`), so a bare invocation is
+a real check; an unreadable manifest or content file, a malformed manifest and
+an unknown `content.adapter` are reported on stderr with exit `1` rather than
+thrown. `storylines:manifest -- --help` names the default manifest. The author
+API validates before
+writing and writes atomically; `--dry-run` prints the candidate and writes
+nothing. The committed Gym artefacts (`example-games/gym/content/storyline-manifest.json`
++ `storyline-graph.mmd` for `storylines.csv`, and
+`example-games/gym/content/long-erasure-manifest.json` +
+`long-erasure-graph.mmd` for the *Long Erasure* content) are validated against
 `schemas/story-line-manifest.schema.json` and kept in sync by `--check`.
+
+The Gym ships two content files: the original demo (`storylines.csv`, the
+`gym` adapter) and `long-erasure.csv` (the `long-erasure` adapter — the
+three-act story-line spike, with `act` / `clockCost` game columns and the
+`hull,morale,stores,goodwill,charge` declared resource set). The two files are
+independent: `long-erasure.csv` uses its own storyline id, so the shipped demo
+rows and their committed options-parity goldens are untouched.
+
+The full game design built on this toolkit is the *Long Erasure* GDD
+([`docs/design/storyline-game-gdd.md`](design/storyline-game-gdd.md)): the
+three-act scene beat sheet, the resource and economy model, the presentation
+contract, the engine-gap backlog and the v1 scope — each section traced to the
+work item that owns it and to a verification command in its
+[test plan](design/storyline-game-gdd.md#5-test-plan). Its evidence base is
+the [observation log](gym/long-erasure-observation-log.md) and the
+[playtest evaluation](design/storyline-playtest-evaluation.md); the design
+itself ships no gameplay code, so nothing here changes at runtime.
+
+### Episode runner
+
+The beat-sheet runtime layer the GDD's core loop is written against
+([§2.3](design/storyline-game-gdd.md#23-how-a-scene-outcome-selects-the-next-beat))
+ships as `createEpisodeRunner` in
+[`src/story-line/episode-runner.ts`](../src/story-line/episode-runner.ts) and is
+exported from `@story-line`. It walks an already validated episode manifest
+(acts → scenes → beats) one beat at a time: it charges the per-scene clock
+budget, classifies each scene close from the authored outcome table, takes the
+first matching route, records the nine-field `scene-exit` record and keeps a
+loss ledger of irreversible deltas. It is constructed **around** a
+`StorylineSystem`, so there is one choice model, one resource projection and
+one seeded RNG for the run, and neither it nor its transitive imports pull in
+Phaser.
+
+The full reference — public API, run-state and ledger shapes, the §2.3 contract
+as a step→test map, persistence and determinism — is
+[Core: Generic Story-Line System → Episode runner](core-engine/story-line.md#episode-runner).
+
+### Authoring branches, costs and gates in CSV
+
+Writers author the whole option model in the `options` cell — no TypeScript
+registration per branch. Each option is `label|successors` followed by optional
+`#name=value` attributes; `#cost` / `#extra` / `#when` may all appear in the same
+cell, and `#when` repeats for an ordered rule list:
+
+| Attribute | Authored example | Meaning |
+|---|---|---|
+| `#cost` | `#cost=stores:1,goodwill:1` | Affordability gate + real payment at resolution (the presenting layer filters with `isOptionAffordable`; the Long Erasure run does). |
+| `#extra` | `#extra=morale:+2` | Resource gain applied on resolution. |
+| `#when` | `#when=charge>=2>le-iii-ahead` | Ordered conditional successor rule (first match wins; empty successor ends the chain). |
+
+A real row from `long-erasure.csv` (record 2, quoted verbatim):
+
+```csv
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
+```
+
+The `resources` column declares the keys a card's attributes may name
+(`"hull,morale,stores,goodwill,charge"`); a blank cell falls back to the
+default `coins` / `reputation` projection. `npm run storylines:validate`
+reports a malformed cell or an undeclared key against its **row, column and a
+stable reason** (e.g. `unknown-attribute`, `malformed-cost-pair`,
+`unparseable-condition`, `unknown-resource-key`, `irreversible-grant`), so a
+writer iterates without reading engine code. The author CLI accepts the same field
+(`storylines:author -- add-card … --resources "coins,hull"`), and the editor's
+`Options` / `Declared resources` fields carry the syntax in their hints.
+
+All of it is documented in
+[Core: Generic Story-Line System → Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)
+(grammar, worked example, diagnostics).
+
+### Authoring prose in CSV
+
+Narrative prose is authored entirely in the content CSV — **no TypeScript
+registration** per beat, option or ending. A writer fills three optional
+surfaces, and existing content that authors none is unchanged:
+
+| Surface | Where it is authored | Scope | Budget |
+|---|---|---|---|
+| `context` | the adapter-mapped `context` column | every beat | 400 characters |
+| outcome prose | `#says=<prose>` in the `options` cell | one option | — |
+| `epilogue` | the adapter-mapped `epilogue` column | a terminal card | 600 characters |
+
+Both Gym content files are the reference: `storylines.csv` authors `context`
+and `#says`, and `long-erasure.csv` authors all three. The columns are shown in
+the editor only when the adapter maps them, and a blank cell means "no prose
+authored" — never an error. The full field contract, escape policy table and
+shipped examples are in
+[Core: Generic Story-Line System → Authored prose](core-engine/story-line.md#authored-prose-context-says-and-epilogue).
+
+**Escapes are only needed inside `#says`.** `;` and `#` are reserved delimiters
+there (`\;`, `\#`; `\\` for a literal backslash); `,`, `|`, `=`, `:` and
+quotes/apostrophes need no escaping. Every backslash outside a says value — in a
+label, a candidate id or a `#cost` value — stays literal, so adding prose cannot
+change the meaning of an existing cell. A says value is one prose segment; a
+decoded `;` (an author-written parallel list) is rejected rather than shown as
+two sentences.
+
+#### Fixing `storylines:validate` diagnostics
+
+Every diagnostic names the **record**, the **column** and a stable **reason**:
+
+```text
+✗ [invalid-option] row 3, column "options" (unescaped-says-delimiter): Choice card "u-mid" has a malformed options column: Invalid storyline options encoding "Recall|u-end#says=Two things happened; and one of them will be forgotten": option 1 has an unescaped ";" in its #says value (a literal ";" must be written "\;").
+✗ [missing-column], column "context" (missing-mapped-column): Mapped prose column "context" is missing from the content header (columns: id, name, effect, options, storylineId, storylineTitle, resources).
+! [prose-budget] row 2, column "context" (prose-over-budget): Card "p-a" context prose is 401 characters, over the 400-character budget.
+```
+
+The first two lines are the shipped `storylines:validate` output for
+[`prose-says-unescaped.csv`](../tests/fixtures/story-line/prose/prose-says-unescaped.csv);
+the warning line is the shape pinned by `tests/story-line/content/validate.test.ts`.
+`✗` lines are hard errors (validation fails, the author API refuses to write);
+`!` lines are non-fatal warnings (the content is still valid).
+
+| Code / reason | What it means | How to fix it |
+|---|---|---|
+| `prose-budget` / `prose-over-budget` | `context` exceeds 400 characters or `epilogue` exceeds 600 | Shorten the paragraph, or accept the warning deliberately. Never blocks a write. |
+| `invalid-option` / `unescaped-says-delimiter` | A raw `;` or `#` inside a `#says` value | Escape it: `\;` for `;`, `\#` for `#` (and `\\` for `\`). |
+| `invalid-option` / `says-segment-count` | The decoded says value contains a `;`, so it reads as a parallel list | Keep one prose segment per option — rephrase, or split the consequence into a second option. |
+| `invalid-option` / `unknown-attribute` | An unknown `#name=` attribute in `options` | Use one of `#cost`, `#extra`, `#when`, `#says`. |
+| `invalid-option` / `no-valid-option` | The `options` cell decodes to no option | Fill in the option head (a label, then the separator and successor list; an empty successor list is a valid terminal option). |
+| `missing-column` / `missing-mapped-column` | The adapter maps `context` / `epilogue` but the file's header lacks the column | Add the column (blank cells are valid) or remove the mapping from the adapter. |
+
+**Editor fields.** When the adapter maps prose, **Edit card** / **Add card**
+render `Context` and `Epilogue` as long-text controls whose hints quote the
+400- and 600-character budgets (from `PROSE_FIELD_SPECS`, the same source the
+validator uses). The `Options` field's hint documents the `#says=` attribute
+and its `\;` / `\#` escapes, so the escape policy is discoverable where the
+writer types it, and the field set is derived from the adapter descriptors
+(`src/story-line/editor/field-descriptors.ts`) rather than hard-coded.
+
+The Gym *Long Erasure* spike is the end-to-end reference: its content is
+authored entirely this way, and its Phaser-free rules module
+(`example-games/gym/GymLongErasureGame.ts`) is what presents and resolves the
+options.
 
 See [Core: Generic Story-Line System](core-engine/story-line.md#authoring-seams-content-manifest-validator-author)
 for the adapter contract, validator codes, manifest shape and API examples.
@@ -2040,15 +2365,35 @@ The generic branching story-line system (`@story-line`) is documented in
 [`docs/core-engine/story-line.md`](core-engine/story-line.md).
 
 **Authoring seam.** The extended option model — declarative `cost`,
-`extraEffect` and `conditionalSuccessors` — is **programmatic** only: register
-it with `registerStorylineOptions(eventId, options)` and validate the list with
-`validateStorylineOptions(...)`. The CSV `options` column
-(`label|cardA,cardB;label2|cardC`) stays a label/outcome shorthand and cannot
-author the extended fields, so existing CSV content is unaffected. The engine
-adapter's optional `applyResourceDelta(state, { coins?, reputation? })` method
-is the seam core uses to deduct costs and apply extra effects; an adapter that
-omits it keeps compiling and running unchanged (core warns in the activity log
-instead of mutating resources).
+`extraEffect`, `conditionalSuccessors` and `says` (option-outcome prose) — is
+authored **in content**: the CSV `options` cell carries `#cost=key:number`,
+`#extra=key:number`, `#when=field<op>number>successor` and
+`#says=<escaped prose>` attributes alongside the
+`label|cardA,cardB` shorthand (grammar, worked example and diagnostics:
+[Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)).
+Escapes (``\;``, ``\#``, ``\\``) are recognised only inside a `#says` value, and
+`serialiseStorylineOptionsEncoding` re-encodes a parsed list to the same cell.
+`registerStorylineOptions(eventId, options)` remains the seam for what content
+cannot express — the `condition` and `successorResolver` callbacks — and a
+registered list takes precedence over the cell. **Decision reversal
+(2026-11-19):** this replaces the earlier producer decision that the extended
+fields be programmatic only. The shorthand stays valid, so existing CSV content
+is unaffected and the extended attributes are additive; validate either source
+with `validateStorylineOptions(...)`. The engine adapter's optional
+`applyResourceDelta(state, delta)` method is the seam core
+uses to deduct costs and apply extra effects; an adapter that omits it keeps
+compiling and running unchanged (core warns in the activity log instead of
+mutating resources). Resources are **game-declared** — declare the keys on the
+adapter's optional `resources` member (or build the resource seam from
+`createResourceProjection({ … })`), and `coins` / `reputation` stay the default
+projection when nothing is declared. The same projection can carry per-key
+**bounds** (`createResourceProjection(fields, { bounds, onRemainder })`): a gain
+at a key's maximum spills and a loss at its minimum clamps, with the per-key
+`applied` / `spilled` / `clamped` remainder returned from `applyResourceDelta`
+and reported once per call through the hook (omitting `bounds` keeps the old
+unbounded behaviour exactly). See
+[Declared resources](core-engine/story-line.md#declared-resources) and
+[Resource bounds](core-engine/story-line.md#resource-bounds-spill-at-the-cap-clamp-at-the-floor).
 
 ## Build-Time Version Injection
 
@@ -4322,6 +4667,8 @@ const label = createHudText(this, 200, 50, 'Turn 1', '#ffffff', { fontSize: '18p
 
 Attaches an interactive tooltip zone to a HUD text element. On desktop, tooltip shows on hover; on mobile, toggles on tap. Sets ARIA labels for accessibility.
 
+The helper holds no timing of its own — it inherits the timing of the scene's `tooltipManager` (`TooltipManagerConfig.delayMs` / `touchDelayMs`), and a caller that does not opt into a delay keeps the immediate show. Its hover handlers pass the `'hover'` input type and the tap-toggle handler passes `'touch'`, so a manager configured with a shorter `touchDelayMs` responds faster to a press (a desktop click on a tap-toggle HUD element also uses the touch delay — `inputType` names the interaction, not the device).
+
 ```typescript
 attachHudTooltipZone(
   this,
@@ -4905,6 +5252,48 @@ cardSprite.setInteractive({ useHandCursor: true });
 cardSprite.on('pointerover', () => tooltip.show('Card info', cardSprite.x, cardSprite.y));
 cardSprite.on('pointerout', () => tooltip.hide());
 ```
+
+**Hover intent (opt-in delay).** By default the overlay appears the instant `show()` is called. A game that shows tooltips on `pointerover`/`pointermove` can require a deliberate **dwell** instead, so sweeping the pointer across a busy board no longer flashes overlay text:
+
+```typescript
+const tooltip = new TooltipManager(this, settingsPanel, {
+  delayMs: 1500,      // mouse hover dwell
+  touchDelayMs: 500,  // press-and-hold dwell (independent, default 0)
+});
+
+tooltip.show('Card info', x, y);                        // hover path → 1500 ms
+cardSprite.on('pointerdown', () =>
+  tooltip.show('Card info', x, y, undefined, 'touch'),  // press path → 500 ms
+);
+```
+
+- Both delays default to **0 ms**, and `0`/absent renders synchronously on the same code path as before — **no timer is scheduled at all**, so existing callers (The Rising, Gym demos, `attachHudTooltipZone`) keep their exact frame timing and both render modes.
+- `show(content, x, y, ctx?, inputType = 'hover')`: `inputType` states which delay applies. It is an explicit trailing argument (never inferred from global pointer state) so every existing 1–4 argument call keeps its signature and its immediate behaviour. `'touch'` describes the *interaction* (a press), not the device.
+- With a non-zero delay the show is **pending**: nothing renders until the delay elapses, then the overlay appears once.
+- A repeated `show()` **while a show is pending** refreshes the pending content, context and anchor (so the overlay lands at the live pointer) but **does not restart the delay** — a continuous sweep inside one target cannot postpone the tooltip forever. A different target inside the window therefore reuses the elapsed dwell; `pointerout` → `hide()` is what cancels it in practice.
+- `hide()` and `destroy()` cancel a pending show, and `destroy()` leaves no timer behind (no leak across scene teardown).
+- The Settings "Tooltips" suppression is checked on entry **and** re-checked when the timer fires, so switching tooltips off during a dwell cancels the show.
+- Scenes with no time manager (headless runs, bare unit-test mocks) fall back to an immediate render, mirroring the guarded `time?.delayedCall` precedent in `illegalMoveToastView.ts`.
+
+```typescript
+// The pending show is cancellable and never lands after teardown.
+tooltip.show('Card info', x, y);   // scheduled (delayMs > 0)
+tooltip.hide();                    // cancelled — nothing will appear
+```
+
+**Following a moving target (re-anchor).** The delay gates *appearance*, not *following*. Once the overlay is up, `reanchor(x, y)` keeps it with its target instead of freezing it where it first landed:
+
+```typescript
+cardSprite.on('pointermove', () => tooltip.reanchor(cardSprite.x, cardSprite.y));
+```
+
+- While a show is **pending**, `reanchor()` moves the pending anchor exactly as a repeated `show()` does: the dwell keeps running, so following a moving pointer can never postpone the appearance.
+- Once the overlay is **visible**, `reanchor()` repositions it immediately with the same placement rules the first render used (DOM: the canvas/camera mapping plus the viewport flip and clamp; Phaser: the container's position) and leaves its content alone — no re-render, no destroy/re-create, so there is no flicker.
+- With **nothing** pending and nothing visible it is a no-op: a re-anchor never shows a tooltip the host has not asked for.
+- A further `show()` is *not* the way to follow: with the overlay already rendered it arms a **second dwell** and leaves the visible overlay frozen at its old anchor. `hide()` + `show()` instead flickers and waits out a fresh delay.
+- Settings suppression still wins: with tooltips switched off, a re-anchor cancels the pending show and hides any visible overlay, exactly as `show()` does.
+
+Tests advance a fake clock (unit) or the real Phaser clock via `scene.time.preUpdate()` + `scene.time.update(now + delay, delay)` (browser) — the delay is never exercised with a real-time sleep.
 
 **Bounds guarantee.** A tooltip must never render (partially) outside its visible bounds — an off-screen DOM tooltip used to extend the page's scrollable area and make the page "resize to make space". Both modes are now clamped:
 

@@ -653,3 +653,105 @@ describe('sibling-only game composition (merged core)', () => {
     expect(resolved.absoluteScenePath).toBe(sibling);
   });
 });
+
+// ── Worktree-aware sibling resolution (CG-0MWTVP7AI008RAPB) ────────────────
+
+describe('worktree-aware sibling resolution (CG-0MWTVP7AI008RAPB)', () => {
+  /**
+   * A distribution layout in its canonical form: preset sibling paths are
+   * `../tce-<game>`, i.e. siblings of the **main** checkout. A linked worktree
+   * lives two levels down at `.worklog/worktrees/<id>/`, so `<worktree>/../`
+   * is `.worklog/worktrees/` — another item's checkout, never the game.
+   *
+   * ```text
+   * <parent>/
+   *   tableau-card-engine/            main checkout (.worklog/ + configs/)
+   *     .worklog/worktrees/wl-CG-X/   linked worktree (configs/ only)
+   *     .worklog/worktrees/tce-golf/  decoy: another item's game checkout
+   *   tce-golf/                       canonical sibling game repo
+   * ```
+   */
+  function makeWorktreeLayout(): { parent: string; main: string; worktree: string } {
+    const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'tce-wt-discovery-'));
+    tmpRoot = parent;
+    const main = path.join(parent, 'tableau-card-engine');
+    const worktree = path.join(main, '.worklog', 'worktrees', 'wl-CG-X');
+
+    const preset = {
+      games: [
+        {
+          id: 'golf',
+          path: '../tce-golf',
+          scenePath: 'example-games/golf/scenes/GolfScene.ts',
+          siblingScenePath: 'src/scenes/GolfScene.ts',
+        },
+      ],
+    };
+    for (const root of [main, worktree]) {
+      fs.mkdirSync(path.join(root, 'configs'), { recursive: true });
+      fs.writeFileSync(
+        path.join(root, 'configs', 'preset.json'),
+        JSON.stringify(preset, null, 2),
+      );
+    }
+    fs.mkdirSync(path.join(main, '.worklog', 'worktrees'), { recursive: true });
+
+    const writeScene = (file: string, description: string): string => {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(
+        file,
+        [
+          'export class GolfScene {}',
+          'export const GAME_INFO = {',
+          "  sceneKey: 'GolfScene',",
+          "  title: 'Golf',",
+          `  description: '${description}',`,
+          '};',
+          '',
+        ].join('\n'),
+      );
+      return file;
+    };
+
+    // The canonical sibling checkout.
+    writeScene(
+      path.join(parent, 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+      'canonical sibling',
+    );
+    // Another item's worktree sitting exactly where the unanchored
+    // `<worktree>/../tce-golf` resolution would land.
+    writeScene(
+      path.join(main, '.worklog', 'worktrees', 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+      'decoy worktree',
+    );
+
+    return { parent, main, worktree };
+  }
+
+  it('resolves the main checkout sibling from a worktree build, not the worktree parent', () => {
+    const { parent, worktree } = makeWorktreeLayout();
+    const config = loadGamesConfig(path.join(worktree, 'configs', 'preset.json'));
+
+    const [resolved] = discoverGames(config, worktree, { GAMES_CONFIG: 'preset' });
+
+    expect(resolved.absoluteScenePath).toBe(
+      path.join(parent, 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+    );
+    expect(resolved.info.description).toBe('canonical sibling');
+    expect(resolved.absoluteScenePath).not.toContain(
+      `.worklog${path.sep}worktrees${path.sep}tce-`,
+    );
+  });
+
+  it('leaves a main-checkout build resolving the same sibling as before', () => {
+    const { parent, main } = makeWorktreeLayout();
+    const config = loadGamesConfig(path.join(main, 'configs', 'preset.json'));
+
+    const [resolved] = discoverGames(config, main, { GAMES_CONFIG: 'preset' });
+
+    expect(resolved.absoluteScenePath).toBe(
+      path.join(parent, 'tce-golf', 'src', 'scenes', 'GolfScene.ts'),
+    );
+    expect(resolved.info.description).toBe('canonical sibling');
+  });
+});

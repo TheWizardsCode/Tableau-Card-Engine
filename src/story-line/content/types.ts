@@ -20,6 +20,7 @@
  *     effect: 'flavour',
  *     options: 'choices',
  *     storylineId: 'arc',
+ *     resources: 'resource_keys',
  *   },
  * };
  * ```
@@ -33,6 +34,22 @@
  *
  * @module
  */
+
+/**
+ * The legacy per-card `clockCost` column the Long Erasure spike still carries.
+ *
+ * **Migration-only.** A per-card clock cost is beat-sheet data written in the
+ * wrong place (GDD §2.1): pacing belongs to `beat.clockCost` in the episode
+ * manifest, and the column retires with that move (`CG-0MWR0BJXI007UINE`, G10).
+ * Until then exactly one reader consults it — the manifest validator's
+ * `clock-cost-mismatch` rule — and never as a beat's authoritative cost.
+ *
+ * It is a **game column**, not a {@link ContentFieldMapping} field: an adapter
+ * that declares it lists it in {@link ContentAdapter.columns}, and the rule
+ * reads the raw cell from {@link ContentCard.fields}. Removing it from that
+ * declaration (G10) therefore switches the check off with no code change.
+ */
+export const LEGACY_CLOCK_COST_COLUMN = 'clockCost' as const;
 
 /**
  * One story-line card as **content**: the generic story-line fields plus the
@@ -53,6 +70,19 @@ export interface ContentCard {
   readonly effect: string;
   /** Raw CSV `options` encoding (`''` when absent). */
   readonly options: string;
+  /**
+   * The beat's situation paragraph, verbatim from the adapter's `context`
+   * column (`null` when the cell is blank). The value is only present when the
+   * adapter **maps** the column — an unmapped prose column means "this file
+   * has no such column", so the card carries no prose key at all.
+   */
+  readonly context?: string | null;
+  /**
+   * The terminal card's closing prose, verbatim from the adapter's `epilogue`
+   * column (`null` when the cell is blank). Present only when the adapter maps
+   * the column, like {@link ContentCard.context}.
+   */
+  readonly epilogue?: string | null;
   /** Story-arc identifier (`null` when the card belongs to no arc). */
   readonly storylineId: string | null;
   /** Human-readable story-arc title (`null` when absent). */
@@ -62,6 +92,20 @@ export interface ContentCard {
    * keyed by CSV column name, with the raw cell text (untrimmed).
    */
   readonly fields: Readonly<Record<string, string>>;
+  /**
+   * The resource keys this card declares for its option attributes: the row's
+   * `resources` cell (`"coins, hull, morale"` → `['coins', 'hull', 'morale']`)
+   * when it is non-blank, otherwise the file-level `#resources:` declaration
+   * (`parseCsv` → `parseResourceDeclaration`). Empty when neither declares
+   * any.
+   *
+   * A per-row cell **overrides** the file declaration rather than extending it,
+   * so one file can carry a mixed-resource minority. The effective set is the
+   * validation vocabulary for the card's `#cost`, `#extra` and `#when` option
+   * attributes; when it is empty the engine's default `coins` / `reputation`
+   * projection is checked instead.
+   */
+  readonly resourceKeys: readonly string[];
 }
 
 /**
@@ -79,12 +123,29 @@ export interface ContentFieldMapping {
   readonly name: string;
   /** Column carrying the human-readable effect text. */
   readonly effect?: string;
+  /**
+   * Column carrying the beat's situation paragraph. Optional: omitting it
+   * means the content file has no prose column, which is always valid.
+   */
+  readonly context?: string;
+  /**
+   * Column carrying a terminal card's closing prose. Optional for the same
+   * reason as {@link ContentFieldMapping.context}.
+   */
+  readonly epilogue?: string;
   /** Column carrying the CSV `options` encoding. */
   readonly options?: string;
   /** Column carrying the storyline id. */
   readonly storylineId?: string;
   /** Column carrying the storyline title. */
   readonly storylineTitle?: string;
+  /**
+   * Column declaring the resource keys the card's option attributes may use
+   * (e.g. `resources` → `"hull,morale,stores,goodwill"`). Optional: when the
+   * adapter declares no such column (or a cell is blank), validation falls
+   * back to the engine's default `coins` / `reputation` projection.
+   */
+  readonly resources?: string;
 }
 
 /**
@@ -130,6 +191,18 @@ export interface ContentAdapter {
    * deterministic; `''`/undefined when the game has nothing to add.
    */
   readonly describeImpact?: (card: ContentCard) => string;
+  /**
+   * The resource keys this game's content may never **grant** back — the
+   * authoring declaration of the run's irreversible set (e.g. `['hull']`).
+   *
+   * The manifest's `resources.irreversible` is the authoritative source; this
+   * declaration exists because the CSV validator never sees a manifest, so it
+   * is the vocabulary the manifest-free authoring checks use. The run wiring
+   * derives the engine projection from the manifest and audits the two for
+   * drift, so the declarations cannot diverge silently. Omitted means "declares
+   * none", which is byte-identical to the pre-irreversible contract.
+   */
+  readonly irreversibleResources?: readonly string[];
 }
 
 /**
@@ -162,10 +235,13 @@ export function mappedFieldColumns(
   ];
   if (fields.effect !== undefined) pairs.push(['effect', fields.effect]);
   if (fields.options !== undefined) pairs.push(['options', fields.options]);
+  if (fields.context !== undefined) pairs.push(['context', fields.context]);
+  if (fields.epilogue !== undefined) pairs.push(['epilogue', fields.epilogue]);
   if (fields.storylineId !== undefined) pairs.push(['storylineId', fields.storylineId]);
   if (fields.storylineTitle !== undefined) {
     pairs.push(['storylineTitle', fields.storylineTitle]);
   }
+  if (fields.resources !== undefined) pairs.push(['resources', fields.resources]);
   return pairs;
 }
 

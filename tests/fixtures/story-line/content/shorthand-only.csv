@@ -1,0 +1,3 @@
+id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta,context
+sh-a,Shorthand A,Plain shorthand,Go|sh-b;Stop|,sh,Shorthand,"coins,reputation",Incident,0,0,0,
+sh-b,Shorthand B,Terminal card,,sh,Shorthand,"coins,reputation",Incident,0,0,0,

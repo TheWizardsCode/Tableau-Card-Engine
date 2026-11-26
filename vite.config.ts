@@ -87,7 +87,13 @@ export default defineConfig(({ mode, command }) => ({
     // copies the public dir. Without this a `GAMES_CONFIG=full` dev server or
     // build serves the games' source but 404s on every game asset
     // (CG-0MUKYCG9L00587FA).
-    gameAssetsPlugin(),
+    //
+    // Composition is destructive (it creates, replaces and removes links), and
+    // several unit tests build this real project root with different presets.
+    // Under Vitest two workers would race over the one shared `public/assets`
+    // tree while Vite copies it (`ENOENT` on a concurrently removed link), so
+    // test-context builds compose nothing at all (CG-0MWW6BWZB00968NQ).
+    gameAssetsPlugin({ compose: !process.env.VITEST }),
     // Runtime game plugin shared dependencies (CG-0MUV9Y71Z002W8N2): in the
     // packaged Electron launcher only, emit a stable shared-runtime chunk per
     // engine module + an import map in index.html so dynamically-imported game

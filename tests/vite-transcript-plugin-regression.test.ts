@@ -28,6 +28,30 @@ import {
   DEFAULT_MAX_BODY_BYTES,
 } from '../scripts/vite-transcript-plugin';
 
+/**
+ * Pin one deterministic preset for the whole file (CG-0MWW8D6N6006ZR49).
+ *
+ * The dev server below is created from the real `vite.config.ts`, whose game
+ * discovery reads `GAMES_CONFIG`. Without an explicit pin the server would
+ * inherit whatever preset the caller exported (`full` under the runners), so
+ * the graph it serves would depend on the environment rather than this test.
+ * `core-only` is the always-available preset (the merged core is
+ * sibling-only). Pinning once at file scope — not around each server start —
+ * means the preset cannot differ mid-run.
+ */
+const FORCED_PRESET = 'core-only';
+let ambientPreset: string | undefined;
+
+beforeAll(() => {
+  ambientPreset = process.env.GAMES_CONFIG;
+  process.env.GAMES_CONFIG = FORCED_PRESET;
+});
+
+afterAll(() => {
+  if (ambientPreset === undefined) delete process.env.GAMES_CONFIG;
+  else process.env.GAMES_CONFIG = ambientPreset;
+});
+
 // ── deterministic middleware unit guards ───────────────────
 interface MockReq extends EventEmitter {
   method: string;

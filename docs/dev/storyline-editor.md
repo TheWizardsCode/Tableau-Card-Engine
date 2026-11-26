@@ -20,6 +20,9 @@ See also:
 - [Core: Generic Story-Line System](../core-engine/story-line.md) — the runtime
   and authoring seams this tool drives (adapter contract, validator codes,
   manifest shape, author API).
+- [The Long Erasure GDD — writer content pipeline](../design/storyline-game-gdd.md#29-writer-content-pipeline-csv-authoring-and-the-review-gate)
+  — the writer-facing gate this tool sits inside: the column table, the worked
+  rows, the validator/guard/artefact sequence and who signs off.
 - `tests/story-line/editor/` — the viewer and round-trip browser tests that pin
   everything documented below.
 
@@ -131,9 +134,12 @@ Notes on the contract (`ContentAdapter` in
 
 - **Required:** `gameId`, `columns` (the CSV's columns in file order) and the
   `fields` mapping with at least `id` and `name`.
-- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`.
-  Omit a field mapping when the game has no such column — omitting means "no
-  such column", never an error.
+- **Optional mappings:** `effect`, `options`, `storylineId`, `storylineTitle`,
+  `resources`. Omit a field mapping when the game has no such column — omitting
+  means "no such column", never an error. The `resources` mapping declares the
+  card's resource keys; it is the vocabulary the editor validates an option's
+  `#cost` / `#extra` / `#when` attributes against (blank → the default
+  `coins` / `reputation` projection).
 - **The manifest's `isChoice` node flag is derived, not mapped.** It is `true`
   exactly when the card has at least one compiled option (`optionCount > 0`),
   so it can never disagree with the option list; no content column feeds it.
@@ -251,7 +257,12 @@ writing a file literally named `true`.
 1. **Select a card** in the graph, then open **Edit card** (or **Add card**).
    The form is built from the adapter's field descriptors: core fields first
    (id read-only when editing), then every adapter column.
-2. **Change fields.** The change is a *pending draft*; nothing is written.
+2. **Change fields.** The change is a *pending draft*; nothing is written. The
+   **Options** field authors the whole option model — `label|target;label2|target2`
+   plus `#cost=…`, `#extra=…` and `#when=…` attributes — and **Declared
+   resources** declares the keys those attributes may name (both carry the
+   syntax in their field hints). See
+   [Authoring options in CSV](../core-engine/story-line.md#authoring-options-in-csv).
 3. **Preview** — post the derived edit to the bridge; it applies the edit **in
    memory**, validates it and diffs the affected rows (column by column,
    before → after). The preview panel renders the diff **and** the validator's
@@ -274,7 +285,10 @@ The **Add card** form guides both decisions:
 - **Incoming link** — optionally choose the existing card that leads to the new
   card. This makes the form emit a single transactional `add-linked-card` edit:
   the card is appended **and** the predecessor gains an option pointing at it,
-  validated once and written once.
+  validated once and written once. The edit delegates to the shared
+  `addLinkedContentCard` in `src/story-line/content/mutate.ts` — the same
+  function the CLI's `add-linked-card` command uses — so the editor and the
+  command line author a forward reference identically.
 
 A new card that nothing links to in a story-line is refused by the validator
 (`unreachable-card`) — the guided form makes the missing-link case obvious
@@ -339,6 +353,36 @@ After any write, run the game's artefact drift guards to confirm nothing is out
 of step (`npm run storylines:graph -- --format json --check`, Mermaid
 `--check`, and any game-side generated-doc `--check`).
 
+### Prose without an editor session
+
+Prose has **CLI parity**: the editor's `context` and `epilogue` fields are
+authored from the command line too, so no editor session is needed.
+
+```bash
+# add a beat with its situation paragraph
+npm run storylines:author -- add-card --id evt-x --name "X" \
+  --context "Rain on the road; the toll house is shuttered." \
+  --storyline-id storyline-x --storyline-title "X Arc"
+
+# rewrite a card's closing prose, or clear it entirely
+npm run storylines:author -- update-card --id evt-x \
+  --epilogue "The gate closes behind you."
+npm run storylines:author -- update-card --id evt-x --clear-epilogue
+```
+
+`add-card` and `update-card` both accept `--context <text>` and
+`--epilogue <text>`; `update-card` adds `--clear-context` / `--clear-epilogue`
+to null-clear a field. A prose column the adapter does not map is simply not
+written. Use the dedicated flags, not `--field`: `--field context=…` is refused
+as a **mapped story-line column**.
+
+Authored prose is checked against the adapter's adopted prose budget
+(`src/story-line/content/prose.ts`: `context` 400, `epilogue` 600 characters).
+An over-budget paragraph is a **warning, never a refusal** — the edit still
+applies, and the `prose-budget` warning is written to **stderr** (so the
+candidate CSV a `--dry-run` prints on stdout stays machine-readable), matching
+the warning `storylines:validate` and the editor's preview panel report.
+
 ## 8. Concurrency guard and manual documentation
 
 - **Stale content is never clobbered.** The session captures the content
@@ -358,7 +402,78 @@ After an accepted edit the artefacts are regenerated and **verified** (the
 post-write drift check re-reads them), so a "regenerated" claim is never
 assumed.
 
-## 9. Troubleshooting
+## 9. Route-space guard (is the branch actually playable?)
+
+The editor and `storylines:validate` both prove an edit is **well formed**. A
+branch can still be *unplayable*: a cost gate can leave it reachable but
+unwinnable, an ending can be orphaned behind a gate, and a "consequential"
+choice can quietly rejoin its alternative one beat later (the slideshow shape).
+The route-space guard checks exactly those three things:
+
+```bash
+npm run storylines:guard                 # every CI target (configs/storyline-guard.json)
+npm run storylines:guard -- --csv path/to/storylines.csv --game gym \
+  --initial coins=3 --json
+```
+
+| Invariant | What a writer needs to do |
+|---|---|
+| `gated-branch-survivable` | Give every `#cost` / `#when`-gated option at least one affordable route to an ending. |
+| `ending-reachable` | Make every ending reachable on a playable route. |
+| `consequential-rejoin` | Either let a marked choice's branches stay apart for the minimum number of beats, or stop marking it. |
+
+**Tell the guard what matters.** Two ordinary content columns carry the
+authoring intent (the runtime ignores them, and `storylines:validate` does not
+require them):
+
+- `consequential` — the option label(s) whose consequence must persist, e.g.
+  `Chart the reef` or `Chart the reef|Take the helm`, or `*` for every option on
+  the card. Leave it blank on cosmetic choices: the guard only checks what is
+  marked.
+- `ending` — `yes` on a card that ends a route (needed when an ending loops back
+  to the start, as a reset ending does). With no marked cards, endings default
+  to the cards that have no outgoing successor.
+
+An ad-hoc file can also name its entries/endings on the command line
+(`--entry`, `--endings`) and set the threshold (`--min-rejoin`, default `2`
+beats). A mark naming an option the card does not offer is itself reported, so
+a `consequential` cell cannot drift from the content.
+
+**Bounds and honesty.** The guard bounds its search (`--max-depth`,
+`--max-states`) and **fails closed**: if a bound is hit it says so and exits
+non-zero rather than claiming an invariant it could not check. A cycle that
+grows a resource forever is unbounded — keep such cycles resource-neutral or
+mark their endings.
+
+The guard models declared resources only. A game-specific budget that is not a
+declared resource (Long Erasure's pressure clock, for example) is outside it;
+that game keeps its own playtest harness. See
+[Core: Generic Story-Line System → Route-space guard](../core-engine/story-line.md#route-space-guard)
+for the full contract.
+
+### 9.1 Prohibited-term (IP) scan (are the words the setting's own?)
+
+The validator proves a row is well formed; the route-space guard proves it is
+playable. Neither looks at whether a word belongs to someone else. The IP scan
+does, over the guarded set in `configs/storyline-ip-scan.json` with the term
+list in `tests/fixtures/story-line/ip-prohibited-terms.json`:
+
+```bash
+npm run storylines:ip-scan                            # every configured target
+npm run storylines:ip-scan -- path/to/candidate.csv   # one ad-hoc candidate
+npm run storylines:ip-scan -- --json                  # machine-readable report
+```
+
+It exits `0` only when every target is readable and clean; a match is reported
+with its file, line and term. The term list may carry a **narrow, case-sensitive
+allowance** for a technical homograph (the engine framework's own name), never a
+general exemption — a narrative use of the same word is still caught, and the
+unit tests pin that. Add a new content file to the guarded set in the same
+change. The Long Erasure GDD records the scan, the trademark read and the
+carried-forward review step ([scan record](../design/storyline-game-gdd.md#43-prohibited-term-scan-record),
+[gate](../design/storyline-game-gdd.md#45-the-prohibited-term-gate-and-how-a-writer-runs-it)).
+
+## 10. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|
@@ -370,7 +485,7 @@ assumed.
 | Port already in use | `npm run storylines:editor -- --port 5180`. |
 | The server won't bind | Check the port is free (`--port 5180`) and the host resolves. The editor defaults to loopback (`127.0.0.1`); a **valueless `--host`** binds all interfaces (`0.0.0.0`), and an explicit `--host <addr>` binds that address. A non-loopback bind prints a warning: the editor is reachable from the network and can write the loaded content CSV (no authentication). |
 
-## 10. Testing
+## 11. Testing
 
 The editor's renderers are plain-DOM modules, so the core `browser` project
 drives them **directly** in Vitest's real Chromium document — no second dev

@@ -18,8 +18,20 @@ export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..
 /** Absolute path of the story-line content fixtures directory. */
 export const FIXTURES_DIR = join(REPO_ROOT, 'tests/fixtures/story-line');
 
+/**
+ * Absolute path of the prose-contract fixtures directory
+ * (`tests/fixtures/story-line/prose/`).
+ */
+export const PROSE_FIXTURES_DIR = join(FIXTURES_DIR, 'prose');
+
 /** Absolute path of the shipped Gym story-line content. */
 export const GYM_CONTENT_PATH = join(REPO_ROOT, 'example-games/gym/content/storylines.csv');
+
+/** Absolute path of the shipped Long Erasure story-line content. */
+export const LONG_ERASURE_CONTENT_PATH = join(
+  REPO_ROOT,
+  'example-games/gym/content/long-erasure.csv',
+);
 
 /** Absolute path of the committed Gym manifest artefact. */
 export const GYM_MANIFEST_PATH = join(REPO_ROOT, 'example-games/gym/content/storyline-manifest.json');
@@ -43,6 +55,16 @@ export function readFixture(name: string): string {
 /** Absolute path of a named fixture CSV. */
 export function fixturePath(name: string): string {
   return join(FIXTURES_DIR, name);
+}
+
+/** Reads a named prose-contract fixture CSV. */
+export function readProseFixture(name: string): string {
+  return readText(join(PROSE_FIXTURES_DIR, name));
+}
+
+/** Absolute path of a named prose-contract fixture CSV. */
+export function proseFixturePath(name: string): string {
+  return join(PROSE_FIXTURES_DIR, name);
 }
 
 /** A temp directory plus a cleanup function (call in `afterEach`/`finally`). */

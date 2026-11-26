@@ -1,9 +1,11 @@
 /**
  * Shared argument handling for the story-line authoring CLIs.
  *
- * Kept in one place so the three `tsx` entry points (`storyline-author.ts`,
- * `storyline-graph.ts`, `validate-storylines.ts`) share identical, predictable
- * parsing without duplicating it three times.
+ * Kept in one place so the `tsx` entry points (`storyline-author.ts`,
+ * `storyline-graph.ts`, `validate-storylines.ts`, `storyline-guard.ts`,
+ * `storyline-manifest.ts`) share identical, predictable parsing without
+ * duplicating it per script, plus the one manifest-input reader the manifest
+ * validator and the scene-space guard both need.
  *
  * @module
  */
@@ -16,10 +18,24 @@ export interface ParsedArgv {
   readonly positionals: readonly string[];
   /** Every `--field key=value` occurrence, in order. */
   readonly fieldPairs: readonly (readonly [string, string])[];
+  /** Every `--attr <value>` occurrence, in order (repeatable option attributes). */
+  readonly attributeValues: readonly string[];
+  /**
+   * Every `--link-attr <value>` occurrence, in order (repeatable attributes for
+   * the option `add-linked-card` generates on the predecessor).
+   */
+  readonly linkAttributeValues: readonly string[];
 }
 
 /**
- * Parses argv into flags, positionals and repeated `--field` pairs.
+ * Parses argv into flags, positionals, repeated `--field` pairs and repeated
+ * `--attr` values.
+ *
+ * `--field` and `--attr` are the two repeatable flags, so they are collected
+ * in authored order instead of the last value winning. A bare `--attr` or
+ * `--link-attr` has no meaning (an attribute is always `name=value`, optionally
+ * `#`-prefixed), so it is reported as an error rather than becoming a literal
+ * `true` attribute.
  *
  * @param argv Raw arguments (without the node/script prefix).
  * @returns The parsed arguments.
@@ -28,6 +44,8 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
   const flags = new Map<string, string>();
   const positionals: string[] = [];
   const fieldPairs: (readonly [string, string])[] = [];
+  const attributeValues: string[] = [];
+  const linkAttributeValues: string[] = [];
 
   for (let i = 0; i < argv.length; i++) {
     const token = argv[i];
@@ -50,10 +68,26 @@ export function parseArgv(argv: readonly string[]): ParsedArgv {
       fieldPairs.push([value.slice(0, separator), value.slice(separator + 1)]);
       continue;
     }
+    if (key === 'attr') {
+      if (value === 'true') {
+        flags.set('attr-error', value);
+        continue;
+      }
+      attributeValues.push(value);
+      continue;
+    }
+    if (key === 'link-attr') {
+      if (value === 'true') {
+        flags.set('link-attr-error', value);
+        continue;
+      }
+      linkAttributeValues.push(value);
+      continue;
+    }
     flags.set(key, value);
   }
 
-  return { flags, positionals, fieldPairs };
+  return { flags, positionals, fieldPairs, attributeValues, linkAttributeValues };
 }
 
 /** Reads a nullable id flag: `undefined` when absent, `null` when cleared. */
@@ -65,6 +99,43 @@ export function nullableFlag(
   if (flags.has(clearKey)) return null;
   const value = flags.get(valueKey);
   return value === undefined ? undefined : value;
+}
+
+/** A manifest's declared content binding (`content.adapter` / `content.file`). */
+export interface EpisodeContentBinding {
+  /** The shipped adapter id that reads the content file. */
+  readonly adapter: string;
+  /** The repository-relative (or absolute) content CSV path. */
+  readonly file: string;
+}
+
+/**
+ * Reads an episode manifest's declared content binding.
+ *
+ * Total: a malformed document yields an error string instead of throwing, so a
+ * CLI's diagnostic path never becomes an uncaught exception.
+ *
+ * @param manifest The parsed manifest document.
+ * @returns The binding, or a reviewer-facing diagnostic.
+ */
+export function readEpisodeContentBinding(
+  manifest: unknown,
+): EpisodeContentBinding | { readonly error: string } {
+  const content =
+    typeof manifest === 'object' && manifest !== null
+      ? (manifest as Record<string, unknown>).content
+      : undefined;
+  if (typeof content !== 'object' || content === null) {
+    return { error: 'manifest declares no content binding (content.adapter / content.file)' };
+  }
+  const { adapter, file } = content as Record<string, unknown>;
+  if (typeof adapter !== 'string' || adapter === '') {
+    return { error: 'manifest content.adapter is missing or not a string' };
+  }
+  if (typeof file !== 'string' || file === '') {
+    return { error: 'manifest content.file is missing or not a string' };
+  }
+  return { adapter, file };
 }
 
 /** Reads a boolean flag (`--flag`, `--flag true`, `--flag false`). */

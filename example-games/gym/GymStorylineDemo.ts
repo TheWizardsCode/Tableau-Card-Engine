@@ -3,18 +3,25 @@
  *
  * The scene is deliberately thin: everything that decides *what happens* when
  * a card is drawn or an option is chosen lives here, so the demo's branching
- * fixture can be unit-tested without booting Phaser or a browser:
+ * narrative can be unit-tested without booting Phaser or a browser:
  *
- * - {@link DEMO_CARDS} — the four-card branching fixture (two-way choice →
- *   successor choice → terminal, plus a terminal option that ends the chain
- *   immediately).
+ * - {@link demoCardsFromCsv} — projects the **authored** content
+ *   (`example-games/gym/content/storylines.csv`, the file
+ *   `npm run storylines:editor` writes) onto the demo's card catalogue. The
+ *   demo therefore plays the content an author edits: there is no second,
+ *   hand-maintained catalogue to keep in step, and every authored option
+ *   attribute (`#cost`, `#extra`, `#when`, `#says`) reaches play.
+ * - {@link demoCardCost} — the beat's authored `cost` column, charged as a
+ *   real payment when the card resolves (settled with the card's own effect,
+ *   so the demo's `Public Investment` branch nets +20 coins rather than
+ *   reading as a free reward).
  * - {@link createDemoState} — the initial demo state (coins, reputation,
  *   turn, seeded rng, activity log, chain deck).
  * - {@link createDemoEngine} — the {@link StorylineEngineAdapter} mapping the
  *   generic story-line seams (rng draw, effect application, resource reads,
  *   activity log, template lookup, chain-card sink) onto that state.
- * - {@link startDemo} / {@link applyDemoChoice} / {@link applyTerminalCard} —
- *   the three pure transitions the scene renders. Each returns plain data
+ * - {@link startDemo} / {@link drawDemoCard} / {@link applyDemoChoice} — the
+ *   three pure transitions the scene renders. Each returns plain data
  *   (compiled/available options, resource deltas, the pushed successor) and
  *   leaves all presentation to the caller.
  *
@@ -22,10 +29,16 @@
  * `@story-line` contract, which is what makes it directly testable — see
  * `core/tests/gym/GymStorylineDemo.test.ts`.
  *
+ * The CSV text is a **parameter**, never an import: the scene supplies it with
+ * Vite's `?raw` suffix (mirroring `GymLongErasureScene`), while the Node unit
+ * tests read the same file with `node:fs`. That keeps this module free of both
+ * Phaser and the bundler.
+ *
  * @module example-games/gym/GymStorylineDemo
  */
 
 import {
+  createResourceProjection,
   createStorylineSystem,
   type PendingStorylineChoice,
   type StorylineCard,
@@ -34,6 +47,9 @@ import {
   type StorylineOption,
   type StorylineSystem,
 } from '@story-line';
+import { GYM_CONTENT_ADAPTER } from '../../src/story-line/content/adapters';
+import { cardsFromCsv, parseCsv } from '../../src/story-line/content/csv';
+import type { ContentCard } from '../../src/story-line/content/types';
 
 /** The demo's minimal game state. */
 export interface DemoState {
@@ -52,58 +68,128 @@ export const DEMO_START_CARD_ID = 'gym-story-start';
 export const DEMO_RNG_SEED = 0x5eed;
 
 /**
- * The demo's card catalogue (templates, no instance serials).
+ * A demo card template.
  *
- * Shape: `Town Meeting` (Invest / Ignore) → `Public Investment` (Celebrate /
- * Double down) or `Neglected Roads` (Repair / Let it be) → terminal
- * `New Beginning`. `Double down` and `Let it be` carry an empty successor, so
- * they end the chain immediately.
+ * `context` is the beat's authored situation paragraph, projected from the CSV
+ * `context` column (`example-games/gym/content/storylines.csv`). It is
+ * optional, exactly like the content model's prose field: a card without one
+ * renders no context block. `#says` outcome prose rides on the card's
+ * `options` encoding and compiles onto {@link StorylineOption.says}.
  */
-export const DEMO_CARDS: readonly StorylineCard[] = [
-  {
-    id: 'gym-story-start',
-    name: 'Town Meeting',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Lose 50 coins',
-    coinDelta: -50,
-    options: 'Invest|gym-story-invest;Ignore|gym-story-ignore',
-  },
-  {
-    id: 'gym-story-invest',
-    name: 'Public Investment',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Gain 120 coins',
-    coinDelta: 120,
-    options: 'Celebrate|gym-story-end;Double down|',
-  },
-  {
-    id: 'gym-story-ignore',
-    name: 'Neglected Roads',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Lose 80 coins',
-    coinDelta: -80,
-    options: 'Repair|gym-story-end;Let it be|',
-  },
-  {
-    id: 'gym-story-end',
-    name: 'New Beginning',
-    storylineId: 'gym-story',
-    storylineTitle: 'Gym Storyline',
-    effect: 'Gain 60 reputation',
-    reputationDelta: 60,
-  },
-];
+export interface DemoCard extends StorylineCard {
+  /** The beat's situation paragraph, or `null`/absent when none is authored. */
+  readonly context?: string | null;
+  /**
+   * The beat's authored `cost` (the content file's `cost` column), in coins.
+   *
+   * A beat's cost is a **real payment**, not a display label: it settles
+   * together with the card's own effect when the card resolves (see
+   * {@link demoCardCost}), so `Public Investment` ("Gain 120 coins", `cost`
+   * 100) is a trade of 100 coins for 120 rather than a free reward.
+   */
+  readonly cost?: number;
+}
 
-const TEMPLATES = new Map<string, StorylineCard>(
-  DEMO_CARDS.map((card) => [card.id, card]),
-);
+/**
+ * The demo's card catalogue, projected from the authored content CSV.
+ *
+ * This replaces the hand-maintained `DEMO_CARDS` literal the demo used to
+ * ship: the CSV is the single source of truth, so a content edit made in
+ * `npm run storylines:editor` (rename, effect, `context` prose, option
+ * mechanics) reaches the scene without a TypeScript change.
+ *
+ * @param csvText Raw `storylines.csv` text (a `?raw` import in the scene, a
+ *   `readFileSync` in the Node tests).
+ * @returns The demo catalogue in CSV row order.
+ */
+export function demoCardsFromCsv(csvText: string): DemoCard[] {
+  return cardsFromCsv(parseCsv(csvText), GYM_CONTENT_ADAPTER).map(demoCardFromContent);
+}
 
-/** Looks up a demo card template by id (undefined when unknown). */
-export function getDemoTemplate(id: string): StorylineCard | undefined {
-  return TEMPLATES.get(id);
+/**
+ * Projects one content row onto the demo's card shape.
+ *
+ * The game's own columns are ordinary CSV columns the generic adapter leaves
+ * in {@link ContentCard.fields}; the demo reads its two resource deltas and
+ * the beat's `cost` from there. A non-numeric or blank cell reads as `0`, so a
+ * card always carries a concrete amount.
+ */
+function demoCardFromContent(card: ContentCard): DemoCard {
+  return {
+    id: card.id,
+    name: card.name,
+    effect: card.effect,
+    options: card.options,
+    storylineId: card.storylineId,
+    storylineTitle: card.storylineTitle,
+    coinDelta: demoDelta(card, 'coinDelta'),
+    reputationDelta: demoDelta(card, 'reputationDelta'),
+    cost: demoDelta(card, 'cost'),
+    context: card.context ?? null,
+  };
+}
+
+/** Reads a numeric game column, treating blank/non-numeric as `0`. */
+function demoDelta(card: ContentCard, column: string): number {
+  const value = Number(card.fields[column] ?? '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+/** One option as the scene renders it: its label plus its authored outcome. */
+export interface DemoOptionView {
+  /** The compiled option's label. */
+  readonly label: string;
+  /** The chosen path's authored `#says` prose, or `null` when none is authored. */
+  readonly outcome: string | null;
+}
+
+/**
+ * The beat's presentation view model.
+ *
+ * The scene renders exactly this: a `context` paragraph above the options when
+ * the card authors one (`null` otherwise, so the layout can close up), the
+ * beat's authored `cost` so the price is visible on the card line before the
+ * player chooses, and the authored outcome prose per option so a choice can
+ * narrate its consequence.
+ */
+export interface DemoCardView {
+  /** The beat's authored situation paragraph, or `null` when absent. */
+  readonly context: string | null;
+  /** The beat's authored cost in coins (`0` when the beat costs nothing). */
+  readonly cost: number;
+  /** One entry per compiled option, in declaration order. */
+  readonly options: readonly DemoOptionView[];
+}
+
+/** Normalises optional prose: blank or non-string reads as "not authored". */
+function authoredProse(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() !== '' ? value : null;
+}
+
+/** Builds the scene's view model for a drawn card and its compiled options. */
+export function buildDemoCardView(
+  card: StorylineCard,
+  options: readonly StorylineOption<DemoState>[],
+): DemoCardView {
+  return {
+    context: authoredProse((card as DemoCard).context),
+    cost: demoCardCost(card),
+    options: options.map((option) => ({
+      label: option.label,
+      outcome: authoredProse(option.says),
+    })),
+  };
+}
+
+/**
+ * A card's authored beat cost, in coins (`0` when the card authors none).
+ *
+ * The beat cost is charged when the card resolves — see the demo engine's
+ * `applyEffect`, which settles it together with the card's own coin delta.
+ */
+export function demoCardCost(card: StorylineCard): number {
+  const cost = (card as DemoCard).cost;
+  return typeof cost === 'number' && Number.isFinite(cost) ? cost : 0;
 }
 
 /**
@@ -120,10 +206,27 @@ function nextRandom(state: DemoState): number {
   return state.rngSeed / 0x100000000;
 }
 
+/**
+ * The demo's starting coins.
+ *
+ * Tuned to the **authored** content, not to taste: the first beat costs 50
+ * coins on resolution and its `Invest` option costs a further 5, so the start
+ * must be at least 55 for the branch to be affordable — while staying under
+ * the 100-coin floor of the authored `#when=coins>=100>gym-story-end` gate on
+ * that same option. Starting above the gate would short-circuit the branch
+ * straight to the ending and make `gym-story-invest` unreachable in the demo.
+ * 60 keeps every authored card reachable and the cost affordable.
+ *
+ * Public Investment's own authored `cost` (100 coins) needs no extra float: it
+ * settles against that card's +120 coin effect in a single step, so the branch
+ * nets +20 and the balance never has to hold 100 coins at once.
+ */
+export const DEMO_STARTING_COINS = 60;
+
 /** Fresh demo state, identical to what `[ Reset ]` installs. */
 export function createDemoState(): DemoState {
   return {
-    coins: 1000,
+    coins: DEMO_STARTING_COINS,
     reputation: 50,
     turn: 1,
     rngSeed: DEMO_RNG_SEED,
@@ -132,24 +235,51 @@ export function createDemoState(): DemoState {
   };
 }
 
+/**
+ * The demo's resource declaration, expressed as a projection of its own state
+ * fields.
+ *
+ * The demo uses exactly the engine's **default projection** (`coins` /
+ * `reputation`) — declaring it explicitly is behaviour-neutral and shows the
+ * seam a multi-resource game would use (`createResourceProjection` over
+ * `hull`, `morale`, … instead of `coins` / `reputation`).
+ */
+const demoResources = createResourceProjection<DemoState>({
+  coins: {
+    read: (state) => state.coins,
+    apply: (state, delta) => {
+      state.coins += delta;
+    },
+  },
+  reputation: {
+    read: (state) => state.reputation,
+    apply: (state, delta) => {
+      state.reputation += delta;
+    },
+  },
+});
+
 /** Engine adapter mapping the generic seams onto the demo state. */
-export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineCard> {
+export function createDemoEngine(
+  cards: readonly DemoCard[],
+): StorylineEngineAdapter<DemoState, StorylineCard> {
+  const templates = new Map<string, DemoCard>(cards.map((card) => [card.id, card]));
   return {
+    ...demoResources,
     rng: (state) => nextRandom(state),
     applyEffect: (state, card) => {
-      state.coins += card.coinDelta ?? 0;
+      // A beat's authored `cost` is a real payment, settled together with the
+      // card's own effect in one step: the balance never dips through a
+      // transient negative, and the reported `coinChange` is the beat's real
+      // trade (Public Investment: +120 gained − 100 paid = +20).
+      state.coins += (card.coinDelta ?? 0) - demoCardCost(card);
       state.reputation += card.reputationDelta ?? 0;
     },
-    applyResourceDelta: (state, delta) => {
-      state.coins += delta.coins ?? 0;
-      state.reputation += delta.reputation ?? 0;
-    },
-    getResources: (state) => ({ coins: state.coins, reputation: state.reputation }),
     appendLog: (state, text) => {
       state.activityLog.push({ turn: state.turn, text });
     },
     getActivityLog: (state) => state.activityLog,
-    getTemplate: (id) => TEMPLATES.get(id) ?? null,
+    getTemplate: (id) => templates.get(id) ?? null,
     getBaseTypeId: (id) => getBaseTypeId(id),
     getChainScanCards: (state) => state.deck,
     pushChainCard: (state, card) => {
@@ -162,13 +292,26 @@ export function createDemoEngine(): StorylineEngineAdapter<DemoState, StorylineC
 export interface DemoRuntime {
   system: StorylineSystem<DemoState, StorylineCard>;
   state: DemoState;
+  /** The card catalogue this runtime resolves successors from. */
+  cards: readonly DemoCard[];
 }
 
-/** Builds a fresh demo runtime (default UI adapter, deterministic seed). */
-export function createDemoRuntime(): DemoRuntime {
+/**
+ * Builds a fresh demo runtime (default UI adapter, deterministic seed).
+ *
+ * `cards` is the catalogue to play — the scene passes
+ * {@link demoCardsFromCsv} over the authored content. The parameter (rather
+ * than a module-level catalogue) is the seam that lets a scene and its tests
+ * play a fixture without prose to prove the "context absent" layout, and
+ * keeps the demo off a second, hand-maintained card list.
+ */
+export function createDemoRuntime(
+  cards: readonly DemoCard[],
+): DemoRuntime {
   return {
-    system: createStorylineSystem({ engine: createDemoEngine() }),
+    system: createStorylineSystem({ engine: createDemoEngine(cards) }),
     state: createDemoState(),
+    cards,
   };
 }
 
@@ -246,6 +389,8 @@ export interface DemoChoice {
   pushedCard: StorylineCard | null;
   /** Story-update line to journal (null when the adapter produced none). */
   storyUpdate: string | null;
+  /** The chosen option's authored `#says` outcome prose (null when none). */
+  outcomeProse: string | null;
 }
 
 /**
@@ -275,12 +420,13 @@ export function applyDemoChoice(
     reputationChange: result.repChange,
     pushedCard: result.pushedCard ?? null,
     storyUpdate,
+    outcomeProse: result.outcomeProse ?? null,
   };
 }
 
 /** Draws the demo's first card onto a fresh runtime. */
 export function startDemo(runtime: DemoRuntime): DemoDraw & { card: StorylineCard } {
-  const card = TEMPLATES.get(DEMO_START_CARD_ID);
+  const card = runtime.cards.find((entry) => entry.id === DEMO_START_CARD_ID);
   if (!card) throw new Error(`Demo start card ${DEMO_START_CARD_ID} is missing`);
   return { ...drawDemoCard(runtime.system, runtime.state, card), card };
 }

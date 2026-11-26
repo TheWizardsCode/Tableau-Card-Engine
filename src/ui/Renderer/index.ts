@@ -285,10 +285,19 @@ export interface HudTooltipZoneOptions {
 /**
  * Attach a hover/tap tooltip zone to a HUD element.
  *
- * Supports both plain text readouts (`Phaser.GameObjects.Text`) and
+ * Supplements both plain text readouts (`Phaser.GameObjects.Text`) and
  * already-interactive primitives such as `Phaser.GameObjects.Rectangle`
  * (button backgrounds). The aria label is applied to the object's DOM node
  * when one exists (a no-op for canvas-only objects).
+ *
+ * **Hover-intent delay.** The helper holds no timing of its own — it
+ * inherits the timing of the scene's `tooltipManager` (see
+ * `TooltipManagerConfig.delayMs` / `touchDelayMs`). A caller that does not
+ * opt into a delay keeps today's immediate show. The hover handlers pass
+ * the `'hover'` input type and the tap-toggle handler passes `'touch'`, so a
+ * manager configured with a shorter `touchDelayMs` responds faster to a
+ * press (`inputType` names the *interaction*, not the device: a desktop
+ * click on a tap-toggle HUD element also uses the touch delay).
  *
  * @param scene - The Phaser scene owning the tooltip manager.
  * @param textObj - The target object (text or interactive rectangle).
@@ -335,7 +344,7 @@ export function attachHudTooltipZone(
   textObj.on('pointerover', () => {
     tooltipVisible = true;
     const content = contentBuilder();
-    (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10);
+    (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10, undefined, 'hover');
   });
 
   textObj.on('pointerout', () => {
@@ -352,7 +361,7 @@ export function attachHudTooltipZone(
       } else {
         tooltipVisible = true;
         const content = contentBuilder();
-        (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10);
+        (scene as any).tooltipManager?.show(content, textObj.x, textObj.y - 10, undefined, 'touch');
       }
     });
   }

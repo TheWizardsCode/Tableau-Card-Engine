@@ -1,0 +1,4 @@
+card_key,card_name,flavour,arc,arc_name,choices,payoff
+tav-quote,"A name, with a comma","He said ""the road is long"", then left.",tav,Tavern Nights,Go|tav-quote-end,2
+tav-quote-end,"Two
+lines",Empty choice cell and an empty payoff below,tav,Tavern Nights,,

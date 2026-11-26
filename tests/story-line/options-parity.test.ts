@@ -9,13 +9,23 @@
  * before the removal started; it must stay green after every removal phase of
  * the parent epic (`CG-0MVZBUWPH003PWUI`).
  *
- * What it pins, per shipped card id: the card name, its story-line id and the
- * ordered compiled options (label, ordered successor ids, `effectPolicy`).
+ * It is also the baseline guard for the story-line spike
+ * (`CG-0MWNFV6VU003O3PC`): the resource-generalisation and CSV-extension
+ * children must leave every captured option list byte-identical. A diff here is
+ * a **finding**, not an invitation to regenerate the fixture.
+ *
+ * What it pins, per shipped card id: the story-line id and the ordered
+ * compiled options (label, ordered successor ids, `effectPolicy`). Card
+ * **names** are deliberately not pinned (`CG-0MWRSOU91003P36J`): the name is
+ * author-editable content prose, so recording it here made a plain rename in
+ * the story-line editor a fixture regeneration.
  *
  * Sources and adapters:
  *
  * - **Gym demo content** — `example-games/gym/content/storylines.csv` through
- *   the shipped `GYM_CONTENT_ADAPTER`.
+ *   the shipped `GYM_CONTENT_ADAPTER`. This is also the content
+ *   `GymStorylineScene` draws (`demoCardsFromCsv`), so the scene no longer
+ *   needs a second, TypeScript-authored capture of the same cards.
  * - **Main Street reference card pack** —
  *   `tests/fixtures/reference-packs/main-street/main-street/main-street-foundations/cards.csv`
  *   through the minimal options-only adapter declared below. The pack CSV uses
@@ -85,7 +95,6 @@ interface GoldenOption {
 /** One shipped card's compiled option list as recorded in the fixture. */
 interface GoldenCard {
   readonly id: string;
-  readonly name: string;
   readonly storylineId: string | null;
   readonly options: readonly GoldenOption[];
 }
@@ -135,17 +144,29 @@ function readText(path: string): string {
   return readFileSync(join(REPO_ROOT, path), 'utf-8');
 }
 
+/** Projects one compiled option into its fixture record. */
+function captureOption(option: {
+  label: string;
+  successorIds?: readonly string[];
+  successorId?: string | null;
+  effectPolicy: string;
+}): GoldenOption {
+  return {
+    label: option.label,
+    // CSV-authored options only ever declare `successorIds`; a programmatic
+    // `successorId` is normalised into the same ordered list so the fixture has
+    // one successor representation.
+    successorIds: [...(option.successorIds ?? (option.successorId ? [option.successorId] : []))],
+    effectPolicy: option.effectPolicy,
+  };
+}
+
 /** Compiles one CSV through the public content API into fixture records. */
 function captureCards(csvPath: string, adapter: ContentAdapter): GoldenCard[] {
   return cardsFromCsv(parseCsv(readText(csvPath)), adapter).map((card) => ({
     id: card.id,
-    name: card.name,
     storylineId: card.storylineId,
-    options: compileContentOptions(card).map((option) => ({
-      label: option.label,
-      successorIds: [...(option.successorIds ?? [])],
-      effectPolicy: option.effectPolicy,
-    })),
+    options: compileContentOptions(card).map(captureOption),
   }));
 }
 

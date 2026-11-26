@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest';
 import {
   STORY_UPDATE_PREFIX,
   createStorylineSystem,
+  truncateOutcome,
 } from '../../src/story-line';
 import { makeAdapter, makeState, type TestCard } from './helpers';
 
@@ -91,6 +92,86 @@ describe('buildJournal', () => {
       { turn: 2, text: 'Tax collected (+50 coins)' },
     ];
     expect(system.buildJournal(state)).toEqual([]);
+  });
+
+  it('keeps a short outcome verbatim (parity with today’s rows)', () => {
+    const { system, state } = makeSystem();
+    state.activityLog = [
+      { turn: 7, text: 'Story update — Tax Troubles: you accepted the consequence (-200 coins).' },
+    ];
+    const entry = system.buildJournal(state)[0]!;
+    expect(entry.outcome).toBe('you accepted the consequence (-200 coins).');
+    expect(entry.outcomeFull).toBe(entry.outcome);
+  });
+
+  it('carries the full authored prose alongside a display-safe truncation', () => {
+    const { system, state } = makeSystem();
+    const prose =
+      'He does not look up, and the oar drips on the stones, and the word on the sign above him has been freshly repainted in chalk.';
+    const line = `Story update — The Lamplit Quay: ${prose}`;
+    state.activityLog = [{ turn: 3, text: line }];
+
+    const entry = system.buildJournal(state)[0]!;
+    expect(entry.outcomeFull).toBe(prose);
+    expect(entry.outcome).not.toBe(prose);
+    expect(entry.outcome.endsWith('…')).toBe(true);
+    expect(prose.startsWith(entry.outcome.slice(0, -1))).toBe(true);
+    expect(entry.outcome).not.toMatch(/\s…$/);
+    // The untruncated text stays available for the transcript artefact.
+    expect(entry.text).toBe(line);
+  });
+
+  it('splits the envelope on the first separator only, so prose may contain `: `', () => {
+    const { system, state } = makeSystem();
+    const prose = 'He says: "no"; the ink is # 2.';
+    state.activityLog = [{ turn: 3, text: `Story update — The Lamplit Quay: ${prose}` }];
+
+    const entry = system.buildJournal(state)[0]!;
+    expect(entry.storyline).toBe('The Lamplit Quay');
+    expect(entry.outcome).toBe(prose);
+  });
+});
+
+// ── truncateOutcome ─────────────────────────────────────────
+
+describe('truncateOutcome', () => {
+  it('returns a string within the limit unchanged', () => {
+    expect(truncateOutcome('He does not look up.')).toBe('He does not look up.');
+    expect(truncateOutcome('abcde', 5)).toBe('abcde');
+  });
+
+  it('uses a default limit of 80 characters', () => {
+    const atLimit = 'A'.repeat(80);
+    expect(truncateOutcome(atLimit)).toBe(atLimit);
+
+    const overLimit = `${'A'.repeat(80)}B`;
+    const cut = truncateOutcome(overLimit);
+    expect(cut.length).toBe(80);
+    expect(cut.endsWith('…')).toBe(true);
+  });
+
+  it('truncates over-limit text at a word boundary with a single ellipsis', () => {
+    const text = 'alpha beta gamma delta';
+    expect(truncateOutcome(text, 15)).toBe('alpha beta…');
+  });
+
+  it('never leaves a trailing space before the ellipsis', () => {
+    // The character budget ends exactly on a space.
+    expect(truncateOutcome('alpha beta xyz', 12)).toBe('alpha beta…');
+  });
+
+  it('hard-cuts a string with no spaces to the budget', () => {
+    expect(truncateOutcome('A'.repeat(80), 20)).toBe(`${'A'.repeat(19)}…`);
+  });
+
+  it('is a prefix-preserving single-line cut (no newline introduced)', () => {
+    const text =
+      'He does not look up, and the oar drips on the stones, and the word on the sign above him has been freshly repainted in chalk.';
+    const cut = truncateOutcome(text, 40);
+    expect(cut.length).toBeLessThan(text.length);
+    expect(text.startsWith(cut.slice(0, -1))).toBe(true);
+    expect(cut.includes('\n')).toBe(false);
+    expect(cut.slice(0, -1).endsWith(' ')).toBe(false);
   });
 });
 

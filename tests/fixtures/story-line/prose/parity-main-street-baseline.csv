@@ -1,0 +1,3 @@
+family,id,name,effect,options,storylineId,storylineTitle,coinDelta,reputationDelta,trigger
+event,evt-tax,Tax Audit,Lose 45% of your banked coins.,Accept|;Reject|evt-tax-inquiry,storyline-tax,Tax Troubles,-300,0,Incident
+event,evt-tax-inquiry,Tax Inquiry,The audit continues.,Accept|;Reject|,storyline-tax,Tax Troubles,-150,0,Incident

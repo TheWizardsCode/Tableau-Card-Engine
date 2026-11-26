@@ -21,7 +21,9 @@
  *
  * This module is Phaser-free and game-import-free. It writes only generated
  * artefacts — the story-line content CSV itself is written exclusively by
- * `author.ts`.
+ * `author.ts`. The path declarations ({@link DEFAULT_ARTEFACT_PATHS},
+ * {@link ArtefactPaths}) live in the Node-free `artefact-paths` module and are
+ * re-exported here.
  *
  * @module
  */
@@ -29,29 +31,16 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { DEFAULT_ARTEFACT_PATHS, type ArtefactPaths } from './artefact-paths';
 import { renderMermaid, serialiseManifest, type StorylineManifest } from './manifest';
+
+// Re-exported so the artefact path declarations have one source of truth even
+// though they live in a Node-free module (browser bundles must be able to read
+// a content registry without pulling in `node:fs`).
+export { DEFAULT_ARTEFACT_PATHS, type ArtefactPaths } from './artefact-paths';
 
 /** The two generated artefact kinds, in a stable order. */
 export type ArtefactFormat = 'json' | 'mermaid';
-
-/** Paths of the generated artefacts, in whatever base directory the caller uses. */
-export interface ArtefactPaths {
-  /** Path of the JSON manifest artefact. */
-  readonly json: string;
-  /** Path of the Mermaid flowchart artefact. */
-  readonly mermaid: string;
-}
-
-/**
- * The committed Gym artefact paths (repository-relative).
- *
- * The Gym is the default adapter's game, so these are the defaults every tool
- * uses unless a game passes its own paths.
- */
-export const DEFAULT_ARTEFACT_PATHS: ArtefactPaths = {
-  json: 'example-games/gym/content/storyline-manifest.json',
-  mermaid: 'example-games/gym/content/storyline-graph.mmd',
-} as const;
 
 /** The rendered text of both artefacts for one manifest. */
 export interface ArtefactContent {

@@ -20,6 +20,7 @@ import { GymTokenPileViewScene } from '../../example-games/gym/scenes/GymTokenPi
 import { GymRuleEngineScene } from '../../example-games/gym/scenes/GymRuleEngineScene';
 import { GymDlcUnlockScene } from '../../example-games/gym/scenes/GymDlcUnlockScene';
 import { GymStorylineScene } from '../../example-games/gym/scenes/GymStorylineScene';
+import { GymLongErasureScene } from '../../example-games/gym/scenes/GymLongErasureScene';
 import { GymAiStrategyScene } from '../../example-games/gym/scenes/GymAiStrategyScene';
 import { GymAudioFeedbackScene } from '../../example-games/gym/scenes/GymAudioFeedbackScene';
 import { GymI18nScene } from '../../example-games/gym/scenes/GymI18nScene';
@@ -52,6 +53,7 @@ import {
   GYM_RULE_ENGINE_KEY,
   GYM_DLC_UNLOCK_KEY,
   GYM_STORYLINE_KEY,
+  GYM_LONG_ERASURE_KEY,
 } from '../../example-games/gym/GymRegistry';
 
 const SCENES = [
@@ -77,6 +79,7 @@ const SCENES = [
   { key: GYM_RULE_ENGINE_KEY, Scene: GymRuleEngineScene },
   { key: GYM_DLC_UNLOCK_KEY, Scene: GymDlcUnlockScene },
   { key: GYM_STORYLINE_KEY, Scene: GymStorylineScene },
+  { key: GYM_LONG_ERASURE_KEY, Scene: GymLongErasureScene },
 ];
 
 describe('Gym individual scene smoke', () => {

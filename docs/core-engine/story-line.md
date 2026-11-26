@@ -3,11 +3,19 @@
 A game-agnostic branching narrative engine for tableau card games. A drawn
 card presents an ordered set of options; the player's choice selects the next
 card until the chain ends. The mechanic is used by Main Street and demonstrated
-by the Gym `GymStorylineScene`.
+by the Gym `GymStorylineScene` (the base experience) and the Gym *Long Erasure*
+spike scene (a three-act authored narrative with costed, effect-bearing and
+state-gated branches).
 
 Module root: [`src/story-line/`](../../src/story-line/) — import via the
 `@story-line` alias. The module has **no game imports and no Phaser
 dependency**; a game plugs its state and presentation in through two adapters.
+
+Resources are **game-declared data**, not a fixed pair: a game advertises the
+keys it threads through conditions, costs and extra effects (see
+[Declared resources](#declared-resources)). `coins` / `reputation` remain the
+**default projection**, so a game that declares nothing behaves exactly as it
+did before.
 
 ## API
 
@@ -26,27 +34,51 @@ and returns a {@link StorylineSystem} with:
 | Registry | `registerStorylineOptions`, `resetStorylineRegistry`, `hasRegisteredStorylineOptions` |
 | Resolution | `resolveStorylineOption`, `pushChainCard` |
 | Pending choice | `createPendingStorylineChoice`, `getPendingStorylineOptions`, `markChoiceResolved` |
-| Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` |
+| Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` (`truncateOutcome` is exported for display truncation) |
 | Validation | `validateStorylineOptions` (declarative metadata guard) |
 
 ### Story-line options
 
-A `StorylineOption` is the unit a player chooses from. Core describes options
-**programmatically** via `registerStorylineOptions` — the CSV `options` column
-is a *label/outcome* shorthand and cannot author the extended fields below
-(producer decision: programmatic only).
+A `StorylineOption` is the unit a player chooses from. Options come from one of
+two sources, and both produce the same model:
 
-| Field | Type | When it applies |
-|---|---|---|
-| `label` | `string` | always |
-| `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect |
-| `condition?` | `(state) => boolean` | draw time — omit the option when `false` |
-| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor |
-| `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate |
-| `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence |
-| `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins |
-| `cost?` | `{ coins?; reputation? }` | draw time **and** resolution — affordability gate + real payment |
-| `extraEffect?` | `{ coins?; reputation? }` | resolution — additional resource gain |
+- **Content** — a card's CSV `options` cell authors the label/outcome shorthand
+  *and* the extended declarative fields through `#`-prefixed attributes
+  (`#cost`, `#extra`, `#when`, `#says`). See
+  [Authoring options in CSV](#authoring-options-in-csv).
+- **Programmatically** — `registerStorylineOptions` supplies the whole model,
+  including the two callbacks (`condition`, `successorResolver`) that content
+  cannot express. Registered options take precedence over the CSV cell.
+
+> **Decision reversal — 2026-11-19.** An earlier revision of this document
+> recorded **"producer decision: programmatic only"** for `cost`,
+> `extraEffect` and `conditionalSuccessors`, i.e. *every costed or state-gated
+> branch required an engineering ticket*. That decision is **reversed**, and
+> this paragraph replaces it rather than sitting beside it: writers author
+> costed, effect-bearing and state-gated branches entirely in content, with no
+> TypeScript registration (CG-0MWNHZCWJ002XUQI, for the spike
+> CG-0MWNFV6VU003O3PC).
+>
+> **Rationale.** The three fields are plain declarative data — a number map or
+> an ordered condition list — so they serialise without loss; the guard rails
+> that were missing now exist (byte-stable round-trip, row + column + reason
+> diagnostics, an ordered repeatable `#when` rule list); and a ticket per
+> branch was the main obstacle to iterating on a story. The two callbacks
+> (`condition`, `successorResolver`) stay programmatic because a function is
+> not serialisable.
+
+| Field | Type | When it applies | Authored from CSV as |
+|---|---|---|---|
+| `label` | `string` | always | the `label` head of `label\|successors` |
+| `effectPolicy` | `'apply' \| 'skip'` | always — controls the card's intrinsic effect | always `'apply'` for CSV options |
+| `condition?` | `(state) => boolean` | draw time — omit the option when `false` | — (callback; programmatic) |
+| `successorId?` | `string \| null` | resolution — the lowest-precedence single successor | — (registry seam) |
+| `successorIds?` | `string[]` | resolution — one seeded random draw picks a candidate | the `cardA,cardB` candidate list |
+| `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence | — (callback; programmatic) |
+| `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins | `#when=field<op>number>successor` (repeatable) |
+| `cost?` | `Record<resourceKey, number>` | affordability gate + real payment at resolution | `#cost=key:number,…` |
+| `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain | `#extra=key:number,…` |
+| `says?` | `string` | presentation — the authored outcome prose for the option | `#says=<escaped prose>` |
 
 ```ts
 import { createStorylineSystem, validateStorylineOptions } from '@story-line';
@@ -88,6 +120,475 @@ Semantics:
   the pushed card; `null` ends the chain. Rules are evaluated before any
   random draw and consume no RNG.
 
+### Declared resources
+
+The resource *name set* is supplied by the game, not baked into the engine. A
+game declares its keys on the engine adapter — or, equivalently, builds the
+resource half of that adapter from a declarative projection — and every
+declared key is then usable in a `Condition.field`, a `cost` and an
+`extraEffect`:
+
+```ts
+import { createResourceProjection, createStorylineSystem } from '@story-line';
+
+const resources = createResourceProjection<VoyageState>({
+  hull: { read: (s) => s.hull, apply: (s, d) => { s.hull += d; } },
+  morale: { read: (s) => s.morale, apply: (s, d) => { s.morale += d; } },
+  stores: { read: (s) => s.stores, apply: (s, d) => { s.stores += d; } },
+  goodwill: { read: (s) => s.goodwill, apply: (s, d) => { s.goodwill += d; } },
+});
+
+const storyline = createStorylineSystem({
+  engine: { ...resources, rng, applyEffect, appendLog, /* … */ },
+});
+
+storyline.registerStorylineOptions('evt-storm', [
+  {
+    label: 'Ride it out',
+    effectPolicy: 'skip',
+    cost: { stores: 4 },
+    extraEffect: { morale: 1, goodwill: 2 },
+    conditionalSuccessors: [
+      { when: { field: 'hull', op: '>=', value: 4 }, successorId: 'evt-hold' },
+      { when: { field: 'morale', op: '<', value: 1 }, successorId: null },
+    ],
+  },
+]);
+```
+
+`createResourceProjection` makes the field map **the** declaration — the keys
+and the accessors cannot drift apart — and it is spread straight into the
+adapter (`resources`, `getResources`, `applyResourceDelta`).
+
+The projection also carries a game's **never-restored** keys
+(`createResourceProjection(fields, { irreversible: ['hull'] })` →
+`projection.irreversible`, declaration order preserved, `[]` by default). A
+key declared irreversible may still be **spent** as a cost, but content must
+never grant it back: at resolution time a positive extra effect on it is
+refused — the key is not applied and one activity-log line names it
+(`Extra effect refused: hull is irreversible.`) — while the rest of the option
+(cost, effect, successor push) still resolves. The episode manifest's
+`resources.irreversible` is the authoritative source:
+`createEpisodeResourceProjection(manifest, fields)` derives the projection's
+declaration from it, so the engine seam cannot disagree with the manifest. The content adapter's `irreversibleResources`
+declaration is the manifest-free copy the CSV validator uses, and
+`auditIrreversibleDeclaration({ manifest, adapter, projection })` reports every
+divergence per key (and `createEpisodeResourceProjection` fails closed when
+handed a diverging adapter) rather than silently accepting one.
+
+The Gym **Long Erasure** run is the real-content consumer: its loader derives
+`LongErasureContent.irreversible` from the shipped adapter's declaration
+(`LONG_ERASURE_IRREVERSIBLE_RESOURCES`), filtered to the keys the content
+declares, and `createLongErasureRun`'s engine adapter spreads a
+`createResourceProjection` over the run's resource bag with that declaration.
+The guarantee is therefore exercised by real content — the authored
+`#cost=hull` options still pay, while a grant on `hull` would be refused
+(`tests/story-line/irreversible-policy.test.ts`).
+
+The declared set is threaded through the whole lifecycle:
+
+- `StorylineSystem.resources` reports the keys in force (the adapter's
+  declaration, else `DEFAULT_RESOURCE_KEYS` — `['coins', 'reputation']`).
+- **Draw-time affordability** gates option-by-option over the declared keys.
+  `compileStorylineFromEvent` applies it to registered options; a presenting
+  layer applies it to content-authored options (see
+  [Authoring options in CSV](#authoring-options-in-csv)).
+- **Cost payment** and **extra effects** are applied per declared key, and
+  each activity-log line names the key (`Cost paid: -4 stores.`,
+  `Extra effect: +1 morale, +2 goodwill.`).
+- **`validateStorylineOptions(options, { resources, cardId, irreversible })`**
+  checks costs, extra effects and condition fields against the same set, and —
+  when the game's never-restored keys are supplied as `irreversible` — refuses a
+  positive `#extra` on one of them as `irreversible-grant`.
+
+Four rules keep the set honest:
+
+1. **An absent key reads as `0`** — a declared key the state does not
+   currently carry is zero (never `undefined`/`NaN`), both in condition
+   evaluation and in the reported deltas.
+2. **An unspecified cost key is unconstrained** — only the keys a cost names
+   are required; everything else is left alone.
+3. **No resource is ever invented** — the engine only ever forwards declared
+   keys to `applyResourceDelta`. An undeclared key in a cost or extra effect
+   is not applied (it reads as `0`, so a positive cost on it is unaffordable)
+   and resolution appends a warning line naming the ignored key(s).
+   `validateStorylineOptions` reports the same fault ahead of time.
+4. **An irreversible key is never refilled** — a positive extra effect on a
+   key the adapter (or the projection it spreads in) declares `irreversible`
+   is refused, never applied, with one activity-log line naming the key. A
+   cost on that key still pays: it may be spent, never granted.
+
+`coins` / `reputation` stay the **default projection**: omit `resources` (or
+declare the pair) and the shipped behaviour is byte-identical. A game with a
+non-monetary vocabulary can override the default UI adapter's
+`storyUpdateLine` to describe its own currencies — the resolution result
+reports the `coins` / `reputation` projections only.
+
+### Resource bounds: spill at the cap, clamp at the floor
+
+The projection can also carry a game's **bounds** — one inclusive `{ min, max }`
+per declared key, the shape the episode manifest's `resources.bounds` already
+carries:
+
+```ts
+const resources = createResourceProjection<VoyageState>(
+  {
+    hull: { read: (s) => s.hull, apply: (s, d) => { s.hull += d; } },
+    morale: { read: (s) => s.morale, apply: (s, d) => { s.morale += d; } },
+  },
+  {
+    bounds: { hull: { min: 0, max: 5 }, morale: { min: 0, max: 8 } },
+    onRemainder: (report, state) => {
+      for (const entry of report) {
+        if (entry.spilled > 0) log(state, `${entry.spilled} ${entry.key} spilled`);
+        if (entry.clamped > 0) log(state, `${entry.clamped} ${entry.key} clamped`);
+      }
+    },
+  },
+);
+```
+
+A bounded key's delta is clamped to `[min, max]`: a **gain** at the cap is
+applied only up to the cap and the excess is reported as `spilled` (never
+banked, never moved to another key); a **loss** at the floor is applied only
+down to the floor and the unapplied magnitude is reported as `clamped` (never
+applied, never stored as a negative remainder). A delta that is entirely wasted
+calls the field's `apply` not at all. Keys with no `bounds` entry — and any
+projection built without `bounds` — keep the pre-bounds behaviour exactly
+(`applied === delta`, nothing reported), which is the back-compatibility rule.
+
+`applyResourceDelta` returns the remainder: one
+`{ key, applied, spilled, clamped }` entry per declared key, in declaration
+order, zeros for untouched keys, so the report shape never depends on which keys
+moved. The optional `onRemainder(report, state)` hook fires **at most once per
+call**, only when at least one key spilled or clamped, and receives the same
+report the call returns plus the state the delta was applied to. The engine
+reports numbers; the wording — an activity-log line, a HUD note — is the game's.
+
+The seam stays `void`-returning (`StorylineEngineAdapter.applyResourceDelta`),
+so returning the report is legal and no adapter implementation changed; core
+keeps reading resources back through `getResources`.
+
+The Gym **Long Erasure** run is the bounded consumer: `longErasureContentFromCsv`
+reads the committed manifest's `resources.bounds` through the default-free
+`readManifestBounds` (never a hand-copied range literal), carries the result on
+`LongErasureContent.bounds`, and `createLongErasureRun`'s projection clamps and
+spills against it — logging `Surplus spilled: 1 morale past the 8 cap.` /
+`Loss clamped: 1 morale below the 2 floor.` into the run's activity log. The
+GDD's per-key ranges (hull 0–5, morale 0–8, stores 0–6, goodwill 0–5, charge
+0–4) are therefore a runtime guarantee rather than authoring discipline
+(`CG-0MWR0BGVG004UE7X`, GDD §2.8 gap G4).
+
+### Authoring options in CSV
+
+A writer authors the whole option model in the `options` cell. Each option is a
+`label|successors` head followed by zero or more `#name=value` attributes:
+
+```text
+encoding   := option (";" option)*
+option     := label "|" candidates attribute*
+attribute  := "#" ("cost" | "extra" | "when" | "says") "=" value
+candidates := candidate ("," candidate)*        // empty = terminal option
+cost       := key ":" number ("," key ":" number)*
+extra      := key ":" number ("," key ":" number)*
+when       := field op number ">" successor     // empty successor = chain end
+says       := prose                             // one segment; escapes below
+op         := ">=" | "<=" | "==" | ">" | "<"
+```
+
+| Attribute | Authored example | Compiles to |
+|---|---|---|
+| head label | `Log the erasure\|le-i-log` | `label` |
+| head candidates | `Transmit\|le-i-transmit,le-i-silent` | `successorIds` — one seeded draw picks a candidate |
+| `#cost` | `#cost=stores:1,goodwill:1` | `cost` — a real payment at resolution |
+| `#extra` | `#extra=morale:+2` | `extraEffect` — a resolution gain |
+| `#when` | `#when=charge>=2>le-iii-ahead` | one `conditionalSuccessors` rule (repeat for an ordered list) |
+| `#says` | `#says=You log it, and the charts go blank with it.` | `says` — the option's authored outcome prose |
+
+Rules the parser and validator enforce:
+
+- **The shorthand stays valid.** `label|cardA,cardB;label2|cardC` compiles to
+  exactly the options it always did; attributes are additive and may appear in
+  the same cell.
+- **Reserved delimiters.** `;` separates options, `|` separates the label from
+  its candidates, `,` separates candidates and `cost`/`extra` pairs, and `#`
+  starts an attribute — none may appear inside a label or a candidate card id.
+- **`#says` is escaped prose, and escapes are recognised only there.** Inside a
+  `#says` value, `\;` → `;`, `\#` → `#` and `\\` → `\`. Every other backslash
+  (in a label, a candidate id, or a `#cost` / `#extra` / `#when` value) stays a
+  literal character, so no existing cell changes meaning. `|`, `,`, `=`, `:`,
+  quotes and apostrophes are not reserved in prose and need no escaping.
+  `parse → serialise` is byte-identical for a canonically ordered cell
+  (`#cost`, `#extra`, `#when`*, `#says` last), via
+  `serialiseStorylineOptionsEncoding`.
+- **A `#says` value is exactly one prose segment.** `;` delimits options, so a
+  value that decodes to more than one segment (an author-written parallel list,
+  `#says=One\; two`) is rejected by validation as `says-segment-count`, and an
+  unescaped `;` or `#` inside the value is rejected by the parser as
+  `unescaped-says-delimiter`, both with row + column + `options[N].says`.
+- **`#cost` / `#extra` pairs are `key:number`.** Each key is checked against the
+  card's declared resources (the `resources` column, below); an undeclared key
+  is an authoring error, never a silently invented resource.
+- **`#cost` is a resolution payment, gated by the presenter.**
+  `compileStorylineFromEvent` applies the draw-time affordability filter to
+  *registered* options only, so a content-compiled list is returned as
+  authored. A scene that presents CSV-authored options filters with
+  `isOptionAffordable(option, resources, declared)` before offering them — the
+  Long Erasure run's `availableOptions` is the reference implementation, so an
+  unaffordable branch is never shown.
+- **`#when` rules keep authored order, first match wins,** and an empty
+  successor ends the chain (`#when=morale<1>`). A matching rule consumes no RNG
+  draw.
+- **Trimming and round-trip.** Whitespace around every component is trimmed and
+  the cell round-trips byte-identically through `parseCsv` → `serialiseCsv`,
+  including quoted and empty values.
+- **Callbacks are not authorable.** `condition` and `successorResolver` are
+  functions; use `registerStorylineOptions` for those (registered options also
+  win over the cell).
+
+**Declaring the resource keys.** The adapter's `resources` mapping
+(`fields.resources`) points at a column carrying the card's declared keys —
+`"hull,morale,stores,goodwill,charge"` in the Long Erasure content. That set is
+the vocabulary for the card's `#cost` / `#extra` / `#when` keys and the set the
+validator checks.
+
+The key set can instead be declared **once for the whole file** with a leading
+`#resources:` comment line before the header — the per-file declaration seam
+(`CG-0MWQZJEXQ002G3KE`):
+
+```csv
+#resources: hull,morale,stores,goodwill,charge
+id,name,effect,options,resources,storylineId
+le-i-open,The First Unwriting,The charts forget the volume with it.,,long-erasure
+```
+
+(The fixture is
+[`tests/fixtures/story-line/prose/per-file-resources.csv`](../../tests/fixtures/story-line/prose/per-file-resources.csv);
+the `resources` cell is blank, so the row inherits the declaration.)
+
+`parseCsv` lifts leading `#` comment lines out of the header/row matrix into
+`ParsedCsv.declarations` (so the schema and rows are unchanged and a
+round-trip is still byte-identical), and `parseResourceDeclaration` reads the
+first `#resources:` line. The effective set per card resolves in this order:
+
+1. **The row's `resources` cell**, when non-blank — it *overrides*, never
+extends, the file declaration, so a mixed-resource minority stays expressible
+   in one file.
+2. **The file-level `#resources:` declaration**, when the cell is blank (the
+   seam that removes the old per-row repetition).
+3. **The engine's default `coins` / `reputation` projection**, when neither
+   declares any (or the adapter has no `resources` mapping).
+
+Validation always uses the **effective** set, so `unknown-resource-key` still
+fires for a key outside a row's override or outside the file declaration.
+Files that keep per-row `resources` cells validate exactly as before — the
+declaration is opt-in and backward compatible.
+
+Authoring follows the same rule: `add-card` / `add-linked-card` into a file
+that declares `#resources:` leaves the new row's `resources` cell **blank**, so
+the row inherits the declaration instead of re-introducing the per-row copy
+(`CG-0MWRQVBGB003RB6X`). An explicit `--resources <keys>` fills the cell and
+overrides the declaration, and an adapter's `newCardDefaults.resources` is
+applied only when the file declares nothing.
+
+**Worked example.** One row from
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
+(record 2, quoted verbatim):
+
+```csv
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
+```
+
+Its `options` cell compiles to:
+
+```json
+[
+  {
+    "label": "Log the erasure",
+    "successorIds": ["le-i-log"],
+    "effectPolicy": "apply",
+    "cost": { "stores": 1 },
+    "says": "You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be."
+  },
+  {
+    "label": "Rally the survey crew",
+    "successorIds": ["le-i-rally"],
+    "effectPolicy": "apply",
+    "extraEffect": { "morale": 1 },
+    "says": "You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them."
+  }
+]
+```
+
+A state-gated branch from the same file (the `options` cell of record 12),
+where a random candidate list and a conditional gate share one option:
+
+```csv
+Break for the core|le-iii-approach,le-iii-ahead#when=charge>=2>le-iii-ahead#says=You drive straight for the Loom's core while the tear is still open. The Ashlight arrives close enough to touch it, and the clock starts again.;Follow the unravelling|le-iii-approach#extra=charge:1#says=You follow the unravelling instead of racing it and harvest its charge as it comes apart. The core will still be there, and you will arrive with more to spend.
+```
+
+`Break for the core` resolves to `le-iii-ahead` only while `charge >= 2`;
+otherwise its candidate draw picks between `le-iii-approach` and
+`le-iii-ahead` as usual.
+
+**Diagnostics.** `npm run storylines:validate` names the record, the column and
+a stable reason, so a writer fixes content without reading engine code:
+
+```text
+✗ [invalid-option] row 2, column "options" (unknown-attribute): Choice card "bad-a" has a malformed options column: Invalid storyline options encoding "Go|bad-b#bogus=1": unknown option attribute "bogus" (expected cost, extra or when).
+✗ [unknown-resource-key] row 2, column "options" (unknown-resource-key): cost.gold is not a declared resource (declared: coins, hull).
+```
+
+Cell-level reason codes are `missing-separator`, `empty-label`,
+`malformed-attribute`, `unknown-attribute`, `malformed-cost-pair`,
+`malformed-extra-pair`, `unparseable-condition` and `no-valid-option`; the
+semantic codes (`unknown-resource-key`, `non-positive-cost`,
+`negative-extra-effect`, `unknown-condition-op`, `non-numeric-value`,
+`dangling-conditional-successor`) come from
+[`validateStorylineOptions`](#validation) and are reported on the same row and
+column; `irreversible-grant` (a `#extra` on a declared never-restored key)
+names the key and is reported on the same `options` cell. The fixture tests live in
+[`tests/story-line/content/extended-options.test.ts`](../../tests/story-line/content/extended-options.test.ts).
+
+### Authored prose: `context`, `#says` and `epilogue`
+
+Three prose surfaces let a writer tell the story in their own words. All three
+are **optional and additive**: content that authors none behaves exactly as it
+did before the prose slice, and a game opts in by mapping the columns in its
+content adapter.
+
+| Surface | Authored as | Scope | Budget | Presented as |
+|---|---|---|---|---|
+| `context` | the `context` CSV column | every beat | 400 characters | the narrative panel above the options, paged with `paginateProse()` |
+| outcome prose | the `#says=<escaped prose>` option attribute | one option | — | `StorylineResolution.outcomeProse` → the story-update line, the journal row, the narration reveal |
+| `epilogue` | the `epilogue` CSV column | a terminal card | 600 characters | the closing screen (`buildEpilogue().epilogueProse`) |
+
+**The columns are opt-in per adapter.** `ContentFieldMapping` gains two
+optional keys, `context` and `epilogue`, which point at the game's own column
+names:
+
+```ts
+export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
+  gameId: 'long-erasure',
+  columns: [
+    'id', 'name', 'effect', 'options', 'storylineId', 'storylineTitle',
+    'resources', 'act', 'clockCost', 'context', 'epilogue',
+  ],
+  fields: {
+    id: 'id',
+    name: 'name',
+    effect: 'effect',
+    options: 'options',
+    storylineId: 'storylineId',
+    storylineTitle: 'storylineTitle',
+    resources: 'resources',
+    context: 'context',
+    epilogue: 'epilogue',
+  },
+  // …
+};
+```
+
+**An omitted mapping means "this file has no such column".** An adapter that
+does not map `context` / `epilogue` is never an error, and its cards carry no
+prose key at all (`ContentCard.context` / `ContentCard.epilogue` are absent,
+not empty strings). When the columns **are** mapped, a blank cell reads as "no
+prose authored" (`null`) and is always valid. An adapter that maps a prose
+column the file's header does not contain is a hard `missing-column` error, so
+a renamed column is caught rather than silently dropping the prose. The
+no-prose parity promise is pinned by
+[`tests/story-line/content/prose-parity.test.ts`](../../tests/story-line/content/prose-parity.test.ts).
+
+**Shipped CSV examples.** Both Gym content files author these fields. The *Long
+Erasure* header:
+
+```csv
+id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+```
+
+A beat with its `context` and both of its options' `#says` values (record 2 of
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)):
+
+```csv
+gym-story-start,Town Roads,Lose 50 coins in expenses for the meeting.,"Invest|gym-story-invest#cost=coins:5#extra=reputation:+2#when=coins>=100>gym-story-end#says=The vote passes, and the road crews are working before the week is out.;Ignore|gym-story-ignore#says=The question is set aside, and the ruts deepen with every cart that passes.",gym-story,Gym Storyline,"coins,reputation",Incident,0,-50,0,"The people of the town are warning that the roads are in disrepair and the winter is coming to make them worse. The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year."
+```
+
+A terminal card carrying its `epilogue` (record 17 of
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)):
+
+```csv
+le-end-abandon,The Voyage Abandoned,You turn for home and the erasure follows you there.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,0,"You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.","The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left."
+```
+
+#### Escape policy (`#says` only)
+
+`;` and `#` are reserved delimiters in a `#says` value; a literal one must be
+escaped. Escapes are recognised **only inside a says value**, so no existing
+cell can change meaning:
+
+| Written inside `#says` | Decodes to | Shipped / fixture quote |
+|---|---|---|
+| `\;` | `;` | `#says=One thing happened\; then another was forgotten` ([`prose-says-parallel.csv`](../../tests/fixtures/story-line/prose/prose-says-parallel.csv)) |
+| `\#` | `#` | `#says=… A note reads ""1 \# 2"" and the ink is still wet.` ([`prose-option-attributes.csv`](../../tests/fixtures/story-line/prose/prose-option-attributes.csv); `""` is the CSV-escaped double quote) |
+| `\\` | `\` | `#says=… The log reads C:\\ledger, and the room behind you is empty when you turn around.` (same fixture) |
+| any other `\` | `\` (literal) | A backslash in a label, a candidate id, or a `#cost` / `#extra` / `#when` value is an ordinary character |
+
+**Not reserved in prose (no escaping needed):** `,`, `|`, `=`, `:`, double
+quotes and apostrophes. The linked fixture's says values contain all of them
+unescaped (in the `Read it` option) and parse verbatim.
+
+**Reserved and rejected:** an unescaped `;` or `#` inside a says value is
+rejected by the parser (`unescaped-says-delimiter`) instead of silently
+splitting the cell, and a says value that **decodes** to more than one segment
+(an author-written parallel list, `#says=One\; two`) is rejected by validation
+as `says-segment-count`. A says value is exactly **one** prose segment.
+
+**Round-trip.** `serialiseStorylineOptionsEncoding(options)` is the inverse of
+the parser and re-escapes `;`, `#` and `\` in a says value (and touches nothing
+else). Attributes are written in the canonical order `#cost`, `#extra`,
+`#when`*, `#says` last, so a cell authored in that order round-trips
+byte-identically; any other authored order round-trips stably to the same
+model. The fixtures in
+[`tests/fixtures/story-line/prose/prose-option-attributes.csv`](../../tests/fixtures/story-line/prose/prose-option-attributes.csv)
+are pinned by [`prose-contract.test.ts`](../../tests/story-line/content/prose-contract.test.ts).
+
+#### Prose budgets
+
+Authored prose has an adopted length budget. Exceeding it is a **non-fatal
+warning**, never a hard error — an author can deliberately exceed it.
+
+| Field | Budget (characters) | Diagnostic |
+|---|---|---|
+| `context` | 400 | `prose-budget`, reason `prose-over-budget` — reported, never invalidating |
+| `epilogue` | 600 | the same |
+
+The table lives in `PROSE_FIELD_SPECS`
+([`src/story-line/content/prose.ts`](../../src/story-line/content/prose.ts)) so
+the validator, the editor's field hints and this document quote one source of
+truth. `storylines:validate` prints the warning on the offending record and
+column, e.g. `! [prose-budget] row 2, column "context" (prose-over-budget):
+Card "p-a" context prose is 401 characters, over the 400-character budget.`
+(the shape pinned by `tests/story-line/content/validate.test.ts`).
+
+#### Journal and closing behaviour
+
+- **Resolution** — `resolveStorylineOption()` returns the chosen option's
+  `says` verbatim as `StorylineResolution.outcomeProse` (`null` when the option
+  authors none). It never changes the resolved deltas or successor.
+- **Story-update line** — `defaultStoryUpdateLine(card, label, coins, rep,
+  outcomeProse?)` renders `Story update — <story-line name>: <prose>` when
+  prose is present, byte-identically to the pre-prose wording when it is not.
+- **Journal** — `buildJournal()` derives one row per resolved choice;
+  `StorylineJournalEntry.outcome` is cut to a single display line by
+  `truncateOutcome(text, 80)`, while `outcomeFull` keeps the full prose and
+  `text` the original log line, so a transcript never loses what the journal
+  ellipsised.
+- **Closing** — a terminal card's `epilogue` is surfaced by
+  `buildEpilogue()` as `epilogueProse` (or `null`); the scene falls back to its
+  pre-prose framing line when none is authored, so an ending without an
+  epilogue is unchanged. The epilogue is presentation only: the journey score
+  still comes from the journal.
+
 ### Compilation
 
 There is exactly **one** choice model: a card is a choice when it supplies
@@ -101,15 +602,21 @@ Precedence: **registered options > CSV `options` encoding**.
   metadata only — it never makes a card a choice.
 - CSV `options` encoding: `label|cardA,cardB;label2|cardC` (`;` separates
   options, `|` separates the label from candidate ids, `,` separates
-  candidates). An empty candidate list is a **terminal** option. Every
-  CSV-authored option carries `effectPolicy: 'apply'`.
+  candidates), optionally followed by `#cost` / `#extra` / `#when` attributes
+  ([grammar](#authoring-options-in-csv)). An empty candidate list is a
+  **terminal** option. Every CSV-authored option carries `effectPolicy:
+  'apply'`.
 - Draw-time filtering is **combined**: a registered option is omitted when its
   `condition(state)` callback returns `false` **or** its declarative `cost`
-  exceeds the player's current coins/reputation. Options without a cost are
-  always included; a cost exactly equal to the balance is affordable.
+  exceeds the player's current value of a declared resource. Options without a
+  cost are always included; a cost exactly equal to the balance is affordable.
   Filtering happens once, when the option list is compiled at draw time, and
   the result is frozen into `PendingStorylineChoice.options`, where consumers
   (including AI scoring) read the stable presented list.
+- Cost filtering applies to **registered** options; a content-compiled list is
+  returned as authored, and the presenting layer gates it with
+  `isOptionAffordable` over the declared keys (see
+  [Authoring options in CSV](#authoring-options-in-csv)).
 
 ### Resolution
 
@@ -120,10 +627,16 @@ selected option:
 2. **Cost payment** — the option's `cost` is deducted through the engine
    adapter's resource-mutation seam, in addition to the effect.
 3. **Extra effect** — the option's `extraEffect` gains are applied, also
-   through the resource-mutation seam.
-4. **Deltas** — `coinChange` / `repChange` account for all three steps; each
-   applied cost/extra effect appends an activity-log line (`Cost paid: -100
-   coins.`, `Extra effect: +10 coins.`).
+   through the resource-mutation seam, except a gain on a key the adapter
+   declares irreversible: that key is refused (one `Extra effect refused:
+   <key> is irreversible.` activity-log line) and the remaining gains still
+   apply. A cost on the same key is never refused — it may be spent.
+4. **Deltas** — `coinChange` / `repChange` are *projections*: the change in
+   the `coins` / `reputation` keys across all three steps (`0` when the game
+   does not declare that key), which keeps every existing consumer — scene,
+   AI, tests — source-compatible. Each applied cost/extra effect appends an
+   activity-log line naming the declared key (`Cost paid: -100 coins.`,
+   `Extra effect: +10 coins.`, `Cost paid: -4 stores.`).
 5. **Successor** — resolved with this precedence:
 
    1. `option.successorResolver(state)` — a callback; `null`/`undefined` ends
@@ -141,9 +654,9 @@ scanning every card the engine adapter returns from `getChainScanCards`.
 
 ## Validation
 
-`validateStorylineOptions(options, { knownTemplateIds? })` statically validates
-the **declarative** parts of an option list — `cost`, `extraEffect` and
-`conditionalSuccessors`. It never throws and never mutates the list, and it
+`validateStorylineOptions(options, { knownTemplateIds?, resources?, cardId?, irreversible? })`
+statically validates the **declarative** parts of an option list — `cost`,
+`extraEffect` and `conditionalSuccessors`. It never throws and never mutates the list, and it
 works on any source: options registered with `registerStorylineOptions`,
 options compiled from a CSV `options` encoding, or an option list assembled by
 a game.
@@ -166,9 +679,11 @@ Rules:
 
 | Code | Rejects |
 |---|---|
-| `non-positive-cost` | `cost.coins` / `cost.reputation` equal to zero or negative. |
-| `negative-extra-effect` | `extraEffect.coins` / `extraEffect.reputation` below zero (extra effects are gains). |
-| `unknown-condition-field` | A condition field other than `coins` / `reputation`. |
+| `non-positive-cost` | A declared `cost.<key>` equal to zero or negative. |
+| `negative-extra-effect` | A declared `extraEffect.<key>` below zero (extra effects are gains). |
+| `irreversible-grant` | A **positive** `extraEffect.<key>` on a key supplied as `irreversible` (never restored — the runtime guard would refuse the grant). A zero value is not a grant, and a cost on the key is still valid. |
+| `unknown-resource-key` | A `cost.<key>` / `extraEffect.<key>` outside the declared resource set. |
+| `unknown-condition-field` | A condition field outside the declared resource set (the default projection is `coins` / `reputation`). |
 | `unknown-condition-op` | An operator other than `>=`, `<=`, `>`, `<`, `==`. |
 | `non-numeric-value` | A non-finite (or non-numeric) cost, extra-effect or condition value. |
 | `dangling-conditional-successor` | A rule targeting an id outside `knownTemplateIds` (checked only when the catalogue is supplied). |
@@ -176,10 +691,32 @@ Rules:
 | `invalid-conditional-successors` | A `conditionalSuccessors` value that is not an array of rule objects. |
 | `invalid-condition` | A rule without a `when` condition object. |
 
+Every resource-scoped issue also carries the offending `resource` key, and
+passing `cardId` stamps it onto every issue — so a content author sees the
+**card id, field path, resource key and reason** at once:
+
+```ts
+const { valid, issues } = validateStorylineOptions(options, {
+  resources: storyline.resources, // the same set the runtime uses
+  cardId: card.id,
+  knownTemplateIds: allCardTemplateIds,
+});
+// e.g. { path: 'options[0].cost.hull', code: 'unknown-resource-key',
+//        cardId: 'evt-storm', resource: 'hull',
+//        message: 'cost.hull is not a declared resource (declared: coins, reputation).' }
+```
+
 Validation is authoring-time only: runtime resolution remains permissive, so a
-list that fails validation still resolves exactly as declared. No shipped CSV
-content uses `cost`, `extraEffect` or `conditionalSuccessors`, so all shipped
-content validates cleanly.
+list that fails validation still resolves exactly as declared (an undeclared
+key is not applied and is reported in the activity log).
+
+Both shipped Gym content files author these fields from CSV:
+[`storylines.csv`](../../example-games/gym/content/storylines.csv) (default
+`coins` / `reputation` projection) and
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv) (the
+five-key declared set), and both validate cleanly. `storylines:validate`
+passes each card's own declared resource keys to this helper, so the vocabulary
+the runtime uses is the one the author is checked against.
 
 ## Authoring seams (content, manifest, validator, author)
 
@@ -214,7 +751,7 @@ import type { ContentAdapter } from '@story-line/content';
 
 export const TAVERN_ADAPTER: ContentAdapter = {
   gameId: 'tavern',
-  columns: ['card_key', 'card_name', 'flavour', 'arc', 'arc_name', 'choices', 'payoff'],
+  columns: ['card_key', 'card_name', 'flavour', 'arc', 'arc_name', 'choices', 'resource_keys', 'payoff'],
   fields: {
     id: 'card_key',
     name: 'card_name',
@@ -222,6 +759,7 @@ export const TAVERN_ADAPTER: ContentAdapter = {
     options: 'choices',
     storylineId: 'arc',
     storylineTitle: 'arc_name',
+    resources: 'resource_keys',
   },
   editableColumns: ['payoff'],
   newCardDefaults: { flavour: '', choices: '', payoff: '0' },
@@ -230,22 +768,43 @@ export const TAVERN_ADAPTER: ContentAdapter = {
 };
 ```
 
+An adapter may also map `resources` — the column declaring the card's resource
+keys, which is the vocabulary its `#cost` / `#extra` / `#when` attributes are
+validated against. A blank cell inherits the file's leading `#resources:`
+declaration; a cell and declaration that are both absent fall back to the
+default `coins` / `reputation` projection (see
+[Declaring the resource keys](#declaring-the-resource-keys)).
+
+An adapter may declare `irreversibleResources` (e.g. `['hull']`) — the
+never-restored keys its content may spend but never grant back. The episode
+manifest's `resources.irreversible` remains authoritative; this declaration is
+the manifest-free copy the CSV validator checks, and the run wiring audits the
+two for drift (see [Declared resources](#declared-resources)).
+
 Every column **not** in `fields` lands in `ContentCard.fields`, keyed by column
 name, so game columns (coin/reputation deltas, renown, payoff, …) are editable
 and inspectable without core knowing what they mean. Two optional hooks keep
 game semantics out of core: `baseId` (chain-serial stripping; identity by
 default) and `describeImpact` (manifest impact text).
 
-Core ships `GYM_CONTENT_ADAPTER` as the default, backed by the committed
-[`example-games/gym/content/storylines.csv`](../../example-games/gym/content/storylines.csv)
-of the Gym demo content. Tests additionally exercise a differently shaped
-fixture adapter, proving the seam is not shaped around one game.
+Core ships two adapters: `GYM_CONTENT_ADAPTER` (the default, backed by the
+committed
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)) and
+`LONG_ERASURE_CONTENT_ADAPTER` (backed by
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv), whose
+`act` / `clockCost` columns drive the spike scene). `DEFAULT_CONTENT_FILES`
+registers both, so the CLIs validate and drift-check every shipped content
+file, not only the default one. Tests additionally exercise a differently
+shaped fixture adapter, proving the seam is not shaped around one game.
 
 ### CSV and change detection
 
 `parseCsv` handles quoted fields, embedded commas/quotes/newlines and CRLF;
 `serialiseCsv` writes LF with a trailing newline, so a canonically quoted file
-round-trips **byte-identically** (column order preserved).
+round-trips **byte-identically** (column order and leading `#` declaration
+comments preserved). Leading `#` lines before the header are file-level
+declarations — lifted into `ParsedCsv.declarations` and never parsed as data
+rows (see [Declaring the resource keys](#declaring-the-resource-keys)).
 `computeContentChecksum(csvText)` is a deterministic DJB2 hex hash (8 chars) for
 change detection — any byte change produces a different checksum.
 
@@ -301,6 +860,185 @@ first member), so a disconnected fragment is reported as `unreachable-card`.
 `contentValidationToJson(result)` render the same issue/finding data, so the
 text and JSON reports cannot disagree.
 
+### Route-space guard
+
+The static validator proves a content file is **well formed**; it cannot tell a
+writer whether an authored branch is **playable to an ending**. A cost gate can
+leave an option reachable but unwinnable, and a cosmetic choice can undo its own
+consequence one beat later. The route-space guard
+([`src/story-line/content/guard.ts`](../../src/story-line/content/guard.ts))
+answers that question by enumerating the **playable route space** — the same
+affordability-aware walk the Long Erasure playtest harness
+(`scripts/long-erasure-playtest.ts`) uses, generalised over any
+[`ContentAdapter`](#content-adapter).
+
+`evaluateContentGuard(cards, adapter, options)` is pure (never mutates, never
+throws) and returns `{ valid, gatedBranches, endings, consequentialChoices,
+violations, warnings, errors, exploration }`. It asserts three invariants:
+
+| Invariant | Meaning |
+|---|---|
+| `gated-branch-survivable` | Every **state-gated** option — a `#cost` affordability gate, a `#when` successor rule, or both — can be taken on at least one route that reaches an ending. |
+| `ending-reachable` | Every ending is reachable on the playable route space. |
+| `consequential-rejoin` | Every choice **marked consequential** stays distinct from its alternatives for at least the minimum rejoin distance, in beats entered after the fork (`1` = every branch shares the very next beat). |
+
+**Marking choices and endings.** Both are ordinary content data, read from the
+card's own extra columns — the runtime ignores them and the static validator
+does not require them:
+
+| Column | Value | Meaning |
+|---|---|---|
+| `consequential` | option label(s), `\|`/`;`/`,` separated, or `*` | The choice(s) whose consequences must persist. An absent/blank cell marks nothing. |
+| `ending` | `1`, `true`, `yes` or `ending` | A card that ends a route. When **no** card is marked, endings default to the structural terminals (cards with no outgoing successor). |
+
+A typo in a `consequential` cell (a label the card does not offer) is a
+`consequential-rejoin` violation, so a mark cannot silently drift from the
+content. A card that marks a choice but offers no alternative gets a warning.
+
+**Rejoin distance** is measured over the declared successor graph ignoring
+conditions and affordability (a `#when` target counts as reachable). Branches
+that never rejoin pass any minimum — a terminal branch keeps its consequence.
+
+**Bounds.** The enumeration is bounded (`maxDepth` beats per route, `maxStates`
+explored states) because a cycle that also grows a resource has no finite state
+space. Hitting a bound is reported (`exploration.truncated`) and makes the
+report **invalid**: the guard fails closed rather than claiming an invariant it
+could not check, and an unproven invariant is never reported as a violation.
+Resource-neutral cycles (including a reset ending that loops back to the entry)
+terminate through state revisits, so they are an ordinary shape.
+
+**Invocation.** `npm run storylines:guard` guards every target declared in
+[`configs/storyline-guard.json`](../../configs/storyline-guard.json) — the CI
+form. A single file can be guarded ad hoc:
+
+```bash
+npm run storylines:guard
+npm run storylines:guard -- --csv tests/fixtures/story-line/gdd-worked-examples.csv \
+  --game gym --initial coins=3,reputation=1
+npm run storylines:guard -- --csv some/content.csv --game gym \
+  --endings end-a,end-b --min-rejoin 3 --json
+```
+
+| Flag | Purpose |
+|---|---|
+| `--csv <path>` | Guard one file (default: every configured target). |
+| `--game <id>` | Content adapter id (default `gym`). |
+| `--entry <ids>` | Explicit entry card ids (default: every root; a pure cycle falls back to each story-line's first card). |
+| `--initial <k=v,…>` | Starting resource bag (default: every declared key = `0`). |
+| `--endings <ids>` | Explicit ending ids (precedence: this flag > the `ending` column > structural terminals). |
+| `--min-rejoin <n>` | Minimum rejoin distance for marked choices (default `2`). |
+| `--max-depth <n>` / `--max-states <n>` | Search bounds (default `48` / `20000`). |
+| `--consequential-column` / `--ending-column` | Override the annotation column names. |
+| `--json` | Machine-readable report. |
+
+Exit codes: `0` when every invariant holds, `1` on a violation, a content
+error, an exhausted bound, or an unreadable/misconfigured target.
+
+The guard models **declared resources only**. A game-specific mechanic that is
+not a declared resource (Long Erasure's pressure clock, for example) is outside
+it and keeps its own harness; that is why the committed config passes
+explicit `endings` for the Long Erasure content (its reset ending loops back and
+its clock is not a declared resource).
+
+### Scene-space guard
+
+The route-space guard above walks the **card chain** over declared resources, so
+it cannot see a scene boundary, the scene clock or an outcome table — and the
+clock is deliberately **not** a declared resource, so an exhausted scene is
+invisible to it. The scene-space guard
+([`src/story-line/content/scene-guard.ts`](../../src/story-line/content/scene-guard.ts))
+is the other half: it enumerates the **playable scene space** of an episode
+manifest and its declared content file, and asserts the two invariants the
+beat-sheet design depends on (GDD §2.4 third check, §2.8.6 item 5, §2.10 T3).
+
+`enumerateSceneSpace(manifest, cards, options)` is pure (never mutates, never
+throws) and returns a frozen, JSON-safe `SceneGuardReport`. Outcome and route
+precedence are **delegated** to the runtime's own pure helpers
+(`evaluateSceneCondition`, `classifySceneOutcome`, `selectRoute`,
+`resolveRouteTarget`) and affordability to `isOptionAffordable`, so the
+guard cannot silently diverge from `createEpisodeRunner`.
+
+| Invariant | Meaning |
+|---|---|
+| `no-success-on-exhausted-close` | A scene close triggered by a **refused** beat (its `clockCost` exceeds the clock remaining) must not be classified `success`; that would truncate the player's run behind a success banner. `partial` and `failure` remain legitimate classifications of an exhausted close. |
+| `refusal-reaches-ending` | Every refusal's exhausted close must reach a declared ending — directly or through any reachable state — because a refusal is a failure **with** authored recovery content, never a silent truncation. |
+
+**State tuple.** One explored state is the beat the run is about to enter:
+`(`sceneId`, `beatId`, `clockRemaining`, `pendingChain`, declared resource bag)`. The
+scene clock is reset on scene entry and `pendingChain` cleared, exactly as the
+runner does; each state is expanded once, in this order: **beat entry** (a beat
+whose `clockCost` exceeds `clockRemaining` is recorded as a refusal and becomes
+the close trigger; otherwise the cost is charged) → **choice resolution** (every
+affordable option is taken, branching exhaustively over a candidate set rather
+than drawing the RNG, which is what keeps the enumeration deterministic) →
+**scene close** (the objective is evaluated once against the post-resolution
+bag, the outcome table classifies first-match-wins, the matching `losses[]`
+rules apply, and the route gate reads the post-loss bag) → **routing** (the
+winning route resolves to the next scene — clock reset, chain cleared — or to an
+ending, where the branch stops). `refusal-reaches-ending` runs a bounded
+reachability search from each refusal record, sharing the enumeration's state
+key and truncation flag.
+
+**Bounds and fail-closed truncation.** `maxDepth` (transitions along one route —
+beat and scene entries) and `maxStates` (examined states) default to the CSV
+guard's values (`48` / `20000`). Hitting either sets `exploration.truncated` and
+makes the report **invalid**: the guard fails closed rather than claiming an
+invariant it could not check, and an unproven refusal is never reported as a
+stranding. Resource-neutral cycles terminate through the state key, so a loop
+whose reachable set still contains an ending is an ordinary passing shape. No
+wall clock, RNG or ambient state is read, explored state keys are emitted in a
+fixed order and the JSON key order is fixed, so two runs serialise
+**byte-identical**.
+
+**Resource arithmetic is the engine's current behaviour, unclamped.** Every cost, extra effect
+and loss applies **unclamped and unbounded** through the same declared-delta
+selection the runtime's `applyResourceDelta` seam receives; an undeclared key is
+ignored and an irreversible grant refused. The G4 clamping and spill work
+(`CG-0MWR0BGVG004UE7X`) is what will change this arithmetic, and a unit test
+pins the current unclamped behaviour so that change is a deliberate assertion
+flip.
+
+**JSON shape.** `sceneGuardToJson(report)` (and `manifestGuardToJson(result)` in
+the CLI) emits the existing guard's top-level `valid` plus the scene-space keys,
+in a fixed order:
+
+| Key | Contents |
+|---|---|
+| `episodeId`, `maxDepth`, `maxStates` | Provenance and the effective bounds. |
+| `exploredStateKeys` | Every explored state key, sorted. |
+| `sceneExits` | Per exit: `sceneId`, `ruleId` (the winning outcome rule), `outcome`, `clockRemaining`, `refusalTriggered`, `refusedBeatCardId`. |
+| `beatRefusals` | Per refusal: `sceneId`, `beatCardId`, `clockCost`, `clockRemaining`. |
+| `invariants` | Per invariant: `invariant`, `checked`, `violations`. |
+| `violations` | One record per breach: `invariant`, `cardId`, `sceneId`, `ruleId`, `outcome` plus the invariant's facts (invariant 2 adds `routeId` and the `terminalStates` the search reached) and a human-readable `message`. |
+| `exploration` | `statesVisited`, `truncated`. |
+| `valid` | True only when both bounds held and no invariant is violated. |
+
+**Invocation.** `npm run storylines:guard` guards every configured target in
+[`configs/storyline-guard.json`](../../configs/storyline-guard.json) — both CSV
+(route-space) and manifest (scene-space) targets, including the committed worked
+manifest (`example-games/gym/content/long-erasure-episode.json`), so CI is a
+real check of the beat sheet rather than a vacuous pass. One manifest can be
+guarded ad hoc:
+
+```bash
+npm run storylines:guard
+npm run storylines:guard -- --manifest example-games/gym/content/long-erasure-episode.json
+npm run storylines:guard -- --manifest episode.json --max-depth 64 --max-states 40000 --json
+```
+
+`--manifest <file>` guards one manifest plus the content file the manifest itself
+declares (`manifest.content.file`, adapter from `manifest.content.adapter`); the
+manifest is validated before enumeration and refuses with its first three
+findings when it is not. `--manifest` and `--csv` are **mutually exclusive** — a
+run guards one mode — and the CSV-only flags (`--game`, `--entry`, `--initial`,
+`--endings`, `--min-rejoin`) do not apply to a manifest, which declares its own
+adapter and starting bag.
+
+Exit codes: `0` when every invariant holds, `1` on a violation, a truncated
+search, an unreadable content file, a manifest that fails validation or an
+unknown adapter. In configured-target mode a malformed target is reported on
+stderr and the rest of the batch still runs; any failure makes the run exit `1`.
+
 ### Transactional author API
 
 Every edit is: parse → mutate in memory → validate → write atomically (temp file
@@ -339,20 +1077,49 @@ const result = applyContentEditToFile({
 
 `addContentCard` refuses a duplicate id, a missing id/name, an unknown or mapped
 game column, and any edit whose result fails validation (for example a new card
-in a story-line that nothing links to — it would be `unreachable-card`).
+in a story-line that nothing links to — it would be `unreachable-card`). The
+optional `after` field names a base card id and inserts the new row directly
+after that card's row instead of appending, so CSV reading order can track
+narrative order; an `after` that names no card is refused with an error naming
+the id, and omitting it appends exactly as before. Neither form can silently
+re-point an existing story-line's entry card: an add that would move the entry
+(the first member with no incoming link) is refused, naming the old and
+would-be entry card.
 `updateContentCard` changes only the supplied fields; a nullable field set to
 `null` is cleared. A card is a choice exactly when its `options` encoding is
 non-empty — no separate flag or link column exists to set.
 
+**Forward references: `addLinkedContentCard`.** A branch cannot be authored
+one cell at a time — an option may not name a card that does not exist yet
+(`unknown-successor`) and a new card added alone to an existing story-line is
+`unreachable-card`. `addLinkedContentCard(csv, adapter, { card, linkFrom })`
+adds the new card **and** appends an option on the `linkFrom` predecessor
+(`label|newId`, label defaulting to the new card's name) in one in-memory pass,
+then validates the **combined** candidate once — so the branch is never
+half-authored, and either half failing returns the unchanged input. The link is
+appended through the same option-append primitive as `add-option`, so an
+existing options cell (including its `#cost` / `#extra` / `#when` / `#says`
+attributes) is preserved verbatim. `linkFrom.attributes` authors those same
+attributes on the **generated** option (in authored order, with or without the
+leading `#`), so a gated branch is authored in the same single transaction
+rather than in a follow-up `add-option` pass; an attribute naming an undeclared
+resource is refused before anything is written. The editor's `add-linked-card`
+edit and the CLI's `add-linked-card` command are both thin wrappers over this
+one function.
+
 ### CLIs
 
-Thin `tsx` entry points over the seams (no Vite loader, no game import):
+Thin `tsx` entry points over the seams (no Vite loader, no game import). The
+writer-facing workflow built on them — column table, worked rows, the review
+gate and the malformed-entry behaviour — is documented in the GDD's
+[writer content pipeline](../../docs/design/storyline-game-gdd.md#29-writer-content-pipeline-csv-authoring-and-the-review-gate).
 
 | npm script | Script | Purpose |
 |---|---|---|
 | `npm run storylines:validate` | `scripts/validate-storylines.ts` | Validate a content CSV (`--csv`, `--game`, `--json`, `--fail-on-cycle`). |
+| `npm run storylines:guard` | `scripts/storyline-guard.ts` | Guard the playable route space (`--csv`: gated-branch survival, ending reachability, consequential rejoin distance) and the scene space (`--manifest`: no `success` close on an exhausted clock, no refusal strands the run), with `--initial`, `--endings`, `--min-rejoin`, `--max-depth`, `--max-states` and `--json`. |
 | `npm run storylines:graph` | `scripts/storyline-graph.ts` | Write or `--check` the JSON manifest / Mermaid graph (`--format`, `--out`). |
-| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `update-card` (`--dry-run`, `--field column=value`). |
+| `npm run storylines:author` | `scripts/storyline-author.ts` | `add-card` / `add-linked-card` / `add-option` / `update-card` (`--dry-run`, `--field column=value`, `add-card --after <card-id>` positional insert, prose via `--context` / `--epilogue` and `update-card --clear-context` / `--clear-epilogue`, `add-linked-card --link-attr` for the generated link). |
 | `npm run storylines:editor` | `scripts/storyline-editor-cli.ts` | Launch the local editor page or apply one edit headlessly (`--content`, `--adapter`, `--port`, `--host`, `--artefact-json`, `--artefact-mermaid`, `--apply`, `--dry-run`). |
 
 Every CLI supports `--help`, resolves `--game` (the author/validator/graph
@@ -360,6 +1127,68 @@ CLIs) or `--adapter` (the editor) through the shipped adapter registry
 (default `gym`), and exits `0` on success and `1` on invalid/unreadable content
 or drift. `npm run storylines:author -- add-card --id … --dry-run` prints the
 candidate content without writing it.
+
+A forward reference is authored in one command with `add-linked-card`: the new
+card and the predecessor's incoming option land in a single validated write.
+
+A new card appends at the end of the file by default. `--after <card-id>`
+inserts its row directly after that card's row, so the CSV reads in narrative
+order instead of every new beat landing after the last one:
+
+```bash
+npm run storylines:author -- add-card --id gym-story-detour \
+  --name "A Detour" --effect "The scenic route." \
+  --storyline-id gym-story --storyline-title "Gym Storyline" \
+  --after gym-story-invest --options "Walk back|gym-story-start"
+```
+
+`--after` must name an existing base card id; an unknown id is refused with an
+error naming it, and nothing is written. Omitting `--after` appends exactly as
+before. A positional insert never silently re-points a story-line's entry card:
+the entry is the first member in file order with no incoming link, and an add
+that would move the entry (or leave a member unreachable from it) is refused,
+naming the old and would-be entry card. Link the new card in from a story-line
+member with `add-linked-card --link-from <card-id>` to keep the entry unchanged.
+
+```bash
+npm run storylines:author -- add-linked-card --id gym-story-detour \
+  --name "A Detour" --effect "The scenic route." \
+  --storyline-id gym-story --storyline-title "Gym Storyline" \
+  --link-from gym-story-invest --link-label "Take the detour" \
+  --link-attr cost=coins:2 --link-attr extra=reputation:+1
+```
+
+`--link-from` names the predecessor (required; an absent or unknown predecessor
+is refused and nothing is written) and `--link-label` sets the option text
+(default: the new card's name). Each `--link-attr <name=value>` (repeatable)
+is appended, in authored order, to the option the command generates on that
+predecessor — the same `#cost` / `#extra` / `#when` / `#says` encoding
+`add-option --attr` accepts, validated against the card's declared resources,
+so a gated branch needs no follow-up `add-option` pass. Every `add-card` flag
+(`--effect`, `--options`,
+`--context`, `--epilogue`, `--storyline-id`, `--storyline-title`,
+`--resources`, `--after`, `--field`) also applies to `add-linked-card`, so an
+inserted card is linked in from its predecessor in the same transaction.
+
+One option is appended in place with `add-option`, so the existing cell is
+never retyped (and a dropped `;` can no longer remove a branch):
+
+```bash
+npm run storylines:author -- add-option --id gym-story-invest \
+  --label "Wait for spring" --target gym-story-end \
+  --attr cost=coins:2 --attr extra=reputation:+1
+```
+
+`--id` is the card that gains the option, `--label` is its (card-unique) text
+and `--target` is the successor card id; omit `--target` to author a terminal
+option (`label|`). Each `--attr <name=value>` is appended in authored order
+with an optional leading `#` (`cost=coins:2` and `#cost=coins:2` are the same
+attribute). The append is refused, with nothing written, when the label is
+already declared on the card, the target names no card (`unknown-successor`),
+an attribute names an undeclared resource key, or the option encoding is
+malformed — the same validation `update-card --options` runs, applied to the
+whole appended candidate. `update-card --options` still replaces the entire
+cell.
 
 ## Editor (visual authoring tool)
 
@@ -517,8 +1346,9 @@ clobber a concurrent edit.
 |---|---|
 | `rng(state)` | Returns the next seeded value in `[0, 1)`. |
 | `applyEffect(state, card)` | Applies the card's intrinsic effect. |
-| `applyResourceDelta?(state, { coins?, reputation? })` | **Optional** resource-mutation seam core uses to deduct costs and apply extra effects. A legacy adapter that omits it compiles and runs unchanged; core then leaves resources untouched and appends a warning line instead. |
-| `getResources(state)` | Current `{ coins, reputation }` for delta reporting and condition evaluation. |
+| `applyResourceDelta?(state, delta)` | **Optional** resource-mutation seam core uses to deduct costs and apply extra effects. `delta` is a sparse record keyed by declared resource key (`{ hull: -2 }`); core never names an undeclared key, so an adapter cannot be asked to invent a resource. A legacy adapter that omits the seam compiles and runs unchanged; core then leaves resources untouched and appends a warning line instead. |
+| `getResources(state)` | Current resource values keyed by declared resource key (`{ coins, reputation }` by default) for delta reporting and condition evaluation. An omitted key reads as `0`. |
+| `resources?` | **Optional** declared resource keys. Omitted/empty means the default `coins` / `reputation` projection, so a pre-declaration adapter is unchanged. The declared set is what `StorylineSystem.resources` reports and what affordability, cost payment, extra effects, condition evaluation and validation operate over. `createResourceProjection({ … })` builds this member plus the two above from one declarative field map. |
 | `appendLog(state, text, kind?)` | Appends to the game activity log. |
 | `getActivityLog(state)` | The game's append-only log (`{ turn, text }`). |
 | `getTemplate(id)` | Template lookup for chain-card creation. |
@@ -544,10 +1374,69 @@ only on the card type — presentation no longer reads game state:
 The contract has **no clarity-label method**: the retired choice-clarity API is
 gone, and nothing replaces it.
 
+### Option labels with costs
+
+An option's authored `#cost` is part of what the player is choosing, so the
+shared formatters render it rather than leaving it to each game:
+
+```ts
+formatOptionCost({ coins: 5 })                       // '5 coins'
+formatOptionCost({ charge: 1, stores: 2 })           // '1 charge, 2 stores'
+formatOptionLabel({ label: 'Invest', cost: { coins: 5 } })
+                                                     // 'Invest — 5 coins'
+formatOptionLabel({ label: 'Ignore' })               // 'Ignore' (no cost)
+```
+
+Rules the implementation keeps, and the tests pin:
+
+- **Keys are printed as authored** (`coins`, `charge`, `stores`). The engine
+  knows nothing about a game's resource nouns, so it never invents
+  pluralisation — `{ stores: 1 }` renders `1 stores`, and a game that wants
+  `1 store` formats its own text.
+- **Declaration order is preserved**, so the same content always renders the
+  same string.
+- **Zero and non-finite amounts are omitted** (a cost that costs nothing is
+  invisible, not `0 coins`).
+- **A cost-free option keeps its bare label**, so content that authors no cost
+  renders exactly as it did before the formatter existed.
+
+`GymStorylineScene` renders `[ <formatOptionLabel(option)> ]`, which is why its
+first beat shows `[ Invest — 5 coins ]` next to `[ Ignore ]`.
+
 `defaultStoryUpdateLine`'s `accept` / `reject` wording is **label-driven** —
 it switches on the chosen option *label* (a legacy Main Street wording
 convention) and has nothing to do with the retired API. Any other label
 renders the generalised `you chose "<label>"` form.
+
+### Authored outcome prose
+
+An option may author its consequence in the writer's own words (`#says=`,
+see [Authoring options in CSV](#authoring-options-in-csv)). That prose is
+threaded from content to every presentation surface — the engine never
+paraphrases a label the player has just clicked when real prose exists:
+
+1. **Resolution** — `resolveStorylineOption()` returns the chosen option's
+   `says` verbatim as `StorylineResolution.outcomeProse`, or `null` when the
+   option authors none. It never changes the resolved deltas or successor.
+2. **Story-update line** — pass it as the optional fifth argument to
+   `defaultStoryUpdateLine(card, label, coins, rep, outcomeProse?)` (or through
+   `ui.storyUpdateLine`, which takes the same optional argument). With prose,
+   the line is exactly `Story update — <story-line name>: <prose>` — no
+   paraphrase and no appended delta summary. Without prose (absent, `null` or
+   blank) the line is byte-identical to the pre-prose wording, so content that
+   authors none is unchanged. A game that overrides `storyUpdateLine` should
+   forward the argument and prefer the prose when present.
+3. **Journal** — `buildJournal()` derives its rows from those log lines.
+   `parseStoryUpdate()` splits the envelope on the **first** `: `, so authored
+   prose may itself contain `: `, `;`, `#`, quotes and apostrophes.
+
+Journal rows are display copies, so they are short by design:
+`StorylineJournalEntry.outcome` is cut to one line by
+`truncateOutcome(text, maxLength = 80)` — ellipsis, never mid-word, no
+trailing space, no embedded newline, and a space-less string hard-cut to
+`maxLength - 1` + `…`. The untruncated outcome stays on `outcomeFull` and the
+original line on `text`, so the transcript artefact never loses prose the
+journal overlay had to ellipsise.
 
 Core ships `createDefaultStorylineUiAdapter()` (and a ready-made
 `defaultStorylineUiAdapter`). Its wording is the shipped Main Street wording, so
@@ -563,31 +1452,706 @@ const ui = {
 ```
 
 The Gym demo uses the default adapter, demonstrating that no game code is
-required to present the mechanic. The demo's fixtures are unchanged by the
-cost/extra-effect/conditional-successor extension: it exercises the base
-experience, and no Gym fixture uses the new fields.
+required to present the mechanic. It plays the shipped Gym content CSV
+directly (`demoCardsFromCsv` over
+[`storylines.csv`](../../example-games/gym/content/storylines.csv)), so the
+authoring path — a `#cost`, a `#extra` and a `#when` in one cell — is exercised
+by the demo itself: the demo starts at 60 coins so that `Invest`'s 5-coin cost
+is affordable while the `coins>=100` gate stays closed, keeping the branch
+reachable. A card's authored `cost` column is a real payment too:
+`Public Investment` costs 100 coins, charged when the beat resolves together
+with that beat's own +120 coin effect, so the branch reads as a +20 trade
+rather than a free reward (the scene shows the price on the card line before
+the player chooses).
+
+## Episode runner
+
+The beat-sheet layer of [GDD §2.3](../design/storyline-game-gdd.md#23-how-a-scene-outcome-selects-the-next-beat):
+an episode manifest authors acts → scenes → beats, a per-scene clock budget,
+one objective, an outcome-rule table and a route table, and the runner walks
+that data one beat at a time. It is constructed **around** a
+`StorylineSystem`, never beside it, so there is exactly one choice model,
+resource projection and RNG for the run.
+
+Module: [`src/story-line/episode-runner.ts`](../../src/story-line/episode-runner.ts),
+reachable through the `@story-line` barrel. No Phaser import reaches the module
+or its transitive imports (`tests/story-line/episode-runner-surface.test.ts`
+walks the graph and fails on any `phaser` specifier).
+
+| Exported name | Kind | Meaning |
+|---|---|---|
+| `createEpisodeRunner` | function | Constructs the runner positioned at the manifest's `start`, or at a saved position when given `restored`. |
+| `EpisodeRunnerConfig` | type | `{ manifest, storyline, content, seed?, restored? }` — the validated manifest, the one choice model, the card map, the run's seed and an optional versioned payload to resume. |
+| `EpisodeRunner` | type | The runner surface: the config collaborators plus `getState()` / `serialize()` / `restore()` / `getSceneExits()` / `getLossLedger()` / `enterBeat()` / `resolveChoice()` / `closeScene()` / `routeScene()` / `applyLossRule()` / `getBudgetExhausted()` / `getEndingCardId()` / `resetRun()`. |
+| `EpisodeRunState` | type | The read-only run state (see below). |
+| `SerializedEpisodeRunState` | type | The nine-field persisted payload (see "Persistence"). |
+| `EpisodeRunStateSerializer` | const | The `SaveSerializer` for the run state, at `schemaVersion: 1` with no `migrate` hook. |
+| `EPISODE_RUN_STATE_SCHEMA_VERSION` | const | The persisted run state's schema version (`1`). |
+| `serializeRunState` | function | Pure: run state → nine-field JSON-safe payload. |
+| `deserializeRunState` | function | Pure: payload → frozen run state; refuses a malformed field. |
+| `hydrateRunState` | function | Pure: payload + manifest → frozen run state; refuses a scene / act the manifest does not declare. |
+| `ChoiceResolution` | type | One resolved choice's classification: `next`, `case`, `cardId`, `pendingChain`, `pushedCard` and the unchanged `@story-line` `resolution`. |
+| `ChoiceNext` | type | Where a resolved choice sends the run: `'continue'` or `'close'`. |
+| `PushedCardCase` | type | The §2.3 step B.5 case: `'in-scene-beat'`, `'out-of-scene-beat'`, `'ending'` or `'none'`. |
+| `evaluateSceneCondition` | function | Evaluates one `SceneCondition` (`objective`, `budget` or raw resource) against a close context; shared with routing's `when` gates. |
+| `classifySceneOutcome` | function | First-match-wins outcome classification over a scene's authored `outcomeRules`. |
+| `SceneConditionContext` | type | `{ objectiveMet, budgetExhausted, resources }` — the one context the outcome and route gates read. |
+| `SceneOutcomeClassification` | type | The winning outcome rule's `{ ruleId, outcome }`. |
+| `SceneCloseResult` | type | One scene close's `{ sceneId, objectiveMet, outcome, ruleId, budgetExhausted, losses }` — what routing and the `scene-exit` record read. |
+| `RoutingCloseInput` | type | The close fields routing consumes; never re-classifies and never re-evaluates the outcome table. |
+| `selectRoute` | function | First matching route in declaration order, honouring `on` / `when` and skipping a chain door with no pending chain. |
+| `resolveRouteTarget` | function | Resolves a `chain` / `beat` / `ending` target into `{ kind, actId, sceneId, beatId, endingCardId }`. |
+| `RouteSelectionRequest` | type | `{ scene, outcome, context }` — the one input `selectRoute` reads. |
+| `RouteSelectionContext` | type | The scene-condition context plus `pendingChain`; the route `when` gate's input. |
+| `RouteTargetResolution` | type | A route target resolved into the run's next action (see "Routing and scene entry"). |
+| `SceneRouteResult` | type | One routed close: the appended `exit` record, the winning `route`, its `target`, `nextBeat`, `runClosed` and the presented `endingCard`. |
+| `BeatEntry` | type | One beat-entry outcome: the `presented` or `refused` variant (see "Beat entry"). |
+| `PresentedBeatEntry` | type | A beat the clock paid for: charged cost, prose and gated options. |
+| `RefusedBeatEntry` | type | A beat the clock could not pay for: no charge, no options, `budget-exhausted`. |
+| `BeatEntryRefusalReason` | type | Why an entry was refused; currently only `'budget-exhausted'`. |
+| `SceneExitRecord` | type | The nine-field record appended once per scene close. |
+| `LossLedgerEntry` | type | One irreversible-loss line: the `chain` or `rule` variant. |
+| `LOSS_LEDGER_KINDS` | const | The two ledger kinds, `['chain', 'rule']`. |
+| `SCENE_EXIT_FIELDS` | const | The nine `SceneExitRecord` field names, in §2.3 step 11 order. |
+
+```ts
+import { createEpisodeRunner } from '@story-line';
+
+const runner = createEpisodeRunner({
+  manifest,          // EpisodeManifest (already validated — never re-validated)
+  storyline,         // createStorylineSystem({ engine, ui })
+  content: cardsById, // cardsFromCsv(parseCsv(csv), adapter)
+  seed: 1234,
+});
+
+runner.getState();       // EpisodeRunState — frozen snapshot
+runner.serialize();      // { schemaVersion: 1, data: the nine persisted fields }
+runner.restore(payload); // resume from a save, refusing a version mismatch
+runner.getSceneExits();  // readonly SceneExitRecord[] — frozen snapshot
+runner.getLossLedger();  // readonly LossLedgerEntry[] — frozen snapshot
+runner.enterBeat('le-i-open', gameState); // BeatEntry — presented or refused
+runner.resolveChoice(option, gameState);  // ChoiceResolution — next / case / pendingChain
+runner.closeScene(gameState);            // SceneCloseResult — objective / outcome / losses
+runner.routeScene(close, gameState);     // SceneRouteResult — exit / route / target / nextBeat
+runner.getEndingCardId();                // string | null — the ending the run closed on
+runner.resetRun();                       // post-ending restart, back to manifest.start
+```
+
+Construction consumes no RNG and applies no resource delta. A requested run
+whose manifest starts at a scene no act declares throws an actionable error
+naming the manifest and the scene id; everything else is left to
+`validateEpisodeManifest` (GDD §2.4), because the runner must not re-check an
+already validated manifest.
+
+### The §2.3 contract as a step→test map
+
+The routing contract is implemented once, in `episode-runner.ts`, and every
+numbered step names the test that proves it. The step list is also data —
+`EPISODE_STEPS` in
+[`tests/story-line/helpers/episode-fixture.ts`](../../tests/story-line/helpers/episode-fixture.ts) —
+and each owning suite asserts in its first test that the map assigns exactly
+its steps to it, so a numbered step cannot land without an owner.
+
+| Step | Contract | Test that proves it |
+|---|---|---|
+| A.1 | Read the beat's `clockCost` from the validated manifest, never the legacy CSV cell | `episode-runner-beat-entry.test.ts` → “A.1/A.3 charges the manifest cost and presents the beat when affordable” |
+| A.2 | Refuse a beat the clock cannot pay: not played, no options, `budgetExhausted` set, `reason: 'budget-exhausted'` | `episode-runner-beat-entry.test.ts` → “A.2 refuses a beat that costs more than the remaining clock” |
+| A.3 | Charge the cost and present the beat's prose and its affordability-gated options; a cost exactly equal to the remaining clock is affordable | `episode-runner-beat-entry.test.ts` → “A.3 treats a cost exactly equal to the remaining clock as affordable”; “A.3 presents only options the declared-key affordability gate accepts” |
+| B.4 | Resolve the option through `@story-line` unchanged: effect, cost, extra, `pushedCard`, prose, journal and log | `episode-runner-choice.test.ts` → “B.4 delegates every B.5 case to the storyline system unchanged”; “B.4 lets the engine seam apply the option cost, not the runner” |
+| B.5 | Classify `pushedCard`: in-scene beat continues; an out-of-scene beat or ending card closes with `pendingChain`; none closes with `null` | `episode-runner-choice.test.ts` → “B.5 continues the scene when the pushed card is an in-scene beat”; “…beat of another scene”; “…ending card”; “…closes the scene with no pending chain when the choice pushes nothing” |
+| C.6 | Evaluate the objective once against the post-resolution `engine.getResources` snapshot | `episode-runner-scene-close.test.ts` → “evaluates the objective against post-resolution resources”; “reads engine.getResources exactly once for the objective” |
+| C.7 | Classify the outcome first match wins in declaration order, honouring an authored `budget: "exhausted"` rule before the catch-all | `episode-runner-scene-close.test.ts` → “classifies first match wins in declaration order”; “honours an authored budget-exhausted rule before the catch-all” |
+| C.8 | Apply the matching `losses` rules in declaration order, one ledger line and one activity-log line each | `episode-runner-scene-close.test.ts` → “applies the matching loss through the seam with one ledger and one log line”; “applies every matching loss rule in declaration order” |
+| C.9 | Select the first matching route in declaration order, skipping a `chain` route while `pendingChain` is `null` | `episode-runner-routing.test.ts` → “takes the first matching route in declaration order and flips with the order”; “skips a chain route while pendingChain is null” |
+| C.10 | Resolve `chain`, `beat` (with and without an explicit beat) and `ending` targets, including the ending's run close and the post-ending restart | `episode-runner-routing.test.ts` → “chain target opens an out-of-scene beat and enters its scene”; “chain target opens a declared ending and closes the run”; “beat target with an explicit beat opens exactly that beat”; “beat target without an explicit beat opens the target entryBeat” |
+| C.11 | Append exactly one nine-field `scene-exit` record per close, with the derived scene-exit and route log lines | `episode-runner-routing.test.ts` → “appends exactly one nine-field record per close, with the derived log lines” |
+| C.12 | Enter the target scene: reset `sceneClockRemaining`, push the scene/route histories, clear `pendingChain`, never restore irreversible keys | `episode-runner-routing.test.ts` → “resets the clock, pushes the histories, clears the chain and keeps irreversible keys” |
+
+The cross-cutting guarantees have their own suites: the end-to-end pipeline
+(the four endings, the refused close, the reset restart) is
+[`episode-runner-fixture.test.ts`](../../tests/story-line/episode-runner-fixture.test.ts),
+the one-RNG rule is
+[`episode-runner-determinism.test.ts`](../../tests/story-line/episode-runner-determinism.test.ts),
+and the nine persisted fields and their refusals are
+[`episode-runner-persistence.test.ts`](../../tests/story-line/episode-runner-persistence.test.ts).
+The no-RNG clauses inside the map are pinned separately by “consumes no RNG on
+an affordable entry or a refusal” (A) and “consumes no RNG from route selection,
+record emission or scene entry” (C.9–C.12).
+
+### Beat entry
+
+GDD §2.3 steps A.1–A.3. `enterBeat(cardId, state)` enters a beat **of the
+current scene** (a beat of another scene is entered by routing, step 12):
+
+1. **A.1 — read the cost.** The beat's `clockCost` is read from the validated
+   manifest's `Beat`, never from the legacy per-card CSV `clockCost` column
+   (which survives only as a validator cross-check and retires with G10).
+2. **A.2 — refuse what the clock cannot pay.** If `clockCost > sceneClockRemaining`
+   the beat is **refused**: it is not played, `currentBeatId` and the clock are
+   left unchanged, no options are returned, `budgetExhausted` is set (read
+   through `getBudgetExhausted()`), and the record reports
+   `reason: 'budget-exhausted'`. The refusal is the scene's close trigger; the
+   scene close classifies it through the authored outcome table (step 7), so an
+   exhausted close is never hard-coded to `failure`.
+3. **A.3 — charge and present.** Otherwise the cost is charged
+   (`sceneClockRemaining -= clockCost`), `currentBeatId` becomes the beat, and
+   the record carries the card's `context` prose, the scene id (for the scene
+   banner) and the surviving options. Options are gated by the shipped
+   `isOptionAffordable` over the manifest's declared keys
+   (`storyline.resources`); the runner never re-derives affordability.
+   **A cost exactly equal to the remaining clock is affordable** — spending the
+   last tick on the last beat is a legal, authored climax, so that entry is
+   presented with `clockRemaining: 0`.
+
+```ts
+const entry = runner.enterBeat('le-i-open', gameState);
+if (entry.status === 'presented') {
+  renderProse(entry.context);      // the card's `context` paragraph
+  renderOptions(entry.options);    // already affordability-gated
+} else {
+  closeScene(gameState);        // 'budget-exhausted' close trigger
+}
+```
+
+A `BeatEntry` is a discriminated union on `status`, so the options cannot be
+reached on a refusal; the record and its options array are frozen. Beat entry
+consumes no RNG and applies no resource delta. Requesting a `cardId` the
+current scene does not assign throws an actionable error naming the scene
+(a content defect, not a modelling gap). `budgetExhausted` is close-path
+bookkeeping: it is **not** part of the frozen `EpisodeRunState` snapshot and is
+reset when the run enters the next scene (step 12).
+
+### Choice resolution and the scene boundary
+
+GDD §2.3 steps B.4–B.5. `resolveChoice(option, state)` takes the player's
+choice from the presented beat and does exactly two things:
+
+1. **B.4 — delegate.** The option resolves through the run's one choice model,
+   `storyline.resolveStorylineOption(state, card, option)`: effect policy, cost
+   payment, extra effect, the successor push, outcome prose, journal and log
+   are all `@story-line`'s work. The runner adds no second resolution path, does
+   not re-read the card's `options` cell and does not re-implement successor
+   precedence. The returned record carries that same resolution object by
+   reference, so nothing is recomputed.
+2. **B.5 — classify the pushed card.** The pushed card is compared against the
+   validated manifest's assigned-card index (beat card id → the scene that
+   assigns it) and its `endings` list:
+
+| `case` | `cardId` | `next` | `pendingChain` | Meaning |
+|---|---|---|---|---|
+| `in-scene-beat` | a beat of the current scene | `'continue'` | `null` | continue the scene at that beat (the caller's next step is `enterBeat`) |
+| `out-of-scene-beat` | a beat assigned to another scene | `'close'` | the same base id | close the scene; the chain route opens that beat |
+| `ending` | a card in `manifest.endings` | `'close'` | the same base id | close the scene; the chain route opens the ending |
+| `none` | `null` | `'close'` | `null` | close the scene with no chain to route |
+
+```ts
+const resolved = runner.resolveChoice(option, gameState);
+if (resolved.next === 'continue') {
+  runner.enterBeat(resolved.cardId!, gameState); // still the same scene
+} else {
+  closeScene(gameState);           // reads resolved.pendingChain for the chain route
+}
+```
+
+`ChoiceResolution` is the **one** shape the scene close and the tests read: it
+names the case, carries `next`, the classified `cardId` and `pendingChain`, and
+exposes the pushed card and the underlying `StorylineResolution`. The record is
+frozen. `pushedCard` is the card `@story-line` pushed (an instance, e.g.
+`le-i-log-0`); `cardId` and `pendingChain` are its **base** id (the adapter's
+`getBaseTypeId`, e.g. `le-i-log`), because the manifest, `enterBeat`, the route
+targets and the scene close all speak template ids. The two close cases record
+`pendingChain` on the run state (`getState().pendingChain`) for the scene close
+to route; the continuing case changes no run state at all — the scene id, act,
+clock and current beat stay where the beat entry left them.
+
+Classification consumes no RNG and applies no resource delta: everything the
+resolution changed, the engine seam changed. A pushed card that is neither an
+assigned beat nor a declared ending is a content defect (`validateEpisodeManifest`
+reports it as `unassigned-card`), so the runner throws an actionable error
+naming the card and the episode instead of silently classifying it.
+
+### Scene close
+
+GDD §2.3 steps C.6–C.8. `closeScene(state)` closes the current scene in the
+contract's order and returns one frozen {@link SceneCloseResult}:
+
+1. **C.6 — objective, exactly once.** `engine.getResources(state)` is read
+   **once** and the scene's `objective.check` is evaluated against that
+   post-resolution snapshot. `objectiveMet` records the verdict; the same
+   snapshot is the resource bag the outcome table's raw conditions read, so a
+   close observes one moment in time.
+2. **C.7 — outcome, first match wins.** The first `outcomeRules` entry in
+   **declaration order** whose `when` matches classifies the outcome. `when` is
+   one of the three `SceneCondition` forms — `{ objective }`, `{ budget }` or a
+   raw `{ field, op, value }` resource check — evaluated by the exported
+   `evaluateSceneCondition(condition, { objectiveMet, budgetExhausted, resources })`
+   helper (the same helper routing's `when` gates use). The last rule is
+   unconditional by validation (`non-total-outcome-rules`), so classification is
+   total; the classifier has **no defensive catch-all** and throws an actionable
+   error naming the scene if a table classifies nothing.
+   **`budgetExhausted` is an authored input, never a hard-coded `failure`.** A
+   refused beat entry sets it on the run, and a scene that can exhaust its budget
+   authors a `{ budget: "exhausted" }` rule *before* its catch-all — the
+   committed `s-iii-core` authors `watch-spent` (failure) ahead of
+   `crew-with-you`/`crew-gone`, so a refused close classifies `failure` through
+   the table, and a scene whose objective was already achieved may legitimately
+   classify `partial` instead.
+3. **C.8 — losses, declaration order.** Every `losses[]` rule whose `on` equals
+   the classified outcome is applied through `EpisodeRunner.applyLossRule`
+   (hence `engine.applyResourceDelta`) in **declaration order**. Each applied
+   rule appends one ledger `rule` line and one `engine.appendLog` line carrying
+   the authored `statement` plus the signed amount the seam actually applied and
+   the key it fell on, e.g.
+   `Breaking for the core on the last of the watch costs the hull. (−1 hull)`,
+   tagged `'loss'`. A rule the seam did not apply (no resource seam, or a clamped
+   non-negative change) records neither line.
+
+```ts
+const closed = runner.closeScene(gameState);
+// { sceneId, objectiveMet, outcome, ruleId, budgetExhausted, losses }
+closed.objectiveMet; // C.6 verdict
+closed.outcome;      // C.7 word
+closed.ruleId;       // the outcomeRules[] entry that classified it
+closed.losses;       // C.8 ledger lines this close appended, in order
+```
+
+The close consumes no RNG, performs no routing (C.9–C.12 owns the route
+selection, the scene-exit record and scene entry) and does not move the run's
+position or clock: it only classifies and applies the authored losses. The
+returned result is the single shape routing reads, so the objective and the
+outcome table are never re-evaluated.
+
+### Routing and scene entry
+
+GDD §2.3 steps C.9–C.12. `routeScene(close, state)` takes the
+`SceneCloseResult` the close returned and finishes the scene boundary in the
+contract's order. It returns one frozen `SceneRouteResult`, and the run state is
+the only mutation target.
+
+1. **C.9 — select, first match wins.** `selectRoute({ scene, outcome, context })`
+   iterates the closed scene's `routes` in **declaration order** and takes the
+   first entry where all three clauses hold:
+   - `on === "*"` or `on === outcome`;
+   - `when` is absent or matches the close context (the same
+     `{ objective }` / `{ budget }` / raw `{ field, op, value }` vocabulary the
+     outcome table uses);
+   - the route is not `{ kind: "chain" }` while `pendingChain` is `null` — a
+     chain door with no chain has nothing to open.
+
+   The gate reads the resources **after** the close applied its loss rules
+   (steps 6–8 ran first), while the objective and the outcome keep the pre-loss
+   snapshot the close took. A table whose remaining candidates are all chain
+   routes is a content defect the validator cannot see; the selector throws an
+   actionable error instead of silently defaulting.
+2. **C.10 — resolve the target.** `resolveRouteTarget(manifest, route.to,
+   pendingChain)` returns a `RouteTargetResolution`:
+
+| `kind` | `beatId` | Meaning |
+|---|---|---|
+| `chain` | the pending chain card (a beat of another scene, or an ending) | the door the resolved choice pushed |
+| `beat` with `beat` | `target.beat` | that beat of the target scene |
+| `beat` without `beat` | the target scene's `entryBeat` | the scene's authored opening beat |
+| `ending` | the ending card id | the ending card is presented and the run closes |
+
+   `RouteTargetResolution` also carries `actId` / `sceneId` (`null` for an
+   ending) and `endingCardId` (`null` for a beat), so nothing downstream
+   re-derives the target. An `ending` target returns its content card as
+   `SceneRouteResult.endingCard`, records `getEndingCardId()`, and closes the
+   run: no beat can be entered, no choice resolved and no scene closed until
+   `resetRun()` — the post-ending restart action (`le-end-reset`'s *Begin the
+   survey again*) — returns position and clock to `manifest.start` and clears
+   the histories, ledger and scene-exit list. The construction seed is kept.
+3. **C.11 — emit one record.** Exactly one frozen `SceneExitRecord` is appended
+   per close, in close order (see "Scene-exit record"). Two activity-log lines
+   are derived from it and the winning route: a `scene-exit` line
+   (`Scene exit — s-i-open: success (survey-held), 1 of 2 ticks spent, 1 left,
+   budget intact.`) and a `route` line (`Route — quiet-answer →
+   s-i-answer:le-i-silent.`, or `Route — quiet-core → ending le-end-quiet.`).
+   They join the existing activity-log vocabulary; the journal continues to read
+   the `Story update — ` lines, which are `@story-line`'s own.
+4. **C.12 — enter the scene.** A beat target sets `currentActId` /
+   `currentSceneId` / `currentBeatId`, resets `sceneClockRemaining` to the target
+   scene's `budget.clock`, pushes the scene id onto `sceneHistory` (and the route
+   id onto `routeHistory`), and clears `pendingChain` and `budgetExhausted`.
+   Irreversible keys are **never** restored: nothing here touches the game's
+   resources, so entering a scene cannot refund a loss.
+
+```ts
+const close = runner.closeScene(gameState);
+const routed = runner.routeScene(close, gameState);
+
+routed.exit;       // the nine-field SceneExitRecord, also on getSceneExits()
+routed.route.id;   // the routes[] entry that won
+routed.nextBeat;   // === routed.exit.nextBeat
+routed.runClosed;  // true when the route opened an ending
+routed.endingCard; // the presented ending card, or null
+```
+
+Routing validates the close's scene, the selected route, the resolved target
+and the ending card's presence **before** any mutation, so a route that cannot
+be taken leaves the run, the record list and the activity log untouched. Route
+selection, record emission and scene entry consume no RNG and apply no resource
+delta — the adapter's RNG call count is unchanged across them.
+
+### Run state
+
+`EpisodeRunState` is exactly the beat-sheet state of GDD §3.5.2 — resources
+and the journal stay in the game's own state, read through the storyline engine
+adapter:
+
+| Field | At run start |
+|---|---|
+| `seed` | the seed the runner was constructed with |
+| `currentActId` / `currentSceneId` / `currentBeatId` | `manifest.start.act` / `.scene` / `.beat` |
+| `sceneClockRemaining` | the entry scene's `budget.clock` |
+| `pendingChain` | `null` |
+| `sceneHistory` / `routeHistory` | empty (the start scene counts as entered once it closes); each entry is a scene id / route id, in close order |
+| `lossLedger` | empty |
+
+Every read returns a frozen defensively-copied snapshot, so mutating what
+`getState()` returns never changes the run, and two calls never share an
+array instance. The scene-exit records live on `getSceneExits()` and follow
+the same rule; they are append-only, in close order. These nine fields are
+what [Persistence](#persistence) checkpoints.
+
+### Scene-exit record
+
+One record per scene close, appended by `routeScene` in close order and never
+rewritten (`getSceneExits()` returns a frozen defensive copy). It carries
+exactly the nine fields of §2.3 step 11 and in
+that order (`SCENE_EXIT_FIELDS`):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sceneId` | `string` | the scene that closed |
+| `objectiveMet` | `boolean` | whether the scene objective was met at close |
+| `outcome` | `'success' \| 'partial' \| 'failure'` | the classified outcome |
+| `ruleId` | `string` | the `outcomeRules[].id` that classified it |
+| `routeId` | `string` | the `routes[].id` the close took |
+| `clockSpent` | `number` | ticks spent in the scene |
+| `clockRemaining` | `number` | ticks left when the scene closed |
+| `budgetExhausted` | `boolean` | whether a beat was refused for want of clock |
+| `nextBeat` | `string` | the beat (or ending card id) the route opens |
+
+A change to the record is a deliberate, compiler-checked change in both the
+interface and `SCENE_EXIT_FIELDS`; the surface test fails `npm run build` when
+the two disagree, and checks this section lists the same nine names.
+
+### Loss ledger entries
+
+GDD §2.2.8. The ledger is the beat sheet's permanent record of every
+irreversible loss; the resources themselves live in the game's state, and every
+change reaches them through `storyline.engine.applyResourceDelta` — the runner
+performs no resource arithmetic of its own. It has exactly two sources, and
+both record what the run **observed**, never a value re-derived from authored
+data:
+
+| `kind` | Fields | Recorded when |
+|---|---|---|
+| `chain` | `sceneId`, `beatId`, `field`, `delta` | an irreversible key fell across a beat resolution |
+| `rule` | `sceneId`, `ruleId`, `field`, `delta`, `statement` | a scene's `losses[]` rule fired at close, in declaration order |
+
+**Chain lines.** `resolveChoice()` snapshots the manifest's
+`resources.irreversible` keys from `engine.getResources` immediately before and
+after the one choice model resolves, and records one line per key whose **net**
+change is negative. Keys are visited in the manifest's declaration order, so a
+single resolution that spends two irreversible keys appends both lines in
+authored order. `delta` is the observed difference (e.g. `#cost=hull:1` records
+`-1`), and `beatId` is the beat being resolved — the player's choice spent the
+resource, and the ledger only noticed.
+
+**Rule lines.** `applyLossRule(rule, state)` is the ledger's **rule-loss seam**,
+called once per matching `losses[]` entry, in declaration order, by the scene
+close (step C.8). The manifest authors `amount` as a magnitude removed, so the
+seam passes `-amount` to `engine.applyResourceDelta`; the recorded `delta` is
+then read back from `engine.getResources`, so it is the change the seam actually
+applied rather than a repeat of the authored number. `sceneId` is the scene the
+rule fired in (`currentSceneId` at close), `ruleId` is the rule's `id`, and
+`statement` is the rule's player-facing line, copied verbatim for the ledger
+consumer and the journal.
+
+```ts
+// Scene close, GDD §2.3 step C.8 — matching rules in declaration order.
+for (const rule of scene.losses?.filter((loss) => loss.on === outcome) ?? []) {
+  runner.applyLossRule(rule, gameState);
+  appendLossLogLine(rule);           // statement + signed amount + key
+}
+```
+
+**Invariants.**
+
+- The ledger **never holds a positive line**: a refund (a net positive change on
+  an irreversible key) records nothing, and neither does a zero change.
+- A line **never exists without its apply**: a rule whose field the seam cannot
+  change — or an adapter that omits the optional `applyResourceDelta` seam —
+  applies nothing, so nothing is recorded. `applyLossRule` returns the appended
+  line, or `null` when nothing was observed to fall.
+- Lines are **ordered by observation**, across both sources: chain lines appear
+  where the resolution that spent them happened, rule lines where the close
+  applied them.
+- The ledger is **read-only to callers**: `getLossLedger()` (and
+  `getState().lossLedger`) return frozen snapshots with freshly-copied entries,
+  so mutating what a caller received cannot change the run.
+- Every line is **JSON-safe** and survives a `JSON.parse(JSON.stringify(...))`
+  round-trip unchanged, because the ephemeral score and epilogue read it from a
+  save or a transcript.
+
+Irreversible keys are never reset, topped up or compensated when a scene is
+entered or closed; the ledger and the journal are what survive the reset
+ending.
+
+The numbered §2.3 subsections (beat entry, choice resolution, scene close,
+routing, persistence) are documented here as they ship.
+
+### Determinism
+
+A run is a scripted pipeline, not an interactive one: the same seed and the
+same choice sequence must walk the same beats, take the same routes and close
+on the same ending. The rule that makes that true is **one RNG**:
+
+> The run consumes exactly one seeded RNG stream, and the only thing that may
+draw from it is the `@story-line` choice model resolving an option. Beat
+entry, scene close (including outcome classification and loss application),
+route selection, target resolution, serialisation and construction consume
+**no** draw.
+
+The choice model itself draws at most once per selection — a single
+`engine.rng()` call for the uniform candidate draw, and none for a callback
+resolver, a matching declarative `#when` rule or a terminal option. The runner
+does not draw independently; it delegates resolution and observes what
+happened.
+
+Two consequences the tests pin:
+
+- **Same seed, same choices ⇒ same run.** Two independently constructed
+  runners produce identical ordered `scene-exit` records, identical
+  `getLossLedger()` lines, an identical activity log and the same ending —
+  byte-identical after JSON serialisation.
+- **Route-table order is the only other lever.** Route selection is first
+  match wins in declaration order, so reordering two competing routes flips
+  the routed decision at a fixed seed without drawing any RNG. No wall clock
+  enters the run either: `Math.random` never appears in
+  [`src/story-line/episode-runner.ts`](../../src/story-line/episode-runner.ts),
+  no `Date.now()` / `new Date()` is read, and neither the scene-exit record
+  (exactly the nine §2.3 fields) nor a loss-ledger line carries a timestamp.
+
+The pinned tests are in
+[`tests/story-line/episode-runner-determinism.test.ts`](../../tests/story-line/episode-runner-determinism.test.ts),
+and they drive the committed acceptance fixture through the shared harness in
+[`tests/story-line/helpers/episode-fixture.ts`](../../tests/story-line/helpers/episode-fixture.ts).
+That harness tags every `engine.rng` draw with the pipeline stage that was
+running, so a draw outside option resolution is visible in the ledger rather
+than silently tolerated.
+
+### Persistence
+
+GDD §3.5.2. A run checkpoints through the core write/read pair —
+`serializeWithVersion` / `deserializeWithVersion` from
+[`src/core-engine/SaveLoad.ts`](../../src/core-engine/SaveLoad.ts) — with the
+runner's own `EpisodeRunStateSerializer` at `schemaVersion: 1`. Exactly **nine**
+fields are persisted:
+
+| Field | Meaning |
+|---|---|
+| `seed` | the run's single seed |
+| `currentActId` | the act the run was in |
+| `currentSceneId` | the scene the run was in |
+| `currentBeatId` | the beat the run was on |
+| `sceneClockRemaining` | clock ticks left in that scene |
+| `pendingChain` | a resolved choice's pushed card awaiting its close, or `null` |
+| `sceneHistory` | scene ids entered, in entry order |
+| `routeHistory` | route ids taken, in close order |
+| `lossLedger` | every `chain` / `rule` loss line, in observation order |
+
+Resources and the journal are **not** in a checkpoint: they are the game's own
+state, reached through the storyline engine adapter. Nor are the scene-exit
+records (transcript material), the close-path `budgetExhausted` flag or the
+terminal ending marker — a checkpoint is beat-sheet position, not a session
+recording.
+
+```ts
+import { serializeWithVersion, deserializeWithVersion } from '@core-engine';
+import { EpisodeRunStateSerializer } from '@story-line';
+
+const payload = runner.serialize(); // === serializeWithVersion(EpisodeRunStateSerializer, runner.getState())
+const restored = createEpisodeRunner({
+  manifest, storyline, content,
+  restored: payload,                // seed is adopted from the payload
+});
+
+payload.schemaVersion;              // 1
+EpisodeRunStateSerializer.migrate;  // undefined — v1 has no migration hook
+```
+
+**Round-trip.** `serializeRunState(state)` copies the nine fields into a
+JSON-safe payload, `deserializeRunState(payload)` validates each field's shape
+and freezes the result, and `hydrateRunState(payload, manifest)` additionally
+refuses a payload whose scene no act declares (or whose act and scene disagree).
+The payload survives `JSON.parse(JSON.stringify(…))` unchanged, so a save
+backend needs no special handling.
+
+**A version mismatch is a refusal.** `deserializeWithVersion` throws
+`Incompatible save version: expected 1, got N` whenever the payload's
+`schemaVersion` is not `1` — older and newer alike, because v1 ships no
+`migrate` hook. `runner.restore(payload)` hydrates the whole payload *before*
+its first mutation, so a refused restore (version mismatch, malformed field or
+undeclared scene) leaves the run exactly as it was: no partial state, no
+partial ledger, no moved clock. `createEpisodeRunner({ …, restored })` hydrates
+before it constructs any state, so a refused payload cannot construct a
+half-restored run either.
+
+**A restore resumes mid-scene.** The saved `sceneClockRemaining` is adopted as
+is — the entry scene's `budget.clock` is never reloaded — so the next
+`enterBeat` charges from the saved value. `pendingChain` is restored too, so a
+run saved between a choice and its close takes the same route the live run
+would. The scene-exit list is cleared (it is not persisted) and the run becomes
+active again even if it had reached an ending: loading a checkpoint is not the
+reset action.
+
+**A reload is not a refund.** Serialising and restoring consume no RNG and
+apply no resource delta, and a restored ledger deep-equals the saved one
+(`getLossLedger()` and `getState().lossLedger`), so restoring a checkpoint can
+never top a resource up or lose a recorded loss.
+
+### Acceptance fixture
+
+The epic's end-to-end proof is
+[`tests/story-line/episode-runner-fixture.test.ts`](../../tests/story-line/episode-runner-fixture.test.ts):
+a scripted-choice driver plays the committed
+[`long-erasure-episode.json`](../../example-games/gym/content/long-erasure-episode.json)
+manifest and its [CSV](../../example-games/gym/content/long-erasure.csv) through
+the public runner surface. No game module and no rendering are involved, and
+the suite's import graph never enters `example-games/`. The manifest validates
+clean through `validateEpisodeManifest` with the fixture's bound content cards,
+declared key set and content adapter.
+
+**Four-ending walkthrough.** Each route starts at `s-i-open:le-i-open` and is
+asserted by the ending card id the run closes on:
+
+| Ending | Scripted route (beat → option) | Final close |
+|---|---|---|
+| `le-end-abandon` | `le-i-open` Log the erasure → `le-i-log` Transmit the warning → `le-i-transmit` Shelter in the dead zone → `le-ii-shelter` Ration the stores → `le-ii-offer` Abandon the voyage | `s-ii-offer` success (`stores-kept`) → chain ending |
+| `le-end-quiet` | Rally the survey crew → Hold the survey line → Shelter in the dead zone → Ration the stores → Refuse him → Side with the captain → `le-iii-approach` Unwrite the Loom (charge 2) | `s-iii-core` success (`crew-with-you`) → chain ending |
+| `le-end-ram` | The same core prefix → `le-iii-approach` Ram the core (hull 3) | `s-iii-core` success (`crew-with-you`) → chain ending |
+| `le-end-reset` | Rally the survey crew → Hold the survey line → Shelter in the dead zone → Strip the derelict (hull 1) → Share the berth → Refuse him → Side with the captain → `le-iii-approach` Finish the weave | `s-iii-core` success (`crew-with-you`) → chain ending |
+
+The reset ending's restart action (`resetRun`) returns act, scene and beat to
+`manifest.start`, reloads the entry scene's clock and clears the pending chain,
+histories, loss ledger and scene-exit list. Resources are the game's state and
+are never touched: the hull lost to the derelict stays lost (4 of the starting
+5), which is the proof that a restart is not a refund.
+
+**Refused-close arithmetic.** `s-iii-core`'s budget is 5 ticks.
+`le-iii-approach` costs 3, leaving 2; `le-iii-ahead` costs 3, so the entry is
+refused (`budget-exhausted`, no charge, no options, run position unchanged).
+The close then classifies `failure` through `watch-spent` — the failure rule
+precedes the objective rule in declaration order — and its `losses` entry
+`hull-sacrificed` applies `hull: -1` through `engine.applyResourceDelta`,
+recording exactly one `rule` ledger line. Routing takes `quiet-core` (the
+`choose-the-ending` success chain is not eligible) and closes the run on
+`le-end-quiet`.
+
+Every scene exit the suite produces is checked against the manifest: its
+`routeId` and `ruleId` must name a declared route and outcome rule of its
+scene, and exactly one exit is appended per close, in close order.
 
 ## Gym demo
 
 [`GymStorylineScene`](../../example-games/gym/scenes/GymStorylineScene.ts)
-(`GymStorylineScene` in the Gym catalogue) deals a small branching fixture
-(3–4 cards) with two-way and terminal options. It draws a card, renders the
-compiled options with the default UI adapter, resolves the choice, and deals
-the successor until the chain ends. It is covered by the Gym individual-scene
+(`GymStorylineScene` in the Gym catalogue) deals a small branching story-line
+(3–4 cards) with two-way and terminal options, read from the shipped content
+CSV at build time. It draws a card, renders the compiled options with the
+default UI adapter, resolves the choice, and deals the successor until the
+chain ends. It is covered by the Gym individual-scene
 smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 [Gym index](../gym/GYM_INDEX.md).
+
+### Long Erasure (the authored-narrative spike)
+
+[`GymLongErasureScene`](../../example-games/gym/scenes/GymLongErasureScene.ts)
+plays *The Long Erasure*: an original-setting, IP-safe three-act story-line
+built entirely from the content path above. Its rules — act gating, the
+pressure clock, availability filtering, branch resolution and the
+journal-derived epilogue score — live in the Phaser-free
+[`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)
+(unit-tested by `tests/gym/GymLongErasureGame.test.ts`), so the narrative is
+verified headlessly and the scene only renders state and forwards the choice.
+
+The full game design built on this content path — the three-act scene beat
+sheet, the economy, the presentation contract, the engine-gap backlog and the
+v1 scope — is the [*Long Erasure* GDD](../design/storyline-game-gdd.md); the
+spike's evidence is the
+[observation log](../gym/long-erasure-observation-log.md) and the
+[playtest evaluation](../design/storyline-playtest-evaluation.md).
+
+Its content is
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
+with the `long-erasure` adapter: a five-key declared set
+(`hull,morale,stores,goodwill,charge`) plus `act` / `clockCost` game columns.
+Every cost, extra effect and conditional successor in that file is authored in
+CSV with no TypeScript registration — the worked example above is a row from
+it. The run ends with a timeline reset and a scored epilogue, which is the
+manifest `cycles` shape used as designed rather than a loop the runtime
+follows.
 
 ## Testing
 
 - `tests/story-line/compile.test.ts` — options-only and CSV compilation,
   registry precedence, draw-time condition **and cost** filtering, snapshot
   stability.
+- `tests/story-line/episode-runner-surface.test.ts` / `episode-runner-beat-entry.test.ts`
+  — the runner's shipped surface (run state, frozen snapshots, no Phaser import,
+  the nine `scene-exit` fields) and beat entry (A.1–A.3: manifest cost, exact-cost
+  affordability, refusal with `budget-exhausted`, gated options, no RNG).
+- `tests/story-line/episode-runner-choice.test.ts` — choice resolution (B.4–B.5):
+  delegation to `resolveStorylineOption` proved with a spy, and one test per
+  `pushedCard` case (in-scene beat continues, out-of-scene beat and ending close
+  with `pendingChain`, no push closes with `null`).
+- `tests/story-line/episode-runner-persistence.test.ts` — the nine persisted
+  fields, a JSON round-trip of a routed mid-scene run, a pending chain restored
+  and routed like the live run, a mid-scene clock that is not reloaded, ledger
+  fidelity for both line kinds, version-mismatch and undeclared-scene refusals
+  with no partial state, and the no-RNG / no-delta guarantees.
+- `tests/story-line/episode-runner-fixture.test.ts` — the acceptance fixture:
+  the committed `long-erasure` manifest validates clean, four scripted routes
+  reach the four endings by ending card id, the refused `s-iii-core` close
+  classifies `failure` and applies `hull-sacrificed`, the reset restart returns
+  to `manifest.start` without refunding hull, every exit names a declared route
+  and outcome rule, and the suite imports no game module.
+- `tests/story-line/episode-runner-determinism.test.ts` — the one-RNG rule
+  and its proof: two independently constructed runs at the same seed and
+  choices are byte-identical (exits, loss ledger, activity log, ending), an
+  RNG-call ledger attributes every draw to option resolution and every other
+  pipeline step draws nothing, `Math.random` / wall-clock reads are absent and
+  no timestamp reaches a record, and reordering two competing routes flips the
+  decision at a fixed seed while an unmodified copy stays byte-identical.
 - `tests/story-line/resolve.test.ts` — apply/skip, cost payment, extra
   effects, conditional successors, successor precedence, the one-draw rule,
-  deterministic serial naming, pending-choice lifecycle.
+  deterministic serial naming, pending-choice lifecycle, and carrying the
+  chosen option's authored outcome prose (`outcomeProse`).
 - `tests/story-line/validate.test.ts` — declarative metadata validation
-  (costs, extra effects, conditions, dangling successors).
-- `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state.
+  (costs, extra effects, conditions, dangling successors, declared-resource
+  vocabulary and the `cardId` / `resource` issue fields).
+- `tests/story-line/content/extended-options.test.ts` — the CSV attribute
+  grammar (`#cost` / `#extra` / `#when`), shorthand compatibility, the
+  malformed-cell fixtures (row/column/reason diagnostics) and conditional
+  successor resolution.
+- `tests/story-line/resource-declaration.test.ts` — the declared-resource
+  contract: a five-resource fixture game authoring conditions, costs and extra
+  effects on any key, draw-time affordability over declared keys, the
+  absent-key/unspecified-key/no-invention rules, the `coins` / `reputation`
+  default projection and `createResourceProjection` itself.
+- `tests/story-line/resource-bounds.test.ts` — the bounded projection: a gain
+  past `max` applies only up to the cap and reports the excess as `spilled`, a
+  loss past `min` applies only down to the floor and reports the magnitude as
+  `clamped`, multi-key deltas are independent and keep declaration order, the
+  remainder report covers every declared key, the hook fires once per call (only
+  when something was wasted), and a projection built without `bounds` keeps
+  `applied === delta`.
+- `tests/story-line/journal.test.ts` — journal parsing, ordering, empty state,
+  and the display-safe `truncateOutcome()` boundaries (word boundary,
+  space-less hard cut, default 80-character budget) that keep the full prose
+  on `outcomeFull`.
 - `tests/story-line/ui-adapter.test.ts` — default adapter wording, the
   pluggable override seam, and the absence of a clarity-label method.
 - `tests/story-line/content/csv.test.ts` — byte-identical round-trip (two
@@ -627,6 +2191,10 @@ smoke test (`tests/gym/GymSceneSmoke.browser.test.ts`) and listed in the
 - `tests/story-line/editor/build-exclusion.test.ts` / `vite-editor-config.test.ts`
   — the editor entry is not referenced from the game/Electron build, and its
   config is distinct from the game config.
+- `tests/gym/LongErasureContent.test.ts` / `LongErasureEpilogue.test.ts` — the
+  authored content's structure (acts, branch points, the state gate, the
+  terminal option), the prohibited-IP-term scan over content and artefacts,
+  and the epilogue scoring.
 
 Run the unit project with `npx vitest run --project unit` (or
 `/skill:test --type unit`). The Gym scene runs in the `smoke` project.

@@ -48,9 +48,10 @@ import {
   runVitestSync,
   parseTimeoutArgs,
   parseRunnerArgs,
-  hangTimeoutMessage,
-  listHangMessage,
+  hangDiagnostic,
+  deriveStage,
   HANG_TIMEOUT_EXIT_CODE,
+  KILL_GRACE_MS,
   DEFAULT_RUN_TIMEOUT_MS,
   LIST_TIMEOUT_MS,
   resolveVitestBin,
@@ -68,7 +69,32 @@ import {
   PreflightError,
   type VitestRunner,
   type VitestListRunner,
+  type HostContention,
+  type HangDiagnosticContext,
+  sampleHostContention,
+  deriveUnitBound,
+  UNIT_FLOOR_MS,
+  UNIT_CEILING_MS,
+  MEASURED_UNIT_STAGE_SECS,
 } from '../../scripts/vitest-run-with-retry';
+
+/**
+ * Synthesise the runner's real hang output for a fixture run. Production paths
+ * emit `hangDiagnostic(...)`; fixtures reuse it rather than a hand-written
+ * literal, so no test can reintroduce the retired elapsed-as-bound wording
+ * (SA-0MWEURUYL004I470).
+ */
+const hangOutput = (
+  elapsedSecs: number,
+  stage = 'unit',
+  boundMs = 300_000,
+): string =>
+  hangDiagnostic({
+    stage,
+    boundMs,
+    elapsedSecs,
+    contention: { load1m: 38.4, cpuCount: 16 },
+  } as HangDiagnosticContext);
 
 // ── Output fixtures (match real vitest reporter output) ─────
 
@@ -438,7 +464,7 @@ describe('runWithRetry (retry-once orchestration)', () => {
       calls += 1;
       return calls === 1
         ? { status: 1, output: TRANSIENT_OUTPUT }
-        : { status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) };
+        : { status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(60) };
     };
     expect(await runWithRetry([], runner, warnSpy, 60_000)).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(calls).toBe(2);
@@ -569,7 +595,7 @@ describe('hang timeout (bounded wall-clock abort)', () => {
     let calls = 0;
     const runner: VitestRunner = () => {
       calls += 1;
-      return { status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(600) };
+      return { status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(600) };
     };
     expect(await runWithRetry([], runner, warnSpy, 60_000)).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(calls).toBe(1);
@@ -587,15 +613,17 @@ describe('hang timeout (bounded wall-clock abort)', () => {
   });
 
   it('hang output does not satisfy the retry masking guard', () => {
-    expect(shouldRetryOnce(hangTimeoutMessage(600))).toBe(false);
+    expect(shouldRetryOnce(hangOutput(600))).toBe(false);
   });
 
-  it('hangTimeoutMessage documents the elapsed bound, the exit code, and no-retry guidance', () => {
-    const msg = hangTimeoutMessage(600);
-    expect(msg).toContain('600s');
-    expect(msg).toContain(String(HANG_TIMEOUT_EXIT_CODE));
-    expect(msg).toContain('no retry');
-    expect(msg).toContain('npx vitest run --project browser tests/<file>');
+  it('renders the bound and the elapsed time as distinct numbers, exit 124 and no-retry guidance', () => {
+    const msg = hangOutput(600);
+    expect(msg).toContain('did not complete within 300s');
+    expect(msg).toContain('aborting (exit 124)');
+    expect(msg).toContain('elapsed 600s (+300s over bound)');
+    expect(msg).toContain('no retry is performed');
+    // The elapsed time is never labelled as the bound (the retired shape).
+    expect(msg).not.toContain('within 600s');
   });
 });
 
@@ -636,6 +664,54 @@ describe('parseTimeoutArgs (--timeout-ms flag)', () => {
   });
 });
 
+describe('parseRunnerArgs hybrid unit bound', () => {
+  const idle = { load1m: 2, cpuCount: 8 } as HostContention;
+  const loaded = { load1m: 12, cpuCount: 8 } as HostContention;
+  const extreme = { load1m: 40, cpuCount: 8 } as HostContention;
+  const noLoad = { load1m: null, cpuCount: 8 } as HostContention;
+
+  it('applies the floor on an idle host with --project unit and no --timeout-ms', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], idle).timeoutMs).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('applies scaling on a loaded host with --project unit', () => {
+    // load=12, cores=8 → 1.5/core → ceiling
+    expect(parseRunnerArgs(['--project', 'unit'], loaded).timeoutMs).toBe(UNIT_CEILING_MS);
+  });
+
+  it('clamps to the ceiling on an extreme host', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], extreme).timeoutMs).toBe(UNIT_CEILING_MS);
+  });
+
+  it('applies the floor when load is unavailable (Windows)', () => {
+    expect(parseRunnerArgs(['--project', 'unit'], noLoad).timeoutMs).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('an explicit --timeout-ms wins verbatim over the hybrid bound (unit)', () => {
+    expect(parseRunnerArgs(['--project', 'unit', '--timeout-ms', '450000'], extreme).timeoutMs).toBe(
+      450_000,
+    );
+  });
+
+  it('keeps DEFAULT_RUN_TIMEOUT_MS for the browser stage (no hybrid)', () => {
+    expect(parseRunnerArgs(['--project', 'browser'], extreme).timeoutMs).toBe(
+      DEFAULT_RUN_TIMEOUT_MS,
+    );
+  });
+
+  it('keeps DEFAULT_RUN_TIMEOUT_MS when no --project is given', () => {
+    expect(parseRunnerArgs([], extreme).timeoutMs).toBe(DEFAULT_RUN_TIMEOUT_MS);
+  });
+
+  it('the computed bound never exceeds the ceiling nor falls below the floor', () => {
+    for (const load1m of [0, 0.5, 3, 8, 12, 100]) {
+      const bound = parseRunnerArgs(['--project', 'unit'], { load1m, cpuCount: 8 }).timeoutMs;
+      expect(bound).toBeGreaterThanOrEqual(UNIT_FLOOR_MS);
+      expect(bound).toBeLessThanOrEqual(UNIT_CEILING_MS);
+    }
+  });
+});
+
 // ── runVitestSync (real subprocess timeout wiring) ───────────
 
 describe('runVitestSync (production runner)', () => {
@@ -654,12 +730,18 @@ describe('runVitestSync (production runner)', () => {
     // into exit 124.
     const { dir, bin } = writeFakeBin('setInterval(() => {}, 1000);\n');
 
-    const result = await runVitestSync([], 300, bin);
+    const result = await runVitestSync(['--project', 'unit'], 300, bin, KILL_GRACE_MS, {
+      load1m: 38.4,
+      cpuCount: 16,
+    });
 
     expect(result.status).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(result.output).toContain('[hang-timeout]');
-    // Elapsed rounds up to a positive number of seconds (>=1 under load).
-    expect(result.output).toMatch(/\d+s/);
+    // New diagnostic content: stage, bound, elapsed, delta, load, cores.
+    expect(result.output).toContain('[hang-timeout] unit did not complete within 0s');
+    expect(result.output).toContain('elapsed ');
+    expect(result.output).toContain('over bound)');
+    expect(result.output).toContain('host load 38.4 over 16 cores');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -670,10 +752,11 @@ describe('runVitestSync (production runner)', () => {
       "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000);\n",
     );
 
-    const result = await runVitestSync([], 300, bin, 200); // 200ms SIGTERM→SIGKILL grace
+    const result = await runVitestSync([], 300, bin, 200, { load1m: null, cpuCount: 4 }); // 200ms grace
 
     expect(result.status).toBe(HANG_TIMEOUT_EXIT_CODE);
     expect(result.output).toContain('[hang-timeout]');
+    expect(result.output).toContain('host load unavailable (4 cores)');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
@@ -711,8 +794,10 @@ const INCIDENT_DROPPED_GROUP_OUTPUT = [
 
 describe('parseRunnerArgs (opt-in expectation flags)', () => {
   it('defaults to no expectation when the flags are absent', () => {
-    expect(parseRunnerArgs(['--project', 'unit'])).toEqual({
-      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+    // Inject an idle host so the unit-stage hybrid bound is deterministic and
+    // never reads the real load average/core count.
+    expect(parseRunnerArgs(['--project', 'unit'], { load1m: 2, cpuCount: 8 })).toEqual({
+      timeoutMs: UNIT_FLOOR_MS,
       forwarded: ['--project', 'unit'],
       expectedFiles: [],
       expectProjectCoverage: false,
@@ -762,8 +847,15 @@ describe('parseRunnerArgs (opt-in expectation flags)', () => {
   });
 
   it('parseTimeoutArgs remains a forwarding subset parser', () => {
-    expect(parseTimeoutArgs(['--expected-file', 'tests/a.test.ts', '--project', 'unit'])).toEqual({
-      timeoutMs: DEFAULT_RUN_TIMEOUT_MS,
+    // Inject an idle host so the unit-stage hybrid bound is deterministic
+    // (real host load is never read in a test).
+    expect(
+      parseTimeoutArgs(['--expected-file', 'tests/a.test.ts', '--project', 'unit'], {
+        load1m: 2,
+        cpuCount: 8,
+      }),
+    ).toEqual({
+      timeoutMs: UNIT_FLOOR_MS,
       forwarded: ['--project', 'unit'],
     });
   });
@@ -877,9 +969,50 @@ describe('deriveExpectedFiles (pre-flight vitest list)', () => {
   it('fails closed on a collection hang (exit 124)', async () => {
     const runList: VitestListRunner = () => ({
       status: HANG_TIMEOUT_EXIT_CODE,
-      output: listHangMessage(120),
+      output: hangOutput(131, 'vitest list', 120_000),
     });
     await expect(deriveExpectedFiles([], runList, CWD)).rejects.toThrow(/exit 124/);
+  });
+
+  it('reports the measured elapsed time, the bound and the host load on a collection hang', async () => {
+    // Injected clock + contention sample: neither the real clock nor the real
+    // host is read (SA-0MWEURUYL004I470 AC1).
+    const clock = [0, 412_000];
+    let tick = 0;
+    const runList: VitestListRunner = () => ({
+      status: HANG_TIMEOUT_EXIT_CODE,
+      output: 'vitest list timed out',
+    });
+    const err = await deriveExpectedFiles([], runList, CWD, 120_000, {
+      now: () => clock[Math.min(tick++, clock.length - 1)],
+      contention: { load1m: 21.5, cpuCount: 8 },
+    }).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(PreflightError);
+    const msg = (err as Error).message;
+    expect(msg).toContain('[hang-timeout] vitest list did not complete within 120s');
+    expect(msg).toContain('elapsed 412s (+292s over bound)');
+    expect(msg).toContain('host load 21.5 over 8 cores');
+    expect(msg).toContain('aborting (exit 124)');
+    // The bound is never rendered from the elapsed time.
+    expect(msg).not.toContain('within 412s');
+    // The pre-flight gets the abbreviated guidance, never browser advice.
+    expect(msg).not.toContain('requestAnimationFrame');
+  });
+
+  it('falls back to an unavailable-load line when the host sample is null', async () => {
+    const clock = [0, 130_000];
+    let tick = 0;
+    const runList: VitestListRunner = () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: '' });
+    const err = await deriveExpectedFiles([], runList, CWD, 120_000, {
+      now: () => clock[Math.min(tick++, clock.length - 1)],
+      contention: null,
+    }).catch((e: unknown) => e);
+
+    const msg = (err as Error).message;
+    expect(msg).toContain('within 120s');
+    expect(msg).toContain('elapsed 130s (+10s over bound)');
+    expect(msg).toContain('host load unavailable (unknown cores)');
   });
 
   it('fails closed on an empty file set', async () => {
@@ -1274,7 +1407,7 @@ describe('runWithRetry (opt-in coverage gate)', () => {
     const warnings: string[] = [];
     const status = await runWithRetry(
       [],
-      () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: hangTimeoutMessage(60) }),
+      () => ({ status: HANG_TIMEOUT_EXIT_CODE, output: hangOutput(60) }),
       (m) => warnings.push(m),
       DEFAULT_RUN_TIMEOUT_MS,
       { expectedFiles: expected, readExecutedFiles: readerFor(['tests/a.test.ts']) },
@@ -1349,5 +1482,193 @@ describe('runWithRetry (coverage gate × module-fetch)', () => {
     const joined = warnings.join('\n');
     expect(joined).toContain('outcome=retry-clean');
     expect(joined).not.toContain('outcome=coverage-failed');
+  });
+});
+
+// ── Host contention sampler seam ──────────────────────────────────────────────
+
+describe('sampleHostContention', () => {
+  it('returns injected load and core count when readers are supplied', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 4.2,
+      readCpuCount: () => 8,
+    });
+    expect(result).toEqual({ load1m: 4.2, cpuCount: 8 });
+  });
+
+  it('defaults to os.loadavg()[0] and os.cpus().length when no readers provided', () => {
+    const result = sampleHostContention();
+    expect(typeof result.load1m).toBe('number');
+    expect(typeof result.cpuCount).toBe('number');
+  });
+
+  it('returns load1m: null when the load reader throws (sampling failure does not abort)', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => {
+        throw new Error('disk full');
+      },
+      readCpuCount: () => 4,
+    });
+    expect(result.load1m).toBeNull();
+    expect(result.cpuCount).toBe(4);
+  });
+
+  it('returns load1m: null when the load reader returns null/undefined', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => null,
+      readCpuCount: () => 4,
+    });
+    expect(result.load1m).toBeNull();
+  });
+
+  it('degrades cpuCount to 1 when the reader returns zero', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => 0,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+
+  it('degrades cpuCount to 1 when the reader returns undefined', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => undefined as unknown as number,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+
+  it('degrades cpuCount to 1 when the reader returns NaN', () => {
+    const result = sampleHostContention({
+      readLoadAvg: () => 2.0,
+      readCpuCount: () => NaN,
+    });
+    expect(result.cpuCount).toBe(1);
+  });
+});
+
+describe('deriveUnitBound', () => {
+  it('returns the floor when load per core is ≤ 0.75 (idle host)', () => {
+    // load=3, cores=8 → 0.375/core → floor
+    expect(deriveUnitBound({ load1m: 3, cpuCount: 8 })).toBe(UNIT_FLOOR_MS);
+    // load=6, cores=8 → 0.75/core → floor (boundary)
+    expect(deriveUnitBound({ load1m: 6, cpuCount: 8 })).toBe(UNIT_FLOOR_MS);
+  });
+
+  it('applies linear scaling between floor and ceiling at moderate load', () => {
+    // load=8, cores=8 → 1.0/core → factor = 1/0.75 = 1.333 → 800,000ms
+    expect(deriveUnitBound({ load1m: 8, cpuCount: 8 })).toBe(800_000);
+    // load=9, cores=6 → 1.5/core → factor = 2.0 → ceiling
+    expect(deriveUnitBound({ load1m: 9, cpuCount: 6 })).toBe(UNIT_CEILING_MS);
+  });
+
+  it('returns the ceiling when load per core is ≥ 1.5 (extreme load)', () => {
+    // load=24, cores=16 → 1.5/core → ceiling
+    expect(deriveUnitBound({ load1m: 24, cpuCount: 16 })).toBe(UNIT_CEILING_MS);
+    // load=40, cores=16 → 2.5/core → still ceiling
+    expect(deriveUnitBound({ load1m: 40, cpuCount: 16 })).toBe(UNIT_CEILING_MS);
+  });
+
+  it('returns the floor when load1m is null (Windows / unavailable)', () => {
+    expect(deriveUnitBound({ load1m: null, cpuCount: 4 })).toBe(UNIT_FLOOR_MS);
+  });
+});
+
+describe('deriveStage', () => {
+  it('extracts --project value when spaced', () => {
+    expect(deriveStage(['--project', 'unit'])).toBe('unit');
+  });
+
+  it('extracts --project value when equals', () => {
+    expect(deriveStage(['--project=browser'])).toBe('browser');
+  });
+
+  it('returns "unknown project" when no --project flag', () => {
+    expect(deriveStage(['--filesOnly', '--json'])).toBe('unknown project');
+  });
+
+  it('picks the first --project when duplicated', () => {
+    expect(deriveStage(['--project', 'unit', '--project', 'browser'])).toBe('unit');
+  });
+});
+
+describe('hangDiagnostic', () => {
+  const baseCtx = {
+    stage: 'unit',
+    boundMs: 300_000,
+    elapsedSecs: 312,
+    contention: { load1m: 38.4, cpuCount: 16 },
+  } as HangDiagnosticContext;
+
+  it('renders stage, bound, elapsed, delta, and load', () => {
+    const msg = hangDiagnostic(baseCtx);
+    expect(msg).toContain('[hang-timeout] unit did not complete within 300s');
+    expect(msg).toContain('aborting (exit 124)');
+    expect(msg).toContain('elapsed 312s (+12s over bound)');
+    expect(msg).toContain('host load 38.4 over 16 cores');
+  });
+
+  it('does not include browser-stage guidance for unit stage', () => {
+    const msg = hangDiagnostic(baseCtx);
+    expect(msg).not.toContain('requestAnimationFrame');
+    expect(msg).not.toContain('Phaser');
+  });
+
+  it('does not include unit-stage guidance for browser stage', () => {
+    const browserCtx = { ...baseCtx, stage: 'browser' } as HangDiagnosticContext;
+    const msg = hangDiagnostic(browserCtx);
+    expect(msg).toContain('requestAnimationFrame');
+    expect(msg).toContain('Phaser');
+    expect(msg).not.toContain('synchronous loop');
+  });
+
+  it('handles null load (Windows) with core count', () => {
+    const nullLoadCtx = { ...baseCtx, contention: { load1m: null, cpuCount: 4 } } as HangDiagnosticContext;
+    const msg = hangDiagnostic(nullLoadCtx);
+    expect(msg).toContain('host load unavailable (4 cores)');
+  });
+
+  it('handles null contention (no data)', () => {
+    const noDataCtx = { ...baseCtx, contention: null };
+    const msg = hangDiagnostic(noDataCtx);
+    expect(msg).toContain('host load unavailable (unknown cores)');
+  });
+
+  it('shows zero delta when elapsed equals bound', () => {
+    const ctx = { ...baseCtx, elapsedSecs: 300 };
+    const msg = hangDiagnostic(ctx as HangDiagnosticContext);
+    expect(msg).toContain('elapsed 300s (+0s over bound)');
+  });
+
+  it('renders the pre-flight vitest list stage with unit-style guidance', () => {
+    const ctx = {
+      ...baseCtx,
+      stage: 'vitest list',
+      boundMs: 120_000,
+      elapsedSecs: 131,
+    } as HangDiagnosticContext;
+    const msg = hangDiagnostic(ctx);
+    expect(msg).toContain('[hang-timeout] vitest list did not complete within 120s');
+    expect(msg).toContain('elapsed 131s (+11s over bound)');
+    expect(msg).not.toContain('requestAnimationFrame');
+  });
+});
+
+describe('retired elapsed-as-bound hang messages (SA-0MWEURUYL004I470)', () => {
+  it('no longer exports hangTimeoutMessage / listHangMessage', async () => {
+    const runnerModule = await import('../../scripts/vitest-run-with-retry');
+    expect(runnerModule).not.toHaveProperty('hangTimeoutMessage');
+    expect(runnerModule).not.toHaveProperty('listHangMessage');
+  });
+
+  it('keeps the documented measured baseline consistent with the unit floor', () => {
+    // The numbers in the file header justify UNIT_FLOOR_MS; if either moves
+    // without the other the rationale is falsified.
+    expect(MEASURED_UNIT_STAGE_SECS.slice()).toEqual([
+      88, 96, 106, 111, 128, 141, 147, 149, 206, 217,
+    ]);
+    const worstMeasuredMs = Math.max(...MEASURED_UNIT_STAGE_SECS) * 1000;
+    expect(UNIT_FLOOR_MS).toBeGreaterThan(2.5 * worstMeasuredMs - 1);
+    expect(UNIT_CEILING_MS).toBeGreaterThan(UNIT_FLOOR_MS);
+    expect(Number.isFinite(UNIT_CEILING_MS)).toBe(true);
   });
 });

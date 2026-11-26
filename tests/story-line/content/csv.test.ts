@@ -6,8 +6,18 @@
  * checksum — plus projection of rows onto the generic content model through
  * two differently shaped adapters.
  *
+ * The round-trip half is the CSV baseline for the story-line spike
+ * (`CG-0MWNHZ51N007STI3`): identity is asserted for the shipped Gym CSV, the
+ * Main Street reference card pack and **every** committed story-line fixture
+ * (quoted cells, empty cells, embedded commas and embedded newlines), and the
+ * accepted-but-normalised inputs are pinned explicitly so the CSV-extension
+ * child cannot change them unnoticed.
+ *
  * @module
  */
+import { readdirSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
@@ -23,8 +33,23 @@ import {
   parseCsv,
   serialiseCsv,
 } from '../../../src/story-line/content/csv';
-import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
-import { GYM_CONTENT_PATH, readFixture, readText } from './test-support';
+import { TAVERN_CONTENT_ADAPTER, PROSE_CONTENT_ADAPTER } from './fixture-adapter';
+import {
+  FIXTURES_DIR,
+  GYM_CONTENT_PATH,
+  readFixture,
+  readProseFixture,
+  readText,
+} from './test-support';
+
+/**
+ * The Main Street reference card pack, used as a real-world CSV source with
+ * quoted cells containing commas and `""` escapes.
+ */
+const MAIN_STREET_REFERENCE_CSV = join(
+  FIXTURES_DIR,
+  '../reference-packs/main-street/main-street/main-street-foundations/cards.csv',
+);
 
 /** A content card with only the fields a test needs. */
 function card(overrides: Partial<ContentCard> = {}): ContentCard {
@@ -36,6 +61,7 @@ function card(overrides: Partial<ContentCard> = {}): ContentCard {
     storylineId: null,
     storylineTitle: null,
     fields: {},
+    resourceKeys: [],
     ...overrides,
   };
 }
@@ -44,6 +70,63 @@ describe('parseCsv / serialiseCsv', () => {
   it('round-trips the shipped Gym content byte-identically', () => {
     const text = readText(GYM_CONTENT_PATH);
     expect(serialiseCsv(parseCsv(text))).toBe(text);
+  });
+
+  it('round-trips the Main Street reference card pack byte-identically', () => {
+    const text = readText(MAIN_STREET_REFERENCE_CSV);
+    expect(serialiseCsv(parseCsv(text))).toBe(text);
+  });
+
+  it('round-trips every story-line fixture byte-identically', () => {
+    const fixtures = readdirSync(FIXTURES_DIR)
+      .filter((name) => name.endsWith('.csv'))
+      .sort();
+    // Guards the assertion below from silently covering nothing.
+    expect(fixtures.length).toBeGreaterThan(0);
+    for (const name of fixtures) {
+      const text = readFixture(name);
+      expect(serialiseCsv(parseCsv(text)), name).toBe(text);
+    }
+  });
+
+  it('preserves quoted cells, empty cells, embedded commas and newlines cell-for-cell', () => {
+    const text = readFixture('round-trip-quoting.csv');
+    const parsed = parseCsv(text);
+    expect(parsed.rows).toEqual([
+      [
+        'tav-quote',
+        'A name, with a comma',
+        'He said "the road is long", then left.',
+        'tav',
+        'Tavern Nights',
+        'Go|tav-quote-end',
+        '2',
+      ],
+      [
+        'tav-quote-end',
+        'Two\nlines',
+        'Empty choice cell and an empty payoff below',
+        'tav',
+        'Tavern Nights',
+        '',
+        '',
+      ],
+    ]);
+    expect(serialiseCsv(parsed)).toBe(text);
+  });
+
+  it('normalises non-canonical quoting to the minimal quoting the serialiser emits', () => {
+    // Characterisation: byte identity requires a *canonically* quoted file. An
+    // explicitly quoted empty cell and an unnecessary pair of quotes are both
+    // accepted on input but normalised on output.
+    expect(serialiseCsv(parseCsv('a,b\n"",x\n'))).toBe('a,b\n,x\n');
+    expect(serialiseCsv(parseCsv('a,b\n"plain",x\n'))).toBe('a,b\nplain,x\n');
+  });
+
+  it('drops a trailing all-empty record (terminal blank line)', () => {
+    // Characterisation: the parser never emits an all-empty final record, so a
+    // file ending in a blank data line loses it on round-trip.
+    expect(serialiseCsv(parseCsv('a,b\n1,2\n,\n'))).toBe('a,b\n1,2\n');
   });
 
   it('round-trips a differently shaped fixture byte-identically', () => {
@@ -87,7 +170,10 @@ describe('computeContentChecksum', () => {
     expect(checksum).toMatch(/^[0-9a-f]{8}$/);
     expect(computeContentChecksum(text)).toBe(checksum);
     expect(computeContentChecksum(`${text} `)).not.toBe(checksum);
-    expect(computeContentChecksum(text.replace('Town Meeting', 'Town Gathering'))).not.toBe(
+    // Mutate a *structural* token (a card id), never content prose: the shipped
+    // prose is author-editable, so pinning a word here would break the test on
+    // a legitimate editor rename.
+    expect(computeContentChecksum(text.replace('gym-story-invest', 'gym-story-x'))).not.toBe(
       checksum,
     );
   });
@@ -108,7 +194,8 @@ describe('findMissingColumns', () => {
 
 describe('cardsFromCsv', () => {
   it('projects the Gym content onto the generic model plus its game columns', () => {
-    const cards = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
+    const parsed = parseCsv(readText(GYM_CONTENT_PATH));
+    const cards = cardsFromCsv(parsed, GYM_CONTENT_ADAPTER);
     expect(cards.map((entry) => entry.id)).toEqual([
       'gym-story-start',
       'gym-story-invest',
@@ -116,17 +203,27 @@ describe('cardsFromCsv', () => {
       'gym-story-end',
     ]);
 
+    // Expected values come from the row itself: the adapter's contract is that
+    // each mapped column lands on its field (and keeps its cell text), which is
+    // exactly what a content edit may change without touching this test.
+    const cell = (column: string): string =>
+      parsed.rows[0][parsed.header.indexOf(column)] ?? '';
     const start = cards[0];
-    expect(start.name).toBe('Town Meeting');
-    expect(start.effect).toBe('Lose 50 coins');
-    expect(start.options).toBe('Invest|gym-story-invest;Ignore|gym-story-ignore');
-    expect(start.storylineId).toBe('gym-story');
-    expect(start.storylineTitle).toBe('Gym Storyline');
+    expect(start.name).toBe(cell('name').trim());
+    expect(start.name.length).toBeGreaterThan(0);
+    expect(start.effect).toBe(cell('effect').trim());
+    expect(start.options).toBe(cell('options').trim());
+    expect(start.options).toContain('Invest|gym-story-invest');
+    expect(start.storylineId).toBe(cell('storylineId').trim());
+    expect(start.storylineTitle).toBe(cell('storylineTitle').trim());
+    expect(start.resourceKeys).toEqual(['coins', 'reputation']);
+    // Game columns stay raw cells, available to the game without core knowing
+    // what they mean.
     expect(start.fields).toMatchObject({
-      trigger: 'Incident',
-      cost: '0',
-      coinDelta: '-50',
-      reputationDelta: '0',
+      trigger: cell('trigger'),
+      cost: cell('cost'),
+      coinDelta: cell('coinDelta'),
+      reputationDelta: cell('reputationDelta'),
     });
   });
 
@@ -233,5 +330,58 @@ describe('optionSuccessorIds', () => {
     expect(optionSuccessorIds({ label: 'End', effectPolicy: 'apply' }, TAVERN_CONTENT_ADAPTER)).toEqual(
       [],
     );
+  });
+});
+
+describe('authored prose columns (context / epilogue)', () => {
+  const cards = cardsFromCsv(
+    parseCsv(readProseFixture('prose-basic.csv')),
+    PROSE_CONTENT_ADAPTER,
+  );
+
+  it('lifts both prose columns onto the card verbatim', () => {
+    expect(cards[0]?.context).toBe(
+      'You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: "Do not take the morning boat."',
+    );
+    expect(cards[3]?.epilogue).toBe(
+      'The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there.',
+    );
+    // A beat without an ending has no epilogue; an ending without a situation
+    // has no context.
+    expect(cards[0]?.epilogue).toBeNull();
+    expect(cards[3]?.context).toBeNull();
+  });
+
+  it('reads a blank prose cell as null (absent), never as an empty string', () => {
+    expect(cards[2]?.context).toBeNull();
+    expect(cards[2]?.epilogue).toBeNull();
+  });
+
+  it('keeps mapped prose out of the game-specific fields bag', () => {
+    expect(cards[0]?.fields.context).toBeUndefined();
+    expect(cards[0]?.fields.epilogue).toBeUndefined();
+    expect(cards[0]?.fields).toEqual({});
+  });
+
+  it('carries no prose keys when the adapter maps no prose column', () => {
+    // An unmapped optional column is not an error: the card keeps exactly the
+    // pre-prose shape. The Tavern adapter maps no prose column, so its content
+    // (and Main Street's) is untouched by the prose slice.
+    const [tavern] = cardsFromCsv(
+      parseCsv(readFixture('tavern-storylines.csv')),
+      TAVERN_CONTENT_ADAPTER,
+    );
+    expect('context' in (tavern as object)).toBe(false);
+    expect('epilogue' in (tavern as object)).toBe(false);
+  });
+
+  it('round-trips multi-sentence prose with commas, quotes, semicolons, pipes and hashes', () => {
+    const text = readProseFixture('prose-basic.csv');
+    const parsed = parseCsv(text);
+    const context = cards[1]?.context;
+    expect(context).toContain("'I have been expecting you,' he says;");
+    expect(context).toContain('the word | on the sign');
+    expect(context).toContain('A hand has added # 4 in chalk.');
+    expect(serialiseCsv(parsed)).toBe(text);
   });
 });

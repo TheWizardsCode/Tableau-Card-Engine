@@ -148,6 +148,11 @@ native/**/dist/
 sdk/steamworks/
 native/**/sdk/
 
+# Vitest browser attachment output (CG-0MWR14107005F5LL). Browser projects
+# write `context.annotate` attachments here; leaving it untracked trips the
+# `state_changed_during_run` guard in `implement.py finish`.
+.vitest-attachments/
+
 # Committed source data (the `data/` rule above targets runtime artifacts;
 # game content data is tracked).
 !src/data/

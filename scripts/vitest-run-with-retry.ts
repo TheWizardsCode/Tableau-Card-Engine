@@ -74,6 +74,34 @@
  *     into its own process group). The attempt reports exit code 124 with
  *     a hang diagnostic. Hangs are NEVER retried — a genuine hang must
  *     surface, not be masked.
+ *   - Size the unit stage's bound from the host, and print that bound: the
+ *     unit bound is HYBRID and load-aware (SA-0MWEURUYL004I470) — a raised
+ *     static floor (`UNIT_FLOOR_MS` = 600 s, 2.8x the worst measured green
+ *     unit stage) scaled by the sampled 1-minute load average per core
+ *     (factor `clamp((load1m / cpuCount) / 0.75, 1, 2)`), clamped to the
+ *     finite ceiling `UNIT_CEILING_MS` (1200 s = the browser bound). An
+ *     explicit `--timeout-ms` still wins verbatim, and on Windows (no load
+ *     average) the floor applies unscaled.
+ *
+ * Measured baseline behind the unit floor (SA-0MWEURUYL004I470). Ten green
+ * unit stages recorded in `.worklog/cache`: 88, 96, 106, 111, 128, 141, 147,
+ * 149, 206, 217 s — worst 217 s (2026-11-11), i.e. 72 % of the old fixed
+ * 300 s bound and only 2.8x smaller than the new 600 s floor. The old fixed
+ * 300 s bound aborted a GREEN unit stage (241 files, still working) under
+ * sustained contention — load 35-42 on 16 cores from three concurrent suite
+ * runs plus a Monte-Carlo sweep — and the diagnostic could not tell that
+ * contention from a genuine hang. Both halves are fixed here: the bound is
+ * sized from the load, and every hang message names the stage, the bound,
+ * the elapsed wall time, the delta over the bound and the host load at abort
+ * through the single `hangDiagnostic` builder (run abort, pre-flight
+ * `vitest list` abort, and the coverage-pre-flight fallback).
+ *
+ * Inner bounds must stay inside the outer gate budget
+ * (`.pi/test-config.json` `timeoutPerCommand` = 3000 s): unit ceiling 1200 +
+ * browser 1200 + two `vitest list` pre-flights 240 = 2640 s of stage bounds,
+ * plus ~60 s of pre-checks and orchestration = ~2700 s worst case, leaving
+ * ~300 s of margin. Raise the outer value in the same change as any inner
+ * bound — the previous 1500 s held 300 + 1200 with zero slack.
  *
  * Op-in project-coverage gate (CG-0MVL21CVM003VK5H):
  *
@@ -182,6 +210,11 @@ export const ACCEPTABLE_TRANSIENT_SIGNATURES: readonly string[] = [
  * (CG-0MT08R2QR0070F3N). Default: 10 minutes — ample for the browser stage
  * (~24 files at 8-10s each) with headroom for CPU contention, while still
  * failing fast on a true hang. Override with `--timeout-ms <n>`.
+ *
+ * The unit stage does NOT use this default: it derives its own hybrid,
+ * load-aware bound (`deriveUnitBound`, SA-0MWEURUYL004I470) so a contended
+ * host is not handed a bound calibrated for an idle one. Every other stage
+ * keeps this default unless pinned with `--timeout-ms`.
  */
 export const DEFAULT_RUN_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -207,6 +240,128 @@ export const KILL_GRACE_MS = 5000;
  */
 export const LIST_TIMEOUT_MS = 120_000;
 
+// ── Host contention sampler ──────────────────────────────────────────────
+
+/** Readers that can be injected for testing. */
+export interface HostReaders {
+  /** Returns the 1-minute load average, or null/undefined if unavailable. */
+  readLoadAvg: () => number | null | undefined;
+  /** Returns the number of logical CPU cores. */
+  readCpuCount: () => number | undefined;
+}
+
+/** Result of a host contention sample. */
+export interface HostContention {
+  /** 1-minute load average, or null when unavailable (Windows or reader error). */
+  load1m: number | null;
+  /** Logical CPU core count (never zero — degrades to 1 on invalid input). */
+  cpuCount: number;
+}
+
+const DEFAULT_READ_LOAD_AVG: HostReaders['readLoadAvg'] = () => {
+  const avg = os.loadavg();
+  return avg[0];
+};
+
+const DEFAULT_READ_CPU_COUNT: HostReaders['readCpuCount'] = () => os.cpus().length;
+
+/**
+ * Sample the host's contention state: 1-minute load average and core count.
+ *
+ * Load is unavailable on Windows (load average is meaningless there), and the
+ * reader may throw (e.g. resource exhaustion); in both cases `load1m` is
+ * `null`. Invalid core counts (zero, NaN, undefined) degrade to `1` to avoid
+ * division-by-zero in scaling logic.
+ *
+ * Consumers should call this once before starting a stage to size the bound
+ * and once after abort for the diagnostic; both calls go through the same
+ * injected seam so the numbers are consistent.
+ *
+ * @param readers - Injected readers for testing; defaults to `node:os`.
+ * @returns `{ load1m, cpuCount }` — never throws, never returns invalid
+ *          values.
+ */
+export function sampleHostContention(
+  readers?: HostReaders,
+): HostContention {
+  const { readLoadAvg = DEFAULT_READ_LOAD_AVG, readCpuCount = DEFAULT_READ_CPU_COUNT } =
+    readers ?? {};
+
+  let load1m: number | null = null;
+  try {
+    const raw = readLoadAvg();
+    if (raw != null && Number.isFinite(raw) && raw >= 0) {
+      load1m = raw;
+    }
+  } catch {
+    // Reader error (e.g. resource exhaustion) — load is unavailable.
+  }
+
+  // Windows: os.loadavg() exists but returns [0,0,0] which is meaningless.
+  // We rely on the reader to return null there (the caller sets this up).
+
+  let cpuCount = readCpuCount();
+  if (
+    cpuCount == null ||
+    !Number.isFinite(cpuCount) ||
+    cpuCount <= 0
+  ) {
+    cpuCount = 1;
+  }
+
+  return { load1m, cpuCount };
+}
+
+/**
+ * Derive the unit-stage wall-clock bound using the hybrid strategy:
+ *   floor 600s (raised from 300s) × load-aware factor, capped at 1200s ceiling.
+ *
+ * The factor is `clamp((load1m / cpuCount) / 0.75, 1, 2)` — at ≤0.75 load per
+ * core the floor applies; at ≥1.5 load per core the ceiling applies (e.g. 24
+ * load on 16 cores = 1.5/core → 1200s).
+ *
+ * On Windows (load unavailable) or when the sampled load is null, the floor
+ * applies without scaling. An explicit `--timeout-ms` overrides this entirely
+ * and is handled by the caller (`parseRunnerArgs`).
+ *
+ * Both constants are the per-host floor/ceiling an operator can read without
+ * running a suite, and the computed bound never leaves that closed range.
+ * Inner bounds must fit the outer gate budget: unit ceiling 1200 + browser
+ * 1200 + two `vitest list` pre-flights 240 = 2640 s, ~2700 s with
+ * orchestration, against `.pi/test-config.json` `timeoutPerCommand` = 3000 s.
+ *
+ * @param contention - Result from `sampleHostContention`.
+ * @returns The bound in milliseconds, clamped between floor and ceiling.
+ */
+export const UNIT_FLOOR_MS = 600_000;  // 600 s — 2.8x worst measured green stage
+export const UNIT_CEILING_MS = 1_200_000; // 1200 s — matches browser bound
+
+/**
+ * Measured baseline behind `UNIT_FLOOR_MS` (SA-0MWEURUYL004I470): ten green
+ * unit stages recorded in `.worklog/cache` — 88, 96, 106, 111, 128, 141, 147,
+ * 149, 206, 217 s (worst 217 s, 2026-11-11). The floor is 2.8x the worst
+ * observation; the old fixed 300 s bound was only 1.4x it, which is why a
+ * contended host aborted a green stage. Recorded as a constant so the numbers
+ * live beside the bound they justify, and so the docs and the code cannot
+ * drift apart.
+ */
+export const MEASURED_UNIT_STAGE_SECS: readonly number[] = [
+  88, 96, 106, 111, 128, 141, 147, 149, 206, 217,
+];
+
+export function deriveUnitBound(contention: HostContention): number {
+  if (contention.load1m === null) {
+    return UNIT_FLOOR_MS;
+  }
+
+  const perCore = contention.load1m / contention.cpuCount;
+  // Scale factor: 1.0 at ≤0.75 load/core, linear to 2.0 at ≥1.5 load/core.
+  const factor = Math.min(2, Math.max(1, perCore / 0.75));
+  const bound = UNIT_FLOOR_MS * factor;
+
+  return Math.min(UNIT_CEILING_MS, Math.max(UNIT_FLOOR_MS, bound));
+}
+
 /**
  * Exit code reported when the opt-in pre-flight (expected-set derivation)
  * fails or times out. Distinct from a genuine test failure (1) and a hang
@@ -214,28 +369,91 @@ export const LIST_TIMEOUT_MS = 120_000;
  */
 export const PREFLIGHT_FAILURE_EXIT_CODE = 2;
 
-/**
- * Message emitted when the wall-clock bound is exceeded and the run is
- * aborted. `elapsedSecs` is the wall time before the abort.
- */
-export function hangTimeoutMessage(elapsedSecs: number): string {
-  return [
-    `\n[hang-timeout] Vitest run did not complete within ${elapsedSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`,
-    'The browser stage can stall indefinitely under CPU contention (e.g. a',
-    'requestAnimationFrame loop starved of frames, or a Phaser game destroy',
-    'that never completes). This is treated as a hang, NOT a transient',
-    'failure: no retry is performed. Re-run the suite (ideally without other',
-    'CPU-heavy processes competing), or run the suspected file(s) in',
-    'isolation via `npx vitest run --project browser tests/<file>` to diagnose.',
-  ].join('\n');
+// ── Hang diagnostic ────────────────────────────────────────────────────
+
+/** Context needed by the unified hang-diagnostic builder. */
+export interface HangDiagnosticContext {
+  /** Stage label, e.g. "unit", "browser", or "vitest list (<args>)". */
+  stage: string;
+  /** The configured wall-clock bound in milliseconds. */
+  boundMs: number;
+  /** Wall-clock elapsed time in whole seconds. */
+  elapsedSecs: number;
+  /** Host contention sample at abort (may be null if unavailable). */
+  contention: HostContention | null;
 }
 
 /**
- * Abbreviated hang diagnostic for the pre-flight `vitest list` collection —
- * enough to surface + fail closed without the full browser-stage essay.
+ * Unified hang-diagnostic builder. Always renders: the stage, the configured
+ * bound, the elapsed wall time, the delta over the bound, and host load
+ * average / core count — so a contended host is distinguishable from a
+ * genuine hang without opening the cache entry.
+ *
+ * Guidance is stage-appropriate: the browser block (starved
+ * requestAnimationFrame, undestroyed Phaser.Game) is not printed for unit-stage
+ * aborts, which instead point at a synchronous loop in test/engine code.
  */
-export function listHangMessage(elapsedSecs: number): string {
-  return `\n[hang-timeout] vitest list did not complete within ${elapsedSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`;
+export function hangDiagnostic(ctx: HangDiagnosticContext): string {
+  const { stage, boundMs, elapsedSecs, contention } = ctx;
+  const boundSecs = Math.round(boundMs / 1000);
+  const delta = elapsedSecs - boundSecs;
+
+  const lines: string[] = [
+    `\n[hang-timeout] ${stage} did not complete within ${boundSecs}s — aborting (exit ${HANG_TIMEOUT_EXIT_CODE}).`,
+    `elapsed ${elapsedSecs}s (+${delta}s over bound)`,
+  ];
+
+  if (contention && contention.load1m !== null) {
+    lines.push(
+      `host load ${contention.load1m.toFixed(1)} over ${contention.cpuCount} cores`,
+    );
+  } else if (contention && contention.load1m === null) {
+    lines.push(`host load unavailable (${contention.cpuCount} cores)`);
+  } else {
+    lines.push(`host load unavailable (unknown cores)`);
+  }
+
+  // Stage-appropriate guidance.
+  if (stage === 'browser') {
+    lines.push(
+      'The browser stage can stall indefinitely under CPU contention (e.g. a',
+      'requestAnimationFrame loop starved of frames, or a Phaser game destroy',
+      'that never completes). This is treated as a hang, NOT a transient',
+      'failure: no retry is performed. Re-run the suite (ideally without other',
+      'CPU-heavy processes competing), or run the suspected file(s) in',
+      'isolation via `npx vitest run --project browser tests/<file>` to diagnose.',
+    );
+  } else {
+    // unit, vitest list, or any other stage.
+    lines.push(
+      'The test engine cannot preempt synchronous JavaScript — a hung',
+      'run usually indicates a synchronous loop in test or engine code.',
+      'This is treated as a hang, NOT a transient failure:',
+      'no retry is performed.',
+      `Run one file under --project ${stage === 'vitest list' ? 'unit' : stage} in`,
+      'isolation to narrow down the offender.',
+    );
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Derive a human-readable stage label from the forwarded vitest arguments.
+ *
+ * @param args - Forwarded CLI arguments (never includes `--timeout-ms`).
+ * @returns A stage label such as "unit", "browser", or "vitest list".
+ */
+export function deriveStage(args: string[]): string {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--project' && i + 1 < args.length) {
+      return args[i + 1];
+    }
+    if (args[i]?.startsWith('--project=')) {
+      return args[i].slice('--project='.length);
+    }
+  }
+  return 'unknown project';
 }
 
 export interface VitestRunResult {
@@ -297,10 +515,21 @@ export interface ParsedRunnerArgs {
  *   --expect-project-coverage                    derive the expected set via
  *                                                vitest list pre-flight
  *
+ * When no explicit `--timeout-ms` is present and the stage is `unit`, the
+ * bound is derived by the hybrid load-aware strategy (`deriveUnitBound` over a
+ * fresh `sampleHostContention()`): floor 600s scaled up to a 1200s ceiling by
+ * load per core. An explicit `--timeout-ms` is used verbatim and never scaled;
+ * every other stage keeps `DEFAULT_RUN_TIMEOUT_MS`.
+ *
+ * `contention` is injectable so tests never sample the real host.
+ *
  * Throws on an invalid value so `main` can exit 2 with a clear message.
  */
-export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
-  let timeoutMs = DEFAULT_RUN_TIMEOUT_MS;
+export function parseRunnerArgs(
+  rawArgs: string[],
+  contention?: HostContention,
+): ParsedRunnerArgs {
+  let explicitTimeoutMs: number | null = null;
   const forwarded: string[] = [];
   const expectedFiles: string[] = [];
   let expectProjectCoverage = false;
@@ -319,12 +548,12 @@ export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
     const arg = rawArgs[i];
     if (arg === '--timeout-ms') {
       const raw = rawArgs[++i];
-      timeoutMs = parsePositiveInt(raw, '--timeout-ms');
+      explicitTimeoutMs = parsePositiveInt(raw, '--timeout-ms');
       continue;
     }
     if (arg.startsWith('--timeout-ms=')) {
       const raw = arg.slice('--timeout-ms='.length);
-      timeoutMs = parsePositiveInt(raw, '--timeout-ms');
+      explicitTimeoutMs = parsePositiveInt(raw, '--timeout-ms');
       continue;
     }
     if (arg === '--expected-file') {
@@ -349,15 +578,27 @@ export function parseRunnerArgs(rawArgs: string[]): ParsedRunnerArgs {
     }
     forwarded.push(arg);
   }
+
+  // Explicit override wins verbatim; otherwise the unit stage derives its
+  // hybrid load-aware bound and every other stage keeps the default.
+  const timeoutMs =
+    explicitTimeoutMs ??
+    (deriveStage(forwarded) === 'unit'
+      ? deriveUnitBound(contention ?? sampleHostContention())
+      : DEFAULT_RUN_TIMEOUT_MS);
+
   return { timeoutMs, forwarded, expectedFiles, expectProjectCoverage };
 }
 
 /** Backwards-compatible subset parser kept for imports that referenced it. */
-export function parseTimeoutArgs(args: string[]): {
+export function parseTimeoutArgs(
+  args: string[],
+  contention?: HostContention,
+): {
   timeoutMs: number;
   forwarded: string[];
 } {
-  const parsed = parseRunnerArgs(args);
+  const parsed = parseRunnerArgs(args, contention);
   return { timeoutMs: parsed.timeoutMs, forwarded: parsed.forwarded };
 }
 
@@ -457,6 +698,18 @@ export function looksLikeUnknownStaticParse(output: string): boolean {
 }
 
 /**
+ * Injectable inputs for the pre-flight's hang diagnostic
+ * (SA-0MWEURUYL004I470). Both default to live values in production and are
+ * injected in tests so no test ever reads the real clock or host load.
+ */
+export interface PreflightHangOptions {
+  /** Host contention sample to render; `undefined` takes a live sample. */
+  contention?: HostContention | null;
+  /** Monotonic milliseconds clock used to measure the pre-flight's wall time. */
+  now?: () => number;
+}
+
+/**
  * Derive the expected repo-relative test-file set from a collection-only
  * `vitest list --filesOnly --json` over the forwarded args. Uses
  * `--staticParse` (no test imports, so the browser stage pays no second
@@ -468,13 +721,23 @@ export function looksLikeUnknownStaticParse(output: string): boolean {
  * unparsable JSON. Callers must treat the error as "expectation unknown ⇒
  * refuse to run the gate" — they must never silently downgrade to no
  * expectation (AC 9 of CG-0MVL21CVM003VK5H).
+ *
+ * A hang renders the same `hangDiagnostic` block as every other stage
+ * (SA-0MWEURUYL004I470): the stage label, the configured bound, the MEASURED
+ * elapsed wall time, the delta over the bound and the host load at abort.
+ * The elapsed time is timed around the collection attempts and the load is
+ * sampled through `sampleHostContention` — the bound is never passed off as
+ * the elapsed time.
  */
 export async function deriveExpectedFiles(
   forwarded: string[],
   runList: VitestListRunner,
   cwd: string = process.cwd(),
   timeoutMs: number = LIST_TIMEOUT_MS,
+  options: PreflightHangOptions = {},
 ): Promise<string[]> {
+  const now = options.now ?? (() => Date.now());
+  const startedAtMs = now();
   const collectionArgs = (withStaticParse: boolean): string[] => {
     const base = ['--filesOnly', '--json'];
     const args = withStaticParse ? ['--staticParse', ...base] : base;
@@ -488,8 +751,17 @@ export async function deriveExpectedFiles(
   }
 
   if (result.status === HANG_TIMEOUT_EXIT_CODE) {
+    const elapsedSecs = Math.max(1, Math.round((now() - startedAtMs) / 1000));
     throw new PreflightError(
-      `vitest list did not complete within ${Math.round(timeoutMs / 1000)}s (exit ${HANG_TIMEOUT_EXIT_CODE})`,
+      hangDiagnostic({
+        stage: 'vitest list',
+        boundMs: timeoutMs,
+        elapsedSecs,
+        contention:
+          options.contention === undefined
+            ? sampleHostContention()
+            : options.contention,
+      }),
     );
   }
   if (result.status !== 0) {
@@ -1196,13 +1468,15 @@ async function runVitestProcess(
  * `spawnSync` with a `timeout` hangs forever if the child ignores SIGTERM
  * (a genuinely hung vitest would stall the runner instead of aborting).
  *
- * `binPath` and `killGraceMs` are injectable for tests.
+ * `binPath`, `killGraceMs` and `contention` are injectable for tests — the
+ * contention sample is never read from the real host in a test.
  */
 export async function runVitestAsync(
   args: string[],
   timeoutMs: number,
   binPath: string = resolveVitestBin(),
   killGraceMs: number = KILL_GRACE_MS,
+  contention?: HostContention,
 ): Promise<VitestRunResult> {
   const attempted = await runVitestProcess([binPath, 'run', ...args], {
     streamToParent: true,
@@ -1211,7 +1485,13 @@ export async function runVitestAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const message = hangTimeoutMessage(attempted.elapsedSecs);
+    // Sampled after the kill (an indicator of contention during the run).
+    const message = hangDiagnostic({
+      stage: deriveStage(args),
+      boundMs: timeoutMs,
+      elapsedSecs: attempted.elapsedSecs,
+      contention: contention ?? sampleHostContention(),
+    });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
   }
@@ -1226,15 +1506,17 @@ export const runVitestSync = runVitestAsync;
  * `node <vitest-bin> list <args>` in its own process group with the same
  * wall-clock bound and SIGTERM/SIGKILL escalation as a run. Output is fully
  * captured (not streamed — the collection is a quiet pre-check) and an
- * overrun reports exit 124 with the abbreviated hang diagnostic.
+ * overrun reports exit 124 with the full stage-aware hang diagnostic.
  *
- * `binPath` and `killGraceMs` are injectable for tests.
+ * `binPath`, `killGraceMs` and `contention` are injectable for tests — the
+ * contention sample is never read from the real host in a test.
  */
 export async function runVitestListAsync(
   args: string[],
   timeoutMs: number,
   binPath: string = resolveVitestBin(),
   killGraceMs: number = KILL_GRACE_MS,
+  contention?: HostContention,
 ): Promise<VitestRunResult> {
   const attempted = await runVitestProcess([binPath, 'list', ...args], {
     streamToParent: false,
@@ -1243,7 +1525,12 @@ export async function runVitestListAsync(
     killGraceMs,
   });
   if (attempted.timedOut) {
-    const message = listHangMessage(attempted.elapsedSecs);
+    const message = hangDiagnostic({
+      stage: 'vitest list',
+      boundMs: timeoutMs,
+      elapsedSecs: attempted.elapsedSecs,
+      contention: contention ?? sampleHostContention(),
+    });
     process.stderr.write(message + '\n');
     return { status: HANG_TIMEOUT_EXIT_CODE, output: attempted.output + message };
   }
