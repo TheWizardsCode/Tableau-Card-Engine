@@ -1,0 +1,88 @@
+{
+  "source": "example-games/gym/content/storylines.csv",
+  "capturedFrom": "dev before the demo context prose was authored (CG-0MWO7CW99007F8JW)",
+  "cards": [
+    {
+      "id": "gym-story-start",
+      "coinDelta": "-50",
+      "reputationDelta": "0",
+      "options": [
+        {
+          "label": "Invest",
+          "successorIds": [
+            "gym-story-invest"
+          ],
+          "effectPolicy": "apply",
+          "cost": {
+            "coins": 5
+          },
+          "extraEffect": {
+            "reputation": 2
+          },
+          "conditionalSuccessors": [
+            {
+              "when": {
+                "field": "coins",
+                "op": ">=",
+                "value": 100
+              },
+              "successorId": "gym-story-end"
+            }
+          ]
+        },
+        {
+          "label": "Ignore",
+          "successorIds": [
+            "gym-story-ignore"
+          ],
+          "effectPolicy": "apply"
+        }
+      ]
+    },
+    {
+      "id": "gym-story-invest",
+      "coinDelta": "120",
+      "reputationDelta": "0",
+      "options": [
+        {
+          "label": "Celebrate",
+          "successorIds": [
+            "gym-story-end"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Double down",
+          "successorIds": [],
+          "effectPolicy": "apply"
+        }
+      ]
+    },
+    {
+      "id": "gym-story-ignore",
+      "coinDelta": "-80",
+      "reputationDelta": "0",
+      "options": [
+        {
+          "label": "Repair",
+          "successorIds": [
+            "gym-story-end"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Let it be",
+          "successorIds": [],
+          "effectPolicy": "apply"
+        }
+      ]
+    },
+    {
+      "id": "gym-story-end",
+      "coinDelta": "0",
+      "reputationDelta": "60",
+      "options": []
+    }
+  ],
+  "note": "Mechanics only: card id, coin/reputation deltas and the compiled option topology (successors, cost, extra effect, conditional rules, effectPolicy) with authored prose (`#says`) stripped. Author-editable prose columns (name, effect, context) are deliberately excluded so a content edit does not require regenerating this fixture (CG-0MWRSOU91003P36J)."
+}

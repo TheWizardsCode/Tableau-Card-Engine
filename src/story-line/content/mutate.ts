@@ -25,13 +25,15 @@
 
 import {
   cardsFromCsv,
+  compileContentOptions,
   findMissingColumns,
   parseCsv,
+  parseResourceDeclaration,
   serialiseCsv,
   type ParsedCsv,
 } from './csv';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
-import { validateContentCsv, type ContentValidationResult } from './validate';
+import { validateContentCsv, storylineEntryCards, type ContentValidationResult } from './validate';
 
 // ── Result types ────────────────────────────────────────────
 
@@ -55,12 +57,32 @@ export interface AddContentCardSpec {
   readonly name: string;
   /** Human-readable effect text. */
   readonly effect?: string;
+  /**
+   * The beat's authored situation paragraph. Prose is copied into the mapped
+   * `context` column only when the adapter declares that mapping.
+   */
+  readonly context?: string | null;
+  /** The terminal card's authored closing prose (same rule as `context`). */
+  readonly epilogue?: string | null;
   /** CSV `options` encoding (`label|a,b;label2|c`). */
   readonly options?: string;
   /** Story-line id. */
   readonly storylineId?: string | null;
   /** Story-line title. */
   readonly storylineTitle?: string | null;
+  /** Declared resource keys for this card's option attributes. */
+  readonly resources?: string | null;
+  /**
+   * Position the new row directly after this existing card's row instead of
+   * appending it, so CSV reading order can track narrative order. An id that
+   * names no card is refused with a clear error, naming the id; omitting the
+   * position appends (the historical behaviour, unchanged byte-for-byte).
+   *
+   * Neither `after` nor appending moves a story-line's entry card silently: an
+   * edit that would change the entry of an existing story-line (the first
+   * member with no incoming link) is refused, naming the old and new entry.
+   */
+  readonly after?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
   readonly fields?: Readonly<Record<string, string>>;
 }
@@ -77,18 +99,51 @@ export interface UpdateContentCardSpec {
   readonly name?: string;
   /** New effect text. */
   readonly effect?: string;
+  /** New `context` prose (`null` or `''` clears it). */
+  readonly context?: string | null;
+  /** New `epilogue` prose (`null` or `''` clears it). */
+  readonly epilogue?: string | null;
   /** New `options` encoding (`null` or `''` clears). */
   readonly options?: string | null;
   /** New story-line id (`null` clears). */
   readonly storylineId?: string | null;
   /** New story-line title (`null` clears). */
   readonly storylineTitle?: string | null;
+  /** New declared resource keys (`null` or `''` clears). */
+  readonly resources?: string | null;
   /** Game-specific column values, keyed by CSV column name. */
   readonly fields?: Readonly<Record<string, string>>;
 }
 
 /** A pure in-memory content mutation (used by the file writer). */
 export type ContentMutation = (csvText: string) => ContentEditResult;
+
+/**
+ * A spec for appending one option to an existing card's `options` cell.
+ *
+ * This is the `add-option` counterpart of `update-card --options`: it appends
+ * a single `label|target` entry instead of replacing the whole cell, so a
+ * writer adding one branch never retypes the options that already exist.
+ */
+export interface AddOptionContentCardSpec {
+  /** The existing card whose `options` cell gains the option (required). */
+  readonly id: string;
+  /** The option label shown to the player (required, unique on the card). */
+  readonly label: string;
+  /**
+   * Successor card id(s), encoded verbatim after the `|`. Omitted or empty
+   * authors a terminal option. A target that does not exist is refused by
+   * validation (`unknown-successor`).
+   */
+  readonly target?: string | null;
+  /**
+   * Extended option attributes appended in authored order — `cost=coins:2`,
+   * `extra=reputation:+1`, `when=hull>=1>card` or `says=…`. A leading `#` is
+   * optional; each attribute is validated with the candidate content (an
+   * unknown resource key or malformed attribute refuses the edit).
+   */
+  readonly attributes?: readonly string[];
+}
 
 // ── Matrix helpers ──────────────────────────────────────────
 
@@ -137,6 +192,49 @@ function findRow(
   return rows.find((row) => baseIdOf(adapter, row[idIndex] ?? '') === wanted) as
     | string[]
     | undefined;
+}
+
+/**
+ * Refuses an edit that would silently re-point an existing story-line's entry
+ * card.
+ *
+ * A story-line's entry card is the first member (in file order) with no
+ * incoming edge from another member (see {@link storylineEntryCards}). Adding a
+ * row can flip that choice without stranding any member — an appended card that
+ * points back at the old entry, for example, makes the old entry "linked to" so
+ * the new card becomes the entry. Validation passes, yet the story now starts
+ * at a different beat. Because that change is invisible in the diff, the add
+ * operations refuse it and name both the old and the would-be entry card.
+ *
+ * Story-lines that did not exist before the edit are never a re-point: their
+ * entry card is the new card, which is exactly what the author asked for.
+ *
+ * @param command     The author operation, used in the error prefix.
+ * @param originalCsv The content before the edit.
+ * @param candidateCsv The unvalidated content after the edit.
+ * @param adapter     The game content adapter.
+ * @returns The refusal message, or `undefined` when no entry card moved.
+ */
+function entryRepointError(
+  command: 'add-card' | 'add-linked-card',
+  originalCsv: string,
+  candidateCsv: string,
+  adapter: ContentAdapter,
+): string | undefined {
+  const before = storylineEntryCards(readContentCards(originalCsv, adapter), adapter);
+  if (before.size === 0) return undefined;
+  const after = storylineEntryCards(readContentCards(candidateCsv, adapter), adapter);
+  for (const [storylineId, entry] of after) {
+    const previous = before.get(storylineId);
+    if (previous === undefined || previous === entry) continue;
+    return (
+      `${command}: adding the new card would re-point story-line "${storylineId}"'s ` +
+      `entry card (currently "${previous}") to "${entry}" (the first member with ` +
+      'no incoming link); link the new card in from a story-line member ' +
+      '(add-linked-card --link-from <card-id>) so the entry card is unchanged'
+    );
+  }
+  return undefined;
 }
 
 /** Validates a candidate CSV and folds the outcome into an edit result. */
@@ -196,10 +294,11 @@ function fieldKeyErrors(
 /**
  * Applies an `add-card` spec to CSV text **without validating** the candidate.
  *
- * Structural problems (missing required values, duplicate id, unknown column)
- * are still reported. Exposed for composing multi-step edits (a card added
- * *and* linked in) that must be validated once, as a whole candidate — the
- * public {@link addContentCard} wraps this with validation.
+ * Structural problems (missing required values, duplicate id, unknown column,
+ * an `after` naming no card) are still reported. Exposed for composing
+ * multi-step edits (a card added *and* linked in) that must be validated once,
+ * as a whole candidate — the public {@link addContentCard} wraps this with
+ * validation.
  *
  * @internal
  * @param csvText Current content CSV text.
@@ -230,16 +329,48 @@ export function applyAddContentCardSpec(
     };
   }
 
-  const row = emptyRow({ header, rows });
+  // A positional insert must name an existing predecessor; an unknown id is a
+  // structural error reported before any row is built.
+  const after = spec.after?.trim() ?? '';
+  let insertAt: number | undefined;
+  if (after !== '') {
+    const predecessor = findRow(header, rows, adapter, after);
+    if (!predecessor) {
+      return {
+        csv: csvText,
+        ok: false,
+        errors: [`add-card: --after card "${after}" not found (no such card id)`],
+      };
+    }
+    insertAt = rows.indexOf(predecessor) + 1;
+  }
+
+  const row = emptyRow({ header, rows, declarations: parsed.declarations });
+  const fields = adapter.fields;
+  // A file-level `#resources:` line is the file's default set. Stamping the
+  // adapter's full key list into every new row would immediately re-introduce
+  // the per-row repetition the declaration exists to remove, so a declared
+  // file leaves the cell blank and the row inherits the declaration
+  // (`cardsFromCsv` applies it). A file with no declaration keeps the adapter
+  // default, and an explicit `--resources` still overrides either below.
+  const inheritsDeclaredResources =
+    fields.resources !== undefined &&
+    parseResourceDeclaration(parsed.declarations).length > 0;
   for (const [column, value] of Object.entries(adapter.newCardDefaults ?? {})) {
+    if (inheritsDeclaredResources && column === fields.resources) continue;
     if (header.includes(column)) setColumn(header, rows, row, column, value);
   }
 
-  const fields = adapter.fields;
   setColumn(header, rows, row, fields.id, spec.id);
   setColumn(header, rows, row, fields.name, spec.name);
   if (fields.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect ?? '');
+  }
+  if (fields.context !== undefined && spec.context !== undefined) {
+    setColumn(header, rows, row, fields.context, spec.context ?? '');
+  }
+  if (fields.epilogue !== undefined && spec.epilogue !== undefined) {
+    setColumn(header, rows, row, fields.epilogue, spec.epilogue ?? '');
   }
   if (fields.options !== undefined && spec.options !== undefined) {
     setColumn(header, rows, row, fields.options, spec.options);
@@ -250,12 +381,16 @@ export function applyAddContentCardSpec(
   if (fields.storylineTitle !== undefined && spec.storylineTitle) {
     setColumn(header, rows, row, fields.storylineTitle, spec.storylineTitle);
   }
+  if (fields.resources !== undefined && spec.resources !== undefined) {
+    setColumn(header, rows, row, fields.resources, spec.resources ?? '');
+  }
   for (const [column, value] of Object.entries(spec.fields ?? {})) {
     setColumn(header, rows, row, column, value);
   }
 
-  rows.push(row);
-  return { csv: serialiseCsv({ header, rows }), ok: true, errors: [] };
+  if (insertAt === undefined) rows.push(row);
+  else rows.splice(insertAt, 0, row);
+  return { csv: serialiseCsv({ header, rows, declarations: parsed.declarations }), ok: true, errors: [] };
 }
 
 /**
@@ -263,7 +398,9 @@ export function applyAddContentCardSpec(
  *
  * Structural problems (missing required values, duplicate id, unknown column)
  * are reported before the candidate is validated; the returned `csv` is the
- * unchanged input whenever `ok` is false.
+ * unchanged input whenever `ok` is false. An edit that would silently re-point
+ * an existing story-line's entry card is refused too (an author never moves a
+ * story-line's start beat by accident).
  *
  * @param csvText Current content CSV text.
  * @param adapter The game content adapter.
@@ -277,6 +414,10 @@ export function addContentCard(
 ): ContentEditResult {
   const applied = applyAddContentCardSpec(csvText, adapter, spec);
   if (!applied.ok) return applied;
+  const repointed = entryRepointError('add-card', csvText, applied.csv, adapter);
+  if (repointed !== undefined) {
+    return { csv: csvText, ok: false, errors: [repointed] };
+  }
   return finalise(csvText, applied.csv, adapter);
 }
 
@@ -303,11 +444,14 @@ function applyUpdateFields(
   if (fields.effect !== undefined && spec.effect !== undefined) {
     setColumn(header, rows, row, fields.effect, spec.effect);
   }
+  if (spec.context !== undefined) setNullable(fields.context, spec.context);
+  if (spec.epilogue !== undefined) setNullable(fields.epilogue, spec.epilogue);
   if (spec.options !== undefined) setNullable(fields.options, spec.options);
   if (spec.storylineId !== undefined) setNullable(fields.storylineId, spec.storylineId);
   if (spec.storylineTitle !== undefined) {
     setNullable(fields.storylineTitle, spec.storylineTitle);
   }
+  if (spec.resources !== undefined) setNullable(fields.resources, spec.resources);
   for (const [column, value] of Object.entries(spec.fields ?? {})) {
     setColumn(header, rows, row, column, value);
   }
@@ -352,7 +496,7 @@ export function applyUpdateContentCardSpec(
   }
 
   applyUpdateFields(header, rows, row, adapter, spec);
-  return { csv: serialiseCsv({ header, rows }), ok: true, errors: [] };
+  return { csv: serialiseCsv({ header, rows, declarations: parsed.declarations }), ok: true, errors: [] };
 }
 
 /**
@@ -418,7 +562,268 @@ export function updateContentCards(
     applyUpdateFields(header, rows, row, adapter, spec);
   }
 
-  return finalise(csvText, serialiseCsv({ header, rows }), adapter);
+  return finalise(csvText, serialiseCsv({ header, rows, declarations: parsed.declarations }), adapter);
+}
+
+// ── Option append ───────────────────────────────────────────
+
+/**
+ * Encodes one option entry (`label|target#attr…`) for an `options` cell.
+ *
+ * A blank `target` authors a terminal option (`label|`). An attribute may be
+ * written with or without its leading `#`; the canonical encoding always
+ * carries one. Attributes are kept in authored order so an authored cell and
+ * an appended entry read the same way.
+ *
+ * @param label      The option label.
+ * @param target     Successor card id(s), comma-joined; empty for terminal.
+ * @param attributes Extended `#cost` / `#extra` / `#when` / `#says` attributes.
+ * @returns The option entry text.
+ */
+export function encodeOptionEntry(
+  label: string,
+  target?: string | null,
+  attributes?: readonly string[],
+): string {
+  const head = `${label.trim()}|${(target ?? '').trim()}`;
+  const suffix = (attributes ?? [])
+    .map((attribute) => attribute.trim())
+    .filter((attribute) => attribute !== '')
+    .map((attribute) => (attribute.startsWith('#') ? attribute : `#${attribute}`))
+    .join('');
+  return `${head}${suffix}`;
+}
+
+/**
+ * Appends one encoded option entry to an existing `options` cell.
+ *
+ * The existing text is preserved byte-for-byte apart from its trailing
+ * whitespace / separator: an already-terminated cell (`…;`) gains the entry
+ * directly, and a dangling trailing `;` never produces an empty option. This
+ * is what makes one-branch authoring safe without retyping the cell.
+ *
+ * @param existing The current cell text (may be empty).
+ * @param entry    The encoded option entry (see {@link encodeOptionEntry}).
+ * @returns The options cell with the entry appended last.
+ */
+export function appendOptionEncoding(existing: string, entry: string): string {
+  const head = existing.replace(/[\s;]+$/, '');
+  if (head === '') return entry;
+  return `${head};${entry}`;
+}
+
+/**
+ * Appends one option to an existing card and validates the resulting content.
+ *
+ * Structural problems (no options column on the adapter, missing id/label,
+ * unknown card, duplicate label) are reported before the candidate is
+ * validated; the returned `csv` is the unchanged input whenever `ok` is
+ * false. Everything else about an appended option — its successor exists, its
+ * `#cost` / `#extra` keys are declared, its encoding is well formed — is
+ * validated over the whole candidate by {@link validateContentCsv}, so the
+ * refusal reason names the offending option.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param spec    The option to append to an existing card.
+ * @returns The edit result.
+ */
+export function addOptionToContentCard(
+  csvText: string,
+  adapter: ContentAdapter,
+  spec: AddOptionContentCardSpec,
+): ContentEditResult {
+  const optionsColumn = adapter.fields.options;
+  if (optionsColumn === undefined) {
+    // An option lives only in the options encoding: refuse rather than claim
+    // success while writing nothing.
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-option: adapter "${adapter.gameId}" maps no options column, so an option cannot be appended`,
+      ],
+    };
+  }
+
+  const parsed = parseCsv(csvText);
+  const header = [...parsed.header];
+  const rows = mutableRows(parsed);
+
+  const errors = headerErrors(header, adapter);
+  const label = spec.label.trim();
+  if (spec.id.trim() === '') errors.push('add-option: --id is required');
+  if (label === '') errors.push('add-option: --label is required');
+  if (errors.length > 0) return { csv: csvText, ok: false, errors };
+
+  const row = findRow(header, rows, adapter, spec.id);
+  if (!row) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [`add-option: card id "${spec.id}" not found`],
+    };
+  }
+
+  const cardId = baseIdOf(adapter, spec.id);
+  const card = readContentCards(csvText, adapter).find(
+    (candidate) => baseIdOf(adapter, candidate.id) === cardId,
+  );
+  const optionsIndex = header.indexOf(optionsColumn);
+  const existing = optionsIndex < 0 ? '' : (row[optionsIndex] ?? '');
+  if (card && declaresOptionLabel(card, label)) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-option: card "${cardId}" already declares the option label "${label}" (duplicate option label)`,
+      ],
+    };
+  }
+  setColumn(
+    header,
+    rows,
+    row,
+    optionsColumn,
+    appendOptionEncoding(existing, encodeOptionEntry(label, spec.target, spec.attributes)),
+  );
+  return finalise(csvText, serialiseCsv({ header, rows, declarations: parsed.declarations }), adapter);
+}
+
+/**
+ * True when a card already declares a label (case-insensitively, matching the
+ * validator's duplicate-label rule). A malformed existing encoding is not a
+ * duplicate error here — validation reports the malformation itself.
+ */
+function declaresOptionLabel(card: ContentCard, label: string): boolean {
+  if (card.options.trim() === '') return false;
+  const wanted = label.trim().toLowerCase();
+  try {
+    return compileContentOptions(card).some(
+      (option) => option.label.trim().toLowerCase() === wanted,
+    );
+  } catch {
+    return false;
+  }
+}
+
+// ── Add and link (forward-reference authoring) ──────────────
+
+/**
+ * A spec for adding a card **and** linking it in from an existing card in one
+ * transaction: the new card is applied first, then the chosen predecessor
+ * gains an option pointing at it.
+ *
+ * This is the forward-reference authoring path. Validating the two steps
+ * separately would refuse the intermediate candidate — a new card alone in an
+ * existing story-line is `unreachable-card` until the link exists — so both
+ * steps are applied in memory and the **combined** candidate is validated
+ * once. Linking is expressed only through the `options` encoding, so an
+ * adapter that maps no `options` column cannot link a card in (the edit is
+ * refused rather than silently written without the link).
+ */
+export interface AddLinkedCardSpec {
+  /** The new card (the same spec {@link addContentCard} accepts). */
+  readonly card: AddContentCardSpec;
+  /** The predecessor that gains a link to the new card. */
+  readonly linkFrom: {
+    /** The predecessor's card id (required). */
+    readonly id: string;
+    /**
+     * Option label shown to the player. Defaults to the new card's name, so an
+     * omitted label never authors the empty-label option the validator
+     * rejects.
+     */
+    readonly label?: string;
+    /**
+     * Extended attributes for the generated link (`#cost` / `#extra` / `#when`
+     * / `#says`), in authored order, exactly as {@link addOptionToContentCard}
+     * accepts them. Omitted authors a plain `label|newId` link; the validator
+     * still checks every key against the card's declared resources.
+     */
+    readonly attributes?: readonly string[];
+  };
+}
+
+/**
+ * Adds a new card and links it in from an existing card, validating the
+ * combined candidate **once**.
+ *
+ * The new card is applied through the pure add step; the predecessor then
+ * gains `label|newId` appended to its `options` encoding through the same
+ * option-append primitive `add-option` uses (so an existing cell is never
+ * retyped and a dangling `;` never produces an empty option). Any authored
+ * `linkFrom.attributes` (`#cost` / `#extra` / `#when` / `#says`) are encoded on
+ * that generated option, so a gated branch is authored in the same single
+ * transaction. The returned
+ * `csv` is the unchanged input whenever either step fails, so the write path
+ * stays single, transactional and validator-gated.
+ *
+ * @param csvText Current content CSV text.
+ * @param adapter The game content adapter.
+ * @param spec    The new card plus the predecessor link.
+ * @returns The edit result.
+ */
+export function addLinkedContentCard(
+  csvText: string,
+  adapter: ContentAdapter,
+  spec: AddLinkedCardSpec,
+): ContentEditResult {
+  const optionsColumn = adapter.fields.options;
+  if (optionsColumn === undefined) {
+    // Linking is expressed solely through the options encoding: refuse rather
+    // than write the card without the link the caller asked for.
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [
+        `add-linked-card: adapter "${adapter.gameId}" maps no options column, so a card cannot be linked in`,
+      ],
+    };
+  }
+
+  if (spec.linkFrom.id.trim() === '') {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: ['add-linked-card: --link-from is required'],
+    };
+  }
+
+  const added = applyAddContentCardSpec(csvText, adapter, spec.card);
+  if (!added.ok) return added;
+
+  const newId = baseIdOf(adapter, spec.card.id);
+  const predecessorId = baseIdOf(adapter, spec.linkFrom.id);
+  const predecessor = readContentCards(added.csv, adapter).find(
+    (card) => baseIdOf(adapter, card.id) === predecessorId,
+  );
+  if (!predecessor) {
+    return {
+      csv: csvText,
+      ok: false,
+      errors: [`add-linked-card: predecessor card "${spec.linkFrom.id}" not found`],
+    };
+  }
+
+  const label = (spec.linkFrom.label ?? '').trim() || spec.card.name.trim();
+  const linked = applyUpdateContentCardSpec(added.csv, adapter, {
+    id: predecessor.id,
+    options: appendOptionEncoding(
+      predecessor.options,
+      encodeOptionEntry(label, newId, spec.linkFrom.attributes),
+    ),
+  });
+  if (!linked.ok) {
+    // Never hand a partially-applied candidate to the writer: the card was
+    // added in memory, but without its link the branch would be half-authored.
+    return { ...linked, csv: csvText };
+  }
+  const repointed = entryRepointError('add-linked-card', csvText, linked.csv, adapter);
+  if (repointed !== undefined) {
+    return { csv: csvText, ok: false, errors: [repointed] };
+  }
+  return finalise(csvText, linked.csv, adapter);
 }
 
 // ── Read counterpart ─────────────────────────────────────────

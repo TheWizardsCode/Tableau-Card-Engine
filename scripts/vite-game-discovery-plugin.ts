@@ -75,6 +75,15 @@ export const CONFIGS_DIR = 'configs';
 export const DEFAULT_PRESET = 'core-only';
 
 /**
+ * Worklog store directory at the **main** checkout root.
+ *
+ * Linked worktrees live at `<main>/.worklog/worktrees/<id>/`, so its presence
+ * distinguishes a main checkout from a worktree (a worktree has no
+ * `.worklog/` of its own — see `docs/dev/worktree-isolation.md`).
+ */
+export const WORKLOG_DIR = '.worklog';
+
+/**
  * Build the core-module path aliases for a given core checkout root.
  *
  * In the merged core repo itself the root is this directory; in a
@@ -229,6 +238,41 @@ export function selectConfigPath(
   env: Record<string, string | undefined> = process.env,
 ): string {
   const requested = (env.GAMES_CONFIG ?? '').trim();
+  const configPath = resolveRequestedConfigPath(projectRoot, env);
+
+  // An explicit path (or no request) is used as-is: a missing file is reported
+  // by `loadGamesConfig` with its own message.
+  if (!requested || requested.includes('/') || requested.endsWith('.json')) {
+    return configPath;
+  }
+
+  if (!fs.existsSync(configPath)) {
+    const available = listPresets(projectRoot);
+    throw new Error(
+      `[game-discovery] Unknown GAMES_CONFIG preset "${requested}". ` +
+        `Expected one of: ${available.join(', ')} ` +
+        `(or an explicit path such as configs/${requested}.json).`,
+    );
+  }
+  return configPath;
+}
+
+/**
+ * Resolve the preset path a build requests, without checking that it exists.
+ *
+ * Split out of {@link selectConfigPath} so {@link resolveSiblingAnchor} can ask
+ * "does *this* checkout carry the active preset?" for a candidate ancestor
+ * while keeping one implementation of the preset-name/path resolution rule.
+ *
+ * @param projectRoot Absolute repo root (where `configs/` lives).
+ * @param env Environment-like record.
+ * @returns Absolute path to the selected config file (may not exist).
+ */
+function resolveRequestedConfigPath(
+  projectRoot: string,
+  env: Record<string, string | undefined>,
+): string {
+  const requested = (env.GAMES_CONFIG ?? '').trim();
 
   if (!requested) {
     return path.join(projectRoot, CONFIGS_DIR, `${DEFAULT_PRESET}.json`);
@@ -241,16 +285,52 @@ export function selectConfigPath(
       : path.join(projectRoot, requested);
   }
 
-  const candidate = path.join(projectRoot, CONFIGS_DIR, `${requested}.json`);
-  if (!fs.existsSync(candidate)) {
-    const available = listPresets(projectRoot);
-    throw new Error(
-      `[game-discovery] Unknown GAMES_CONFIG preset "${requested}". ` +
-        `Expected one of: ${available.join(', ')} ` +
-        `(or an explicit path such as configs/${requested}.json).`,
-    );
+  return path.join(projectRoot, CONFIGS_DIR, `${requested}.json`);
+}
+
+/**
+ * Resolve the checkout root that preset sibling paths are declared relative to.
+ *
+ * Preset `path` values are sibling repo roots (`../tce-<game>`) relative to the
+ * **main** checkout. A build run from a linked worktree
+ * (`<main>/.worklog/worktrees/<id>/`) has the same `configs/` but no `../tce-<game>`
+ * next door, so resolving the preset from the worktree root would look under
+ * `.worklog/worktrees/` — another item's checkout, or nothing at all
+ * (CG-0MWTVP7AI008RAPB).
+ *
+ * Walks up from `projectRoot` to the nearest ancestor that looks like the main
+ * checkout — it must carry a worklog store (`.worklog/`), a `configs/`
+ * directory **and** the preset the build selected — and returns `projectRoot`
+ * itself when there is none, so a main-checkout build is byte-for-byte
+ * unchanged. Requiring the preset keeps an unrelated parent that happens to
+ * hold a `.worklog/` directory from being mistaken for the main checkout; an
+ * unknown preset falls back to `projectRoot`, leaving `selectConfigPath` to
+ * report it with its own (preset-naming) error.
+ *
+ * @param projectRoot Absolute repo root the build runs from (may be a worktree).
+ * @param env Environment-like record holding `GAMES_CONFIG` (defaults to
+ *   `process.env`).
+ * @returns Absolute path to anchor sibling `path` values against.
+ */
+export function resolveSiblingAnchor(
+  projectRoot: string,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const root = path.resolve(projectRoot);
+
+  let candidate = root;
+  for (;;) {
+    if (
+      fs.existsSync(path.join(candidate, WORKLOG_DIR)) &&
+      fs.existsSync(path.join(candidate, CONFIGS_DIR)) &&
+      fs.existsSync(resolveRequestedConfigPath(candidate, env))
+    ) {
+      return candidate;
+    }
+    const parent = path.dirname(candidate);
+    if (parent === candidate) return root;
+    candidate = parent;
   }
-  return candidate;
 }
 
 /** List available preset names (without the `.json` suffix). */
@@ -339,7 +419,10 @@ export function loadGamesConfig(configPath: string): GamesConfig {
  *    preset keeps working for a game repo that has not migrated yet.
  *
  * @param config Parsed preset.
- * @param projectRoot Absolute repo root.
+ * @param projectRoot Absolute repo root (the checkout being built).
+ * @param env Environment-like record holding `GAMES_CONFIG` (defaults to
+ *   `process.env`) — used only to detect a linked worktree, where sibling
+ *   paths must resolve against the main checkout (CG-0MWTVP7AI008RAPB).
  * @returns Fully resolved games in config order.
  * @throws When a configured game is found in neither sibling location (fail
  *   fast — a partially-populated build is worse than a failed one).
@@ -347,9 +430,14 @@ export function loadGamesConfig(configPath: string): GamesConfig {
 export function discoverGames(
   config: GamesConfig,
   projectRoot: string,
+  env: Record<string, string | undefined> = process.env,
 ): DiscoveredGame[] {
+  // Preset paths are siblings of the **main** checkout; a build from a linked
+  // worktree must never resolve them under `.worklog/worktrees/`.
+  const siblingAnchor = resolveSiblingAnchor(projectRoot, env);
+
   return config.games.map((entry) => {
-    const siblingRoot = path.resolve(projectRoot, entry.path);
+    const siblingRoot = path.resolve(siblingAnchor, entry.path);
     // Option C (F9/C1): try, in order, the explicit `src/`-layout sibling path,
     // then the legacy sibling `example-games/<game>/…` path. An in-tree copy
     // is never consulted: the merged core holds no games at HEAD.
@@ -574,6 +662,7 @@ const GYM_SCENE_NAMES = [
   'GymRuleEngineScene',
   'GymDlcUnlockScene',
   'GymStorylineScene',
+  'GymLongErasureScene',
 ] as const;
 
 // ── The plugin ────────────────────────────────────────────────────────────
@@ -602,7 +691,7 @@ export function gameDiscoveryPlugin(options: {
     const env = options.env ?? process.env;
     const configPath = selectConfigPath(projectRoot, env);
     const config = loadGamesConfig(configPath);
-    const games = discoverGames(config, projectRoot);
+    const games = discoverGames(config, projectRoot, env);
     return renderGameRegistryModule(
       games,
       options.coreRoot ? { coreRoot: options.coreRoot } : {},

@@ -7,11 +7,15 @@
  * | Concern | Module | Members |
  * |---|---|---|
  * | Content model + adapter seam | `types` | `ContentCard`, `ContentAdapter`, `ContentFieldMapping`, `baseIdOf`, … |
- * | CSV + checksum | `csv` | `parseCsv`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
+ * | CSV + checksum | `csv` | `parseCsv`, `parseResourceDeclaration`, `serialiseCsv`, `computeContentChecksum`, `cardsFromCsv`, `compileContentOptions` |
  * | Manifest + Mermaid | `manifest` | `buildStorylineManifest`, `serialiseManifest`, `renderMermaid`, `filterManifestByStoryline`, label helpers |
- * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports |
- * | Transactional authoring | `author` | `addContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
+ * | Episode manifest shape | `episode-manifest` | `EpisodeManifest`/`Act`/`Scene`/`Beat`/… types, `MANIFEST_VERSION`, `DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH`, `validateEpisodeManifest`, `coveredOutcomes`/`SCENE_OUTCOMES`, its finding/result types, text/JSON reports |
+ * | Route-space guard | `guard` | `evaluateContentGuard`, `evaluateContentGuardCsv`, its report types, `contentGuardToJson`/`formatContentGuardReport` |
+ * | Scene-space guard | `scene-guard` | `enumerateSceneSpace`, `SceneGuardReport`, its exit/refusal shapes, `sceneGuardToJson`/`formatSceneGuardReport` |
+ * | Validation | `validate` | `validateContentCards`, `validateContentCsv`, text/JSON reports, `storylineEntryCards` |
+ * | Transactional authoring | `author` | `addContentCard`, `addLinkedContentCard`, `addOptionToContentCard`, `updateContentCard`, `updateContentCards`, `applyContentEditToFile` |
  * | Generated artefacts | `artefacts` | `renderArtefacts`, `checkArtefacts`, `writeArtefacts`, `previewArtefacts`, `DEFAULT_ARTEFACT_PATHS` |
+ * | Prohibited-term (IP) scan | `ip-terms` | `parseProhibitedTermList`, `scanProhibitedTerms` |
  * | Shipped adapters | `adapters` | `GYM_CONTENT_ADAPTER`, `DEFAULT_CONTENT_ADAPTER`, `getContentAdapter` |
  *
  * Nothing here imports a game repository or Phaser,
@@ -42,8 +46,53 @@ export {
   findMissingColumns,
   optionSuccessorIds,
   parseCsv,
+  parseResourceDeclaration,
   serialiseCsv,
 } from './csv';
+
+export type {
+  ContentGuardConsequentialChoice,
+  ContentGuardEnding,
+  ContentGuardGatedBranch,
+  ContentGuardGateKind,
+  ContentGuardInvariant,
+  ContentGuardOptions,
+  ContentGuardReport,
+  ContentGuardViolation,
+} from './guard';
+export {
+  CONSEQUENTIAL_COLUMN,
+  DEFAULT_GUARD_MAX_DEPTH,
+  DEFAULT_GUARD_MAX_STATES,
+  DEFAULT_MIN_REJOIN_DISTANCE,
+  ENDING_COLUMN,
+  contentGuardToJson,
+  evaluateContentGuard,
+  evaluateContentGuardCsv,
+  formatContentGuardReport,
+} from './guard';
+
+export type {
+  SceneGuardBeatRefusal,
+  SceneGuardExhaustedSuccessViolation,
+  SceneGuardExploration,
+  SceneGuardInvariantName,
+  SceneGuardInvariantSummary,
+  SceneGuardOptions,
+  SceneGuardRefusalStrandViolation,
+  SceneGuardReport,
+  SceneGuardSceneExit,
+  SceneGuardViolation,
+} from './scene-guard';
+export {
+  DEFAULT_SCENE_GUARD_MAX_DEPTH,
+  DEFAULT_SCENE_GUARD_MAX_STATES,
+  SCENE_GUARD_INVARIANT_NO_SUCCESS_ON_EXHAUSTED_CLOSE,
+  SCENE_GUARD_INVARIANT_REFUSAL_REACHES_ENDING,
+  enumerateSceneSpace,
+  formatSceneGuardReport,
+  sceneGuardToJson,
+} from './scene-guard';
 
 export type {
   ManifestBuildOptions,
@@ -72,17 +121,63 @@ export type {
   ContentIssueCode,
   ContentValidationOptions,
   ContentValidationResult,
+  ContentWarning,
+  ContentWarningCode,
 } from './validate';
 export {
   contentValidationToJson,
   findCycles,
   formatContentValidationReport,
+  storylineEntryCards,
   validateContentCards,
   validateContentCsv,
 } from './validate';
 
 export type {
+  Act,
+  Beat,
+  ConditionOperator,
+  EpisodeManifest,
+  EpisodeManifestCounts,
+  EpisodeManifestFinding,
+  EpisodeManifestIssueCode,
+  EpisodeManifestRule,
+  EpisodeManifestTraversal,
+  EpisodeManifestValidationResult,
+  LossRule,
+  ManifestActNode,
+  ManifestLeafNode,
+  ManifestSceneNode,
+  Objective,
+  OutcomeRule,
+  ResourceBounds,
+  ResourceCheck,
+  RouteTarget,
+  Scene,
+  SceneCondition,
+  SceneOutcome,
+  SceneRoute,
+} from './episode-manifest';
+export {
+  CONDITION_OPERATORS,
+  DEFAULT_EPISODE_MANIFEST_SCHEMA_PATH,
+  EPISODE_MANIFEST_ISSUE_CODES,
+  MANIFEST_VERSION,
+  SCENE_OUTCOMES,
+  coveredOutcomes,
+  episodeManifestValidationToJson,
+  formatEpisodeManifestReport,
+  validateEpisodeManifest,
+  walkEpisodeManifest,
+} from './episode-manifest';
+
+export type { ProseField, ProseFieldSpec } from './prose';
+export { PROSE_FIELD_SPECS, mappedProseColumns } from './prose';
+
+export type {
   AddContentCardSpec,
+  AddLinkedCardSpec,
+  AddOptionContentCardSpec,
   ApplyContentEditOptions,
   ContentEditResult,
   ContentFileEditResult,
@@ -91,7 +186,11 @@ export type {
 } from './author';
 export {
   addContentCard,
+  addLinkedContentCard,
+  addOptionToContentCard,
+  appendOptionEncoding,
   applyContentEditToFile,
+  encodeOptionEntry,
   hasContentCard,
   readContentCards,
   updateContentCard,
@@ -113,11 +212,24 @@ export {
   writeArtefacts,
 } from './artefacts';
 
+export type {
+  ProhibitedTermAllowance,
+  ProhibitedTermList,
+  ProhibitedTermListParseResult,
+  ProhibitedTermMatch,
+} from './ip-terms';
+export { parseProhibitedTermList, scanProhibitedTerms } from './ip-terms';
+
+export type { ContentFileSpec } from './adapters';
 export {
   CONTENT_ADAPTERS,
   DEFAULT_CONTENT_ADAPTER,
+  DEFAULT_CONTENT_FILES,
   DEFAULT_CONTENT_PATH,
   GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_PATH,
+  findContentFileSpec,
   getContentAdapter,
   resolveContentAdapter,
 } from './adapters';

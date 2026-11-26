@@ -1,0 +1,5 @@
+id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue
+prose-open,The Lamplit Quay,The tide has turned.,Speak to the ferryman|prose-ferry;Walk the pier|prose-pier,prose-quay,The Lamplit Quay,"coins,reputation","You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: ""Do not take the morning boat.""",
+prose-ferry,The Ferryman,He knows your name.,Ask about the note|prose-end;Say nothing|,prose-quay,The Lamplit Quay,"coins,reputation","The ferryman does not look up. 'I have been expecting you,' he says; his oar rests, dripping, on the stones, and the word | on the sign above him has been freshly repainted. A hand has added # 4 in chalk.",
+prose-pier,The Long Pier,The pier creaks.,Turn back|prose-end,prose-quay,The Lamplit Quay,"coins,reputation",,
+prose-end,Morning Boat,Nothing follows you aboard.,,prose-quay,The Lamplit Quay,"coins,reputation",,"The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there."

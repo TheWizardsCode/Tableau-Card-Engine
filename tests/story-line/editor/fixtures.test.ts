@@ -76,9 +76,11 @@ describe('story-line editor fixture helper', () => {
   it('leaves the committed originals byte-identical after editing the copies', () => {
     const fixture = copyEditorFixtureFiles();
     try {
-      // Simulate an editor edit against the isolated copies.
-      writeFileSync(fixture.csvPath, originals.csv.replace('Town Meeting', 'Renamed Meeting'), 'utf-8');
-      writeFileSync(fixture.manifestPath, originals.manifest.replace('Town Meeting', 'Renamed Meeting'), 'utf-8');
+      // Simulate an editor edit against the isolated copies. The mutation is a
+      // content-agnostic marker (the shipped prose is author-editable, so
+      // rewriting a specific card name here could silently become a no-op).
+      writeFileSync(fixture.csvPath, `${originals.csv}\n`, 'utf-8');
+      writeFileSync(fixture.manifestPath, `${originals.manifest}\n`, 'utf-8');
       // The committed originals are untouched.
       expect(readFileSync(CONTENT_CSV_PATH, 'utf-8')).toBe(originals.csv);
       expect(readFileSync(MANIFEST_ARTEFACT_PATH, 'utf-8')).toBe(originals.manifest);

@@ -8,6 +8,11 @@
  * and {@link StorylineUiAdapter} seams — core never imports game types and
  * has no Phaser dependency.
  *
+ * The beat-sheet layer sits on top of the same choice model:
+ * {@link createEpisodeRunner} walks a validated episode manifest (acts, scenes,
+ * beats, clock budget, outcome and route tables — GDD §2.3) around the one
+ * `StorylineSystem` a game supplies.
+ *
  * ```ts
  * import { createStorylineSystem } from '@story-line';
  *
@@ -34,6 +39,7 @@ import {
   parseStoryUpdate,
 } from './journal';
 import { pushChainCard, resolveStorylineOption } from './resolve';
+import { resolveResourceKeys } from './resources';
 import { createDefaultStorylineUiAdapter } from './ui-adapter';
 import type {
   CompiledStoryline,
@@ -67,7 +73,41 @@ export type {
 
 // ── Public runtime helpers ───────────────────────────────────
 export { STORY_UPDATE_PREFIX, parseStoryUpdate } from './journal';
-export { parseStorylineOptionsEncoding } from './compile';
+export { parseStorylineOptionsEncoding, serialiseStorylineOptionsEncoding } from './compile';
+export {
+  StorylineOptionsEncodingError,
+  type StorylineOptionsEncodingErrorReason,
+} from './compile';
+export {
+  COIN_PROJECTION_KEY,
+  DEFAULT_RESOURCE_KEYS,
+  REPUTATION_PROJECTION_KEY,
+  createResourceProjection,
+  normaliseResourceKeys,
+  parseResourceKeys,
+  readManifestBounds,
+  readManifestStartBag,
+  readResource,
+  resolveResourceKeys,
+  selectDeclaredDelta,
+} from './resources';
+export type {
+  DeclaredDeltaSelection,
+  ManifestBoundsRead,
+  ManifestResourceBounds,
+  ManifestResourceReadIssue,
+  ManifestResourceReadReason,
+  ManifestStartBagRead,
+  ResourceProjectionOptions,
+  ResourceRemainderEntry,
+  ResourceRemainderReport,
+  SelectDeclaredDeltaOptions,
+  StorylineResourceField,
+  StorylineResourceKey,
+  StorylineResourceProjection,
+  StorylineResources,
+  StorylineResourcesDelta,
+} from './resources';
 export {
   createDefaultStorylineUiAdapter,
   defaultStorylineUiAdapter,
@@ -77,6 +117,8 @@ export {
   defaultStoryUpdateLine,
   defaultJournalTitle,
   defaultStorylineSummary,
+  formatOptionCost,
+  formatOptionLabel,
 } from './ui-adapter';
 export {
   evaluateCondition,
@@ -94,6 +136,8 @@ export {
   buildJournal,
   journalIsEmpty,
   journalTitle,
+  truncateOutcome,
+  DEFAULT_OUTCOME_MAX_LENGTH,
 } from './journal';
 export {
   compileStorylineFromEvent,
@@ -102,6 +146,58 @@ export {
   isOptionAffordable,
 } from './compile';
 export type { StorylineOptionRegistry } from './compile';
+
+// ── Episode runner (GDD §2.3) ────────────────────────────────
+export {
+  auditIrreversibleDeclaration,
+  classifySceneOutcome,
+  createEpisodeResourceProjection,
+  createEpisodeRunner,
+  deserializeRunState,
+  EPISODE_RUN_STATE_SCHEMA_VERSION,
+  EpisodeRunStateSerializer,
+  evaluateSceneCondition,
+  hydrateRunState,
+  resolveRouteTarget,
+  selectRoute,
+  serializeRunState,
+} from './episode-runner';
+export type {
+  EpisodeResourceProjectionOptions,
+  IrreversibleDeclarationAudit,
+  IrreversibleDeclarationInput,
+  IrreversibleDeclarationIssue,
+  IrreversibleDeclarationIssueReason,
+  IrreversibleDeclarationSource,
+  IrreversibleProjectionDeclaration,
+} from './episode-runner';
+export { LOSS_LEDGER_KINDS, SCENE_EXIT_FIELDS } from './types';
+export type {
+  BeatEntry,
+  BeatEntryRefusalReason,
+  ChainLossLedgerEntry,
+  ChoiceNext,
+  ChoiceResolution,
+  EpisodeRunState,
+  EpisodeRunner,
+  EpisodeRunnerConfig,
+  LossLedgerEntry,
+  LossLedgerKind,
+  PresentedBeatEntry,
+  PushedCardCase,
+  RefusedBeatEntry,
+  RouteSelectionContext,
+  RouteSelectionRequest,
+  RouteTargetResolution,
+  RoutingCloseInput,
+  RuleLossLedgerEntry,
+  SceneCloseResult,
+  SceneConditionContext,
+  SceneExitRecord,
+  SceneOutcomeClassification,
+  SceneRouteResult,
+  SerializedEpisodeRunState,
+} from './types';
 
 /** Configuration for {@link createStorylineSystem}. */
 export interface StorylineSystemConfig<
@@ -133,6 +229,7 @@ export function createStorylineSystem<
   const engine = config.engine;
   const ui =
     config.ui ?? createDefaultStorylineUiAdapter<TCard>();
+  const declaredResources = resolveResourceKeys(engine.resources);
   const registry = createStorylineOptionRegistry<TState>((id) =>
     engine.getBaseTypeId(id),
   );
@@ -141,8 +238,12 @@ export function createStorylineSystem<
     card: TCard,
     state?: TState,
   ): CompiledStoryline<TState> =>
-    compileStorylineFromEvent(card, registry, state, (s) =>
-      engine.getResources(s),
+    compileStorylineFromEvent(
+      card,
+      registry,
+      state,
+      (s) => engine.getResources(s),
+      declaredResources,
     );
 
   const getStorylineOptions = (
@@ -153,6 +254,7 @@ export function createStorylineSystem<
   return {
     engine,
     ui,
+    resources: declaredResources,
 
     // ── Compilation ───────────────────────────────────────────
     compileStorylineFromEvent: compile,

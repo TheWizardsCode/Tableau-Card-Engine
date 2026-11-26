@@ -78,19 +78,51 @@ interface CoreFieldSpec {
  * `options` is the **only** way a card becomes a choice node: it encodes the
  * successor links, so a card can no longer be flagged as a choice or linked
  * through a second, legacy field pair.
+ *
+ * The two prose fields (`context`, `epilogue`) render as long-text controls and
+ * only when the adapter maps them — an adapter that does not map prose
+ * contributes no prose control.
  */
 const CORE_FIELDS: readonly CoreFieldSpec[] = [
   { key: 'id', label: 'Card id', kind: 'read-only', hint: 'The card id is the chain link target; it cannot be renamed here.' },
   { key: 'name', label: 'Name', kind: 'text' },
   { key: 'effect', label: 'Effect', kind: 'long-text' },
   {
+    key: 'context',
+    label: 'Context',
+    kind: 'long-text',
+    hint:
+      'The beat\'s situation, shown above the options. Optional; the adopted budget is 400 characters.',
+  },
+  {
     key: 'options',
     label: 'Options',
     kind: 'long-text',
-    hint: 'Options encoding: label|target;label2|target2 — a comma separates random candidates.',
+    hint:
+      'Options encoding: label|target;label2|target2 — a comma separates random candidates. ' +
+      'Append #cost=coins:5#extra=reputation:+2#when=coins>=3>cardX to declare a cost, ' +
+      'an extra effect and a conditional successor (repeat #when for an ordered rule list). ' +
+      'Append #says=… for the outcome prose of taking the option (escape a literal ";" as \\; ' +
+      'and a literal "#" as \\#; the full policy and examples are in ' +
+      'docs/core-engine/story-line.md, Authored prose → Escape policy).',
   },
   { key: 'storylineId', label: 'Story-line id', kind: 'text' },
   { key: 'storylineTitle', label: 'Story-line title', kind: 'text' },
+  {
+    key: 'resources',
+    label: 'Declared resources',
+    kind: 'text',
+    hint:
+      'Comma-separated resource keys this card declares (e.g. coins,reputation,hull). ' +
+      'The options #cost/#extra/#when attributes may only name a declared key.',
+  },
+  {
+    key: 'epilogue',
+    label: 'Epilogue',
+    kind: 'long-text',
+    hint:
+      'The closing prose shown on a terminal card. Optional; the adopted budget is 600 characters.',
+  },
 ];
 
 /** Options for {@link buildCardFieldDescriptors}. */
@@ -108,12 +140,18 @@ function coreValue(card: ContentCard, key: CoreFieldSpec['key']): string {
       return card.name;
     case 'effect':
       return card.effect;
+    case 'context':
+      return card.context ?? '';
+    case 'epilogue':
+      return card.epilogue ?? '';
     case 'options':
       return card.options;
     case 'storylineId':
       return card.storylineId ?? '';
     case 'storylineTitle':
       return card.storylineTitle ?? '';
+    case 'resources':
+      return card.resourceKeys.join(',');
   }
 }
 
@@ -283,6 +321,12 @@ function applyCoreValue(
     case 'effect':
       spec.effect = value;
       break;
+    case 'context':
+      spec.context = trimmed === '' ? null : value;
+      break;
+    case 'epilogue':
+      spec.epilogue = trimmed === '' ? null : value;
+      break;
     case 'options':
       spec.options = value;
       break;
@@ -291,6 +335,9 @@ function applyCoreValue(
       break;
     case 'storylineTitle':
       spec.storylineTitle = trimmed === '' ? null : trimmed;
+      break;
+    case 'resources':
+      spec.resources = trimmed === '' ? null : value;
       break;
     case 'id':
       // The id is the row selector, not an editable field.
@@ -366,9 +413,12 @@ export function buildAddSpec(
     id: value('id').trim(),
     name: value('name').trim(),
     ...(has('effect') ? { effect: value('effect') } : {}),
+    ...(has('context') ? { context: optional('context') } : {}),
+    ...(has('epilogue') ? { epilogue: optional('epilogue') } : {}),
     ...(has('options') ? { options: value('options') } : {}),
     ...(has('storylineId') ? { storylineId: optional('storylineId') } : {}),
     ...(has('storylineTitle') ? { storylineTitle: optional('storylineTitle') } : {}),
+    ...(has('resources') ? { resources: optional('resources') } : {}),
     ...(Object.keys(fields).length > 0 ? { fields } : {}),
   };
 }
@@ -443,8 +493,23 @@ function attributeIssue(
       return hasField(descriptors, 'storylineId') ? 'storylineId' : null;
     case 'invalid-option':
       return hasField(descriptors, 'options') ? 'options' : null;
+    case 'unknown-resource-key':
+      // The offending key is authored inside the options cell; fall back to the
+      // declared-resources control when the adapter maps no options column.
+      if (hasField(descriptors, 'options')) return 'options';
+      return hasField(descriptors, 'resources') ? 'resources' : null;
+    case 'irreversible-grant':
+      // A `#extra` grant on a never-restored key is authored in the options
+      // cell, so the fix belongs there.
+      return hasField(descriptors, 'options') ? 'options' : null;
     case 'unknown-successor':
       return issue.target ? fieldForTarget(descriptors, draft, issue.target) : null;
+    case 'missing-column': {
+      // The header (not a card cell) is wrong, so attribute the issue to the
+      // control whose CSV column the adapter maps, when the form renders it.
+      const match = descriptors.find((descriptor) => descriptor.column === issue.column);
+      return match ? match.key : null;
+    }
     case 'unreachable-card':
     case 'cycle-error':
       return null;

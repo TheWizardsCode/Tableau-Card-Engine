@@ -125,6 +125,38 @@ export type {
 // Event / transition animation helpers
 export { popTextOrIcon } from './popTextOrIcon';
 export type { PopTextOrIconOptions } from './popTextOrIcon';
+
+// Progressive narration reveal (animated prose + shared SFX, CG-0MWO7CULE001IWU1)
+// See docs/ui-animations.md → revealNarration
+export {
+  revealNarration,
+  planNarrationReveal,
+  resolveNarrationSfxKey,
+  resolveNarrationTextWriter,
+  NARRATION_REVEAL_MS_PER_CHARACTER,
+  NARRATION_REVEAL_MIN_STEP_MS,
+  NARRATION_REVEAL_MAX_STEP_MS,
+  NARRATION_REVEAL_MIN_TOTAL_MS,
+  NARRATION_REVEAL_MAX_TOTAL_MS,
+  NARRATION_REVEAL_DEFAULT_SFX,
+} from './narration-reveal';
+export type {
+  NarrationRevealHandle,
+  NarrationRevealPlan,
+  NarrationRevealPlanOptions,
+  NarrationRevealScheduler,
+  NarrationRevealTarget,
+  NarrationRevealTimer,
+  NarrationSfxSelection,
+  NarrationSoundPlayer,
+  NarrationTextWriter,
+  RevealNarrationOptions,
+} from './narration-reveal';
+export {
+  paginateProse,
+  DEFAULT_PROSE_PAGE_CHARS,
+} from './prose-pagination';
+export type { ProsePagination } from './prose-pagination';
 export { runSceneTransition } from './sceneTransition';
 export type { SceneTransitionOptions, SceneTransitionMode, SceneTransitionType } from './sceneTransition';
 
@@ -218,6 +250,7 @@ export type {
   TooltipRenderContext,
   PhaserTooltipRenderFn,
   TooltipManagerConfig,
+  TooltipInputType,
   TooltipPosition,
   ViewportTooltipPositionOptions,
 } from './Tooltip';

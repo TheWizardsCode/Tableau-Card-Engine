@@ -1,0 +1,342 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://tableau-card-engine.example/schemas/episode-manifest.schema.json",
+  "title": "TCE Episode Manifest",
+  "description": "The scene beat sheet of one story-line episode (docs/design/storyline-game-gdd.md §2.2): acts, scenes, beats, objectives, budgets, outcome rules, routes and loss rules. Pure authored data: no timestamps, no derived state. Every fixed-shape object is closed with additionalProperties:false, so an additive field is a manifest-version bump by design. resources.start and resources.bounds are keyed by the manifest's own declared resource keys, so their key set is constrained by pattern and their values by shape; agreement with resources.declared is the validator's job.",
+  "type": "object",
+  "required": [
+    "manifestVersion",
+    "id",
+    "title",
+    "content",
+    "resources",
+    "start",
+    "endings",
+    "acts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "manifestVersion": {
+      "const": 1,
+      "description": "Literal schema version; a mismatched version is refused, never coerced."
+    },
+    "id": {
+      "$ref": "#/definitions/id",
+      "description": "Stable episode id, unique in the distribution."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Player-facing episode title."
+    },
+    "content": {
+      "type": "object",
+      "description": "The content adapter id and the repo-relative CSV path the beats resolve in.",
+      "required": ["adapter", "file"],
+      "additionalProperties": false,
+      "properties": {
+        "adapter": { "type": "string", "minLength": 1 },
+        "file": { "type": "string", "minLength": 1 }
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Declared key set, the irreversible subset, the run's starting bag and the per-key design bounds.",
+      "required": ["declared", "irreversible", "start", "bounds"],
+      "additionalProperties": false,
+      "properties": {
+        "declared": {
+          "type": "array",
+          "description": "Declared resource keys; must equal the content file's declared set (validator rule).",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "irreversible": {
+          "type": "array",
+          "description": "The subset of declared keys the beat sheet never restores.",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "start": {
+          "type": "object",
+          "description": "The run's starting bag: one integer value per declared resource key.",
+          "patternProperties": {
+            "^[a-z0-9][a-z0-9-]*$": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "bounds": {
+          "type": "object",
+          "description": "Per-key design bounds, one { min, max } entry per declared resource key.",
+          "patternProperties": {
+            "^[a-z0-9][a-z0-9-]*$": { "$ref": "#/definitions/resourceBounds" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "start": {
+      "$ref": "#/definitions/beatRef",
+      "description": "Run entry point."
+    },
+    "endings": {
+      "type": "array",
+      "description": "Content card ids that finish a run; non-empty and unique.",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/definitions/id" }
+    },
+    "acts": {
+      "type": "array",
+      "description": "Non-empty, ordered by each act's `order` (array order is not play order).",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/act" }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Reviewer-facing design notes; ignored at runtime."
+    }
+  },
+  "definitions": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$",
+      "description": "A stable lower-case id: starts with a letter or digit, then letters, digits or hyphens."
+    },
+    "resourceBounds": {
+      "type": "object",
+      "description": "Inclusive design bounds for one resource key.",
+      "required": ["min", "max"],
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      }
+    },
+    "beatRef": {
+      "type": "object",
+      "description": "A reference to one beat: the act and scene it belongs to and the beat's card id.",
+      "required": ["act", "scene", "beat"],
+      "additionalProperties": false,
+      "properties": {
+        "act": { "$ref": "#/definitions/id" },
+        "scene": { "$ref": "#/definitions/id" },
+        "beat": { "$ref": "#/definitions/id" }
+      }
+    },
+    "resourceCheck": {
+      "type": "object",
+      "description": "A check against one declared resource, the same shape and operators @story-line uses.",
+      "required": ["field", "op", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "field": { "type": "string", "minLength": 1 },
+        "op": { "enum": [">=", "<=", ">", "<", "=="] },
+        "value": { "type": "number" }
+      }
+    },
+    "condition": {
+      "description": "Exactly the three documented SceneCondition forms: objective, budget, or a raw resource check. No second condition vocabulary.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["objective"],
+          "additionalProperties": false,
+          "properties": {
+            "objective": { "enum": ["met", "unmet"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["budget"],
+          "additionalProperties": false,
+          "properties": {
+            "budget": { "enum": ["exhausted", "intact"] }
+          }
+        },
+        { "$ref": "#/definitions/resourceCheck" }
+      ]
+    },
+    "objective": {
+      "type": "object",
+      "description": "One line of intent plus one measurable check.",
+      "required": ["statement", "check"],
+      "additionalProperties": false,
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 90,
+          "description": "Player-facing, imperative objective statement."
+        },
+        "check": { "$ref": "#/definitions/resourceCheck" }
+      }
+    },
+    "beat": {
+      "type": "object",
+      "description": "One authored beat; its identity is the content card id.",
+      "required": ["cardId", "clockCost"],
+      "additionalProperties": false,
+      "properties": {
+        "cardId": { "$ref": "#/definitions/id" },
+        "clockCost": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ticks charged when the beat is entered."
+        },
+        "note": { "type": "string", "description": "Reviewer-facing; ignored at runtime." }
+      }
+    },
+    "outcomeRule": {
+      "type": "object",
+      "description": "One outcome classification rule; ordered, first match wins.",
+      "required": ["id", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "when": { "$ref": "#/definitions/condition" },
+        "outcome": { "enum": ["success", "partial", "failure"] }
+      }
+    },
+    "routeTarget": {
+      "description": "There is no retry target kind in v1: chain, beat or ending only.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "chain" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "act", "scene"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "beat" },
+            "act": { "$ref": "#/definitions/id" },
+            "scene": { "$ref": "#/definitions/id" },
+            "beat": { "$ref": "#/definitions/id" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "cardId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "ending" },
+            "cardId": { "$ref": "#/definitions/id" }
+          }
+        }
+      ]
+    },
+    "route": {
+      "type": "object",
+      "description": "One scene door; ordered, first match wins.",
+      "required": ["id", "on", "to"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "on": { "enum": ["success", "partial", "failure", "*"] },
+        "when": { "$ref": "#/definitions/condition" },
+        "to": { "$ref": "#/definitions/routeTarget" }
+      }
+    },
+    "lossRule": {
+      "type": "object",
+      "description": "An additional irreversible loss applied at scene close.",
+      "required": ["id", "on", "field", "amount", "statement"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "on": { "enum": ["success", "partial", "failure"] },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must be in resources.irreversible (validator rule)."
+        },
+        "amount": { "type": "integer", "minimum": 1 },
+        "statement": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "description": "One scene; its beat set is its boundary.",
+      "required": [
+        "id",
+        "title",
+        "objective",
+        "budget",
+        "entryBeat",
+        "beats",
+        "outcomeRules",
+        "routes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "objective": { "$ref": "#/definitions/objective" },
+        "budget": {
+          "type": "object",
+          "required": ["clock"],
+          "additionalProperties": false,
+          "properties": {
+            "clock": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Clock ticks available in this scene; reset per entry, never carried."
+            }
+          }
+        },
+        "entryBeat": { "$ref": "#/definitions/id" },
+        "beats": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/beat" }
+        },
+        "outcomeRules": {
+          "type": "array",
+          "description": "Ordered, first match wins; the last rule must be unconditional (validator rule).",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/outcomeRule" }
+        },
+        "routes": {
+          "type": "array",
+          "description": "Ordered, first match wins; must cover all outcomes or end with on:\"*\" (validator rule).",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/route" }
+        },
+        "losses": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/lossRule" }
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "act": {
+      "type": "object",
+      "description": "One act; it has no budget of its own.",
+      "required": ["id", "title", "order", "entryScene", "scenes"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "$ref": "#/definitions/id" },
+        "title": { "type": "string", "minLength": 1 },
+        "order": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Unique order authority; array order is not play order."
+        },
+        "entryScene": { "$ref": "#/definitions/id" },
+        "scenes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/definitions/scene" }
+        },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

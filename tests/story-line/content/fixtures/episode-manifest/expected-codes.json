@@ -1,0 +1,258 @@
+{
+  "$comment": [
+    "Expected-code metadata for the cross-rule determinism gate",
+    "(CG-0MWSJYY9S0046V55). Tests do not hard-code the corpus: this file is the",
+    "single table the sweep reads, so adding or renaming a fixture without",
+    "declaring what it must report is a gate failure.",
+    "",
+    "`corpus` lists every committed manifest fixture in this directory and the",
+    "exact findings the CLI must emit for it when bound to the shipped",
+    "long-erasure.csv. The expectations are THE CLI's, not the per-rule unit",
+    "tests' (those validate without content bound); a bound fixture may cascade",
+    "into a second rule by design, and the cascade is pinned here so a rule",
+    "cannot become unreachable, or newly reachable, unnoticed.",
+    "",
+    "`contentOverrides` covers the rule families whose defect cannot be expressed",
+    "as a manifest-only mutation (the failing input lives in the content file),",
+    "plus the migration-only rule's committed drift CSV. Both mutations are",
+    "applied to the shipped rows exactly as written and written to a temp file,",
+    "so the sweep still goes through the CLI's real --content path."
+  ],
+  "manifest": "example-games/gym/content/long-erasure-episode.json",
+  "content": "example-games/gym/content/long-erasure.csv",
+  "corpus": [
+    {
+      "file": "cards-dangling-chain.json",
+      "findings": [
+        { "code": "dangling-chain", "path": "acts[1].scenes[1].beats[0].cardId" }
+      ]
+    },
+    {
+      "file": "cards-unknown-card.json",
+      "findings": [
+        { "code": "unknown-card", "path": "acts[2].scenes[0].routes[1].to.cardId" }
+      ]
+    },
+    {
+      "file": "identity-duplicate-act.json",
+      "findings": [
+        { "code": "duplicate-act", "path": "acts[2].id" }
+      ]
+    },
+    {
+      "file": "identity-duplicate-beat.json",
+      "findings": [
+        { "code": "dangling-chain", "path": "acts[1].scenes[1].beats[1].cardId" },
+        { "code": "duplicate-beat", "path": "acts[1].scenes[1].beats[4].cardId" },
+        { "code": "unassigned-card", "path": "content.le-ii-sabotage" }
+      ]
+    },
+    {
+      "file": "identity-duplicate-scene.json",
+      "findings": [
+        { "code": "duplicate-scene", "path": "acts[1].scenes[1].id" }
+      ]
+    },
+    {
+      "file": "identity-unknown-act.json",
+      "findings": [
+        { "code": "unknown-act", "path": "acts[0].scenes[0].routes[1].to.act" }
+      ]
+    },
+    {
+      "file": "identity-unknown-scene.json",
+      "findings": [
+        { "code": "unknown-scene", "path": "start.scene" }
+      ]
+    },
+    {
+      "file": "resources-bounds-inverted.json",
+      "findings": [
+        {
+          "code": "resource-set-mismatch",
+          "path": "resources.bounds.morale",
+          "reason": "bounds-inverted"
+        }
+      ]
+    },
+    {
+      "file": "resources-irreversible-not-declared.json",
+      "findings": [
+        { "code": "loss-not-irreversible", "path": "acts[2].scenes[0].losses[0].field" },
+        {
+          "code": "resource-set-mismatch",
+          "path": "resources.irreversible[0]",
+          "reason": "irreversible-not-declared"
+        }
+      ]
+    },
+    {
+      "file": "resources-missing-bounds.json",
+      "findings": [
+        {
+          "code": "resource-set-mismatch",
+          "path": "resources.bounds.charge",
+          "reason": "missing-bounds-entry"
+        }
+      ]
+    },
+    {
+      "file": "resources-missing-start.json",
+      "findings": [
+        {
+          "code": "resource-set-mismatch",
+          "path": "resources.start.stores",
+          "reason": "missing-start-entry"
+        }
+      ]
+    },
+    {
+      "file": "resources-start-outside-bounds.json",
+      "findings": [
+        {
+          "code": "resource-set-mismatch",
+          "path": "resources.start.goodwill",
+          "reason": "start-outside-bounds"
+        }
+      ]
+    },
+    {
+      "file": "semantics-condition-outcome-field.json",
+      "findings": [
+        {
+          "code": "objective-invalid",
+          "path": "acts[0].scenes[0].outcomeRules[0].when.field",
+          "reason": "undeclared-condition-field"
+        }
+      ]
+    },
+    {
+      "file": "semantics-condition-route-field.json",
+      "findings": [
+        {
+          "code": "objective-invalid",
+          "path": "acts[0].scenes[1].routes[0].when.field",
+          "reason": "undeclared-condition-field"
+        }
+      ]
+    },
+    {
+      "file": "semantics-loss-not-irreversible.json",
+      "findings": [
+        { "code": "loss-not-irreversible", "path": "acts[2].scenes[0].losses[0].field" }
+      ]
+    },
+    {
+      "file": "semantics-numeric-act-order.json",
+      "findings": [
+        {
+          "code": "numeric-invalid",
+          "path": "acts[0].order",
+          "reason": "act-order-invalid"
+        }
+      ]
+    },
+    {
+      "file": "semantics-numeric-amount.json",
+      "findings": [
+        {
+          "code": "numeric-invalid",
+          "path": "acts[2].scenes[0].losses[0].amount",
+          "reason": "loss-amount-invalid"
+        }
+      ]
+    },
+    {
+      "file": "semantics-numeric-clock-cost.json",
+      "findings": [
+        { "code": "clock-cost-mismatch", "path": "acts[0].scenes[0].beats[0].clockCost" },
+        {
+          "code": "numeric-invalid",
+          "path": "acts[0].scenes[0].beats[0].clockCost",
+          "reason": "clock-cost-invalid"
+        }
+      ]
+    },
+    {
+      "file": "semantics-numeric-clock.json",
+      "findings": [
+        {
+          "code": "numeric-invalid",
+          "path": "acts[0].scenes[0].budget.clock",
+          "reason": "budget-clock-invalid"
+        }
+      ]
+    },
+    {
+      "file": "semantics-objective-overlong.json",
+      "findings": [
+        {
+          "code": "objective-invalid",
+          "path": "acts[0].scenes[0].objective.statement",
+          "reason": "statement-too-long"
+        }
+      ]
+    },
+    {
+      "file": "semantics-objective-undeclared-field.json",
+      "findings": [
+        {
+          "code": "objective-invalid",
+          "path": "acts[0].scenes[0].objective.check.field",
+          "reason": "undeclared-objective-field"
+        }
+      ]
+    },
+    {
+      "file": "semantics-objective-unknown-op.json",
+      "findings": [
+        {
+          "code": "objective-invalid",
+          "path": "acts[0].scenes[0].objective.check.op",
+          "reason": "unknown-operator"
+        }
+      ]
+    },
+    {
+      "file": "totality-outcome-rules.json",
+      "findings": [
+        { "code": "non-total-outcome-rules", "path": "acts[0].scenes[0].outcomeRules[1]" }
+      ]
+    },
+    {
+      "file": "totality-routes.json",
+      "findings": [
+        { "code": "non-total-routes", "path": "acts[0].scenes[0].routes" }
+      ]
+    }
+  ],
+  "contentOverrides": [
+    {
+      "id": "unassigned-card",
+      "mutation": {
+        "kind": "append-card",
+        "card": {
+          "id": "le-i-orphan",
+          "name": "Orphan",
+          "options": "Go|le-i-open",
+          "storylineId": "long-erasure"
+        }
+      },
+      "findings": [
+        { "code": "unassigned-card", "path": "content.le-i-orphan" }
+      ]
+    },
+    {
+      "id": "ending-successor",
+      "mutation": {
+        "kind": "set-cell",
+        "cardId": "le-end-reset",
+        "column": "options",
+        "value": "Begin again|le-i-nowhere"
+      },
+      "findings": [
+        { "code": "ending-successor", "path": "endings[0]" }
+      ]
+    }
+  ]
+}

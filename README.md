@@ -181,7 +181,12 @@ into `public/assets/` at dev/build time — see
 `scripts/vite-game-assets-plugin.ts` / `scripts/link-game-assets.ts` — so the
 Game Selector and every game load their assets with no extra step. The composed
 links are gitignored and are removed again when a preset that does not select
-the game is used (e.g. the default `core-only`).
+the game is used (e.g. the default `core-only`). Composition is **on by
+default** for every dev/build/package run; Vitest builds skip it so automated
+tests never mutate the shared `public/assets` tree, and the tests that assert on
+real build output read a private snapshot of `public/` instead — so `npm test`
+leaves the tree exactly as it found it (see
+[docs/DEVELOPER.md](docs/DEVELOPER.md#game-asset-composition)).
 
 The same preset drives `npm run build`, `npm run build:electron` and the test
 profiles, so `setup:distribution` is the one prerequisite for any multi-game
@@ -337,7 +342,12 @@ as a `./core` submodule. The multi-game distribution composes those repos as
 **sibling checkouts** (`../tce-<game>`) alongside the merged core — the core
 carries no games at HEAD. Use `npm run setup:distribution -- --dir ..` to
 bootstrap them. The **Gym stays in the core repo** — it is the canonical
-core-engine feature demonstrator.
+core-engine feature demonstrator. Its full story-line spike, *The Long Erasure*,
+has a complete game design in
+[docs/design/storyline-game-gdd.md](docs/design/storyline-game-gdd.md) — the
+scene beat sheet, economy, presentation contract, engine-gap backlog and v1
+scope — with its evidence in the
+[observation log](docs/gym/long-erasure-observation-log.md).
 
 | Game | Repo | Description |
 |------|------|-------------|

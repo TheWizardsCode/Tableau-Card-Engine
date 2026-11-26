@@ -177,10 +177,18 @@ sibling candidate scene paths **in order**, and using the first that exists:
 `<root>` is the Vite project root (the repo being built); `<path>` is resolved
 relative to it (in the composed distribution this is the sibling checkout). The
 merged core carries **no games at HEAD**, so an in-tree
-`example-games/<game>/` copy is never consulted. Presets resolve from a git
-worktree exactly as from the main checkout, relative to the worktree root —
-so a worktree needs its sibling checkouts beside it (or run distribution
-builds from the main checkout).
+`example-games/<game>/` copy is never consulted.
+
+**Worktree builds anchor on the main checkout.** `<path>` values are declared
+relative to the **main** checkout (`../tce-<game>`). When the build runs from a
+linked worktree (`<main>/.worklog/worktrees/<id>/`), sibling resolution is
+anchored on that main checkout instead of the worktree root — otherwise
+`../tce-<game>` would resolve to `.worklog/worktrees/tce-<game>`, another
+item's checkout (or nothing at all). The anchor is the nearest ancestor that
+carries `.worklog/`, `configs/` **and** the preset the build selected; a
+main-checkout build anchors on itself, so its behaviour is unchanged
+(CG-0MWTVP7AI008RAPB). Game **asset** composition
+(`scripts/link-game-assets.ts`) uses the same anchor.
 
 One preset set therefore works in every composition, because each game repo
 supplies its own source (at repo-root `src/`, or the legacy

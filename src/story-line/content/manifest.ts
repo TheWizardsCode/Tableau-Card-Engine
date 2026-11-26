@@ -73,6 +73,17 @@ export interface ManifestNode {
   readonly options: readonly ManifestOption[];
   /** Human-readable effect text. */
   readonly effect: string;
+  /**
+   * The beat's authored situation paragraph, verbatim. Absent (never `null`)
+   * when the adapter maps no prose column or the cell is blank, so content
+   * without prose produces byte-identical output.
+   */
+  readonly context?: string | null;
+  /**
+   * The terminal card's authored closing prose, verbatim. Absent under the
+   * same rule as {@link ManifestNode.context}.
+   */
+  readonly epilogue?: string | null;
   /** Adapter-provided game impact description (`''` when the adapter has none). */
   readonly impact: string;
   /** Every game-specific column for this card, keyed by CSV column name. */
@@ -183,6 +194,8 @@ export function buildStorylineManifest(
         effectPolicy: option.effectPolicy,
       })),
       effect: card.effect,
+      ...(card.context ? { context: card.context } : {}),
+      ...(card.epilogue ? { epilogue: card.epilogue } : {}),
       impact: adapter.describeImpact ? adapter.describeImpact(card) : '',
       fields: card.fields,
     });

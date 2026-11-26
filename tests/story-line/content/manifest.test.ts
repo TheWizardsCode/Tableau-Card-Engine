@@ -29,12 +29,13 @@ import {
   serialiseManifest,
 } from '../../../src/story-line/content/manifest';
 import { runStorylineGraphCli } from '../../../scripts/storyline-graph';
-import { TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
+import { TAVERN_CONTENT_ADAPTER, PROSE_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   GYM_CONTENT_PATH,
   MANIFEST_SCHEMA_PATH,
   makeTempDir,
   readFixture,
+  readProseFixture,
   readText,
   captureOutput,
 } from './test-support';
@@ -62,13 +63,20 @@ describe('buildStorylineManifest', () => {
     ]);
 
     const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    // The authored prose columns are read off the card under test (a content
+    // edit may change them); everything else here is structure or mechanics.
+    const startCard = cardsFromCsv(
+      parseCsv(readText(GYM_CONTENT_PATH)),
+      GYM_CONTENT_ADAPTER,
+    ).find((card) => card.id === 'gym-story-start');
+    expect(startCard, 'gym-story-start is in the content').toBeDefined();
     expect(start).toMatchObject({
-      name: 'Town Meeting',
+      name: startCard!.name,
+      effect: startCard!.effect,
       storylineId: 'gym-story',
       storylineTitle: 'Gym Storyline',
       isChoice: true,
       optionCount: 2,
-      effect: 'Lose 50 coins',
       impact: '−50 coins',
     });
     expect(start?.options).toEqual([
@@ -158,11 +166,58 @@ describe('filterManifestByStoryline', () => {
   });
 });
 
+describe('authored prose in the manifest', () => {
+  const manifest = buildStorylineManifestFromCsv(
+    readProseFixture('prose-basic.csv'),
+    PROSE_CONTENT_ADAPTER,
+  );
+
+  it('carries the authored context and epilogue verbatim on the node', () => {
+    const open = manifest.nodes.find((node) => node.id === 'prose-open');
+    expect(open?.context).toBe(
+      'You step off the last coach of the evening. The harbour is quiet, but the lamps are lit, and someone has left a note under your door: "Do not take the morning boat."',
+    );
+    expect(open?.epilogue).toBeUndefined();
+
+    const end = manifest.nodes.find((node) => node.id === 'prose-end');
+    expect(end?.epilogue).toBe(
+      'The boat slips its mooring before you have found a seat. Behind you the lamps go out one by one; by the time you look again, the town is not there.',
+    );
+    expect(end?.context).toBeUndefined();
+  });
+
+  it('adds no prose keys when the adapter maps no prose column', () => {
+    const tavernManifest = buildStorylineManifestFromCsv(
+      readFixture('tavern-storylines.csv'),
+      TAVERN_CONTENT_ADAPTER,
+    );
+    for (const node of tavernManifest.nodes) {
+      expect('context' in node, `node ${node.id}`).toBe(false);
+      expect('epilogue' in node, `node ${node.id}`).toBe(false);
+    }
+  });
+
+  it('carries the Gym demo’s authored context, since that adapter opted in', () => {
+    const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    expect(start?.context).toContain('The town meets in the hall above the market');
+  });
+
+  it('validates a prose-bearing manifest against the schema', () => {
+    const ajv = new Ajv({ allErrors: true, strict: false });
+    const validate = ajv.compile(JSON.parse(readText(MANIFEST_SCHEMA_PATH)));
+    expect(validate(JSON.parse(serialiseManifest(manifest)))).toBe(true);
+    expect(validate.errors).toBeNull();
+  });
+});
+
 describe('rendering helpers', () => {
   it('renders choice cards as diamonds, plain cards as rounded boxes and terminal ends', () => {
     const mermaid = renderMermaid(gymManifest);
+    const start = gymManifest.nodes.find((node) => node.id === 'gym-story-start');
+    expect(start, 'gym-story-start is in the manifest').toBeDefined();
     expect(mermaid).toContain('flowchart TD');
-    expect(mermaid).toMatch(/gym_story_start\{"Town Meeting<br\/>gym-story-start/);
+    // The label carries the authored name; the shape is the structural claim.
+    expect(mermaid).toContain(`gym_story_start{"${start!.name}<br/>gym-story-start`);
     expect(mermaid).toMatch(/gym_story_end\("/);
     expect(mermaid).toContain('gym_story_start -->|Invest| gym_story_invest');
     expect(mermaid).toContain('_end(["end"])');
@@ -182,10 +237,17 @@ describe('rendering helpers', () => {
 
   it('builds a node label from the name, id, brief effect and impact', () => {
     const node = gymManifest.nodes.find((entry) => entry.id === 'gym-story-start');
-    expect(node && nodeLabel(node)).toBe(
-      'Town Meeting<br/>gym-story-start<br/>Lose 50 coins<br/>−50 coins',
-    );
-    expect(node && describeEventImpact(node)).toBe('−50 coins');
+    expect(node, 'gym-story-start is in the manifest').toBeDefined();
+    // The composition is the contract; the parts are read off the node, so an
+    // author's rename or rewritten effect prose cannot break this assertion.
+    expect(nodeLabel(node!).split('<br/>')).toEqual([
+      node!.name,
+      node!.id,
+      briefEventDescription(node!.effect),
+      describeEventImpact(node!),
+    ]);
+    // The impact is a mechanics figure, not prose: still pinned.
+    expect(describeEventImpact(node!)).toBe('−50 coins');
   });
 
   it('truncates a long effect at the first sentence or the length cap', () => {

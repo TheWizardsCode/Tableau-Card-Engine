@@ -1,0 +1,391 @@
+{
+  "manifestVersion": 1,
+  "id": "long-erasure",
+  "title": "The Long Erasure",
+  "content": {
+    "adapter": "long-erasure",
+    "file": "example-games/gym/content/long-erasure.csv"
+  },
+  "resources": {
+    "declared": [
+      "hull",
+      "morale",
+      "stores",
+      "goodwill",
+      "charge"
+    ],
+    "irreversible": [
+      "hull"
+    ],
+    "start": {
+      "hull": 5,
+      "morale": 5,
+      "stores": 4,
+      "goodwill": 0,
+      "charge": 2
+    },
+    "bounds": {
+      "hull": {
+        "min": 0,
+        "max": 5
+      },
+      "morale": {
+        "min": 0,
+        "max": 8
+      },
+      "stores": {
+        "min": 0,
+        "max": 6
+      },
+      "goodwill": {
+        "min": 0,
+        "max": 5
+      }
+    }
+  },
+  "start": {
+    "act": "act-i",
+    "scene": "s-i-open",
+    "beat": "le-i-open"
+  },
+  "endings": [
+    "le-end-reset",
+    "le-end-quiet",
+    "le-end-ram",
+    "le-end-abandon"
+  ],
+  "acts": [
+    {
+      "id": "act-i",
+      "title": "The First Unwriting",
+      "order": 1,
+      "entryScene": "s-i-open",
+      "scenes": [
+        {
+          "id": "s-i-open",
+          "title": "The First Unwriting",
+          "objective": {
+            "statement": "End the watch with the survey's stores intact.",
+            "check": {
+              "field": "stores",
+              "op": ">=",
+              "value": 3
+            }
+          },
+          "budget": {
+            "clock": 2
+          },
+          "entryBeat": "le-i-open",
+          "beats": [
+            {
+              "cardId": "le-i-open",
+              "clockCost": 1
+            },
+            {
+              "cardId": "le-i-log",
+              "clockCost": 1
+            },
+            {
+              "cardId": "le-i-rally",
+              "clockCost": 1
+            }
+          ],
+          "outcomeRules": [
+            {
+              "id": "survey-held",
+              "when": {
+                "objective": "met"
+              },
+              "outcome": "success"
+            },
+            {
+              "id": "survey-shaken",
+              "outcome": "partial"
+            }
+          ],
+          "routes": [
+            {
+              "id": "honour-the-door",
+              "on": "success",
+              "to": {
+                "kind": "chain"
+              }
+            },
+            {
+              "id": "quiet-answer",
+              "on": "*",
+              "to": {
+                "kind": "beat",
+                "act": "act-i",
+                "scene": "s-i-answer",
+                "beat": "le-i-silent"
+              }
+            }
+          ]
+        },
+        {
+          "id": "s-i-answer",
+          "title": "The Answering Silence",
+          "objective": {
+            "statement": "Leave the first act with someone still listening.",
+            "check": {
+              "field": "goodwill",
+              "op": ">=",
+              "value": 1
+            }
+          },
+          "budget": {
+            "clock": 2
+          },
+          "entryBeat": "le-i-transmit",
+          "beats": [
+            {
+              "cardId": "le-i-transmit",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-i-silent",
+              "clockCost": 2
+            }
+          ],
+          "outcomeRules": [
+            {
+              "id": "someone-answered",
+              "when": {
+                "objective": "met"
+              },
+              "outcome": "success"
+            },
+            {
+              "id": "silence",
+              "outcome": "partial"
+            }
+          ],
+          "routes": [
+            {
+              "id": "failed-watch",
+              "on": "*",
+              "when": {
+                "budget": "exhausted"
+              },
+              "to": {
+                "kind": "beat",
+                "act": "act-ii",
+                "scene": "s-ii-shelter",
+                "beat": "le-ii-shelter"
+              }
+            },
+            {
+              "id": "follow-the-door",
+              "on": "*",
+              "to": {
+                "kind": "chain"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-ii",
+      "title": "The Dead Zone",
+      "order": 2,
+      "entryScene": "s-ii-shelter",
+      "scenes": [
+        {
+          "id": "s-ii-shelter",
+          "title": "The Dead Zone",
+          "objective": {
+            "statement": "Leave the dead zone with the hull whole.",
+            "check": {
+              "field": "hull",
+              "op": ">=",
+              "value": 5
+            }
+          },
+          "budget": {
+            "clock": 6
+          },
+          "entryBeat": "le-ii-shelter",
+          "beats": [
+            {
+              "cardId": "le-ii-shelter",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-ii-derelict",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-ii-salvage",
+              "clockCost": 2
+            }
+          ],
+          "outcomeRules": [
+            {
+              "id": "hull-whole",
+              "when": {
+                "objective": "met"
+              },
+              "outcome": "success"
+            },
+            {
+              "id": "hull-scored",
+              "outcome": "partial"
+            }
+          ],
+          "routes": [
+            {
+              "id": "open-the-offer",
+              "on": "*",
+              "to": {
+                "kind": "chain"
+              }
+            }
+          ]
+        },
+        {
+          "id": "s-ii-offer",
+          "title": "The Archivist's Offer",
+          "objective": {
+            "statement": "Reach the muster with stores to spare.",
+            "check": {
+              "field": "stores",
+              "op": ">=",
+              "value": 3
+            }
+          },
+          "budget": {
+            "clock": 7
+          },
+          "entryBeat": "le-ii-offer",
+          "beats": [
+            {
+              "cardId": "le-ii-offer",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-ii-bargain",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-ii-refuse",
+              "clockCost": 2
+            },
+            {
+              "cardId": "le-ii-keep",
+              "clockCost": 3
+            },
+            {
+              "cardId": "le-ii-sabotage",
+              "clockCost": 1
+            }
+          ],
+          "outcomeRules": [
+            {
+              "id": "stores-kept",
+              "when": {
+                "objective": "met"
+              },
+              "outcome": "success"
+            },
+            {
+              "id": "stores-spent",
+              "outcome": "partial"
+            }
+          ],
+          "routes": [
+            {
+              "id": "honour-the-answer",
+              "on": "*",
+              "to": {
+                "kind": "chain"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "act-iii",
+      "title": "The Core",
+      "order": 3,
+      "entryScene": "s-iii-core",
+      "scenes": [
+        {
+          "id": "s-iii-core",
+          "title": "The Core",
+          "objective": {
+            "statement": "Reach the core with the crew still behind you.",
+            "check": {
+              "field": "morale",
+              "op": ">=",
+              "value": 4
+            }
+          },
+          "budget": {
+            "clock": 5
+          },
+          "entryBeat": "le-iii-approach",
+          "beats": [
+            {
+              "cardId": "le-iii-approach",
+              "clockCost": 3
+            },
+            {
+              "cardId": "le-iii-ahead",
+              "clockCost": 3,
+              "note": "Entering here leaves 2 of 5; 'Set the charge' needs 3, so this is the scene's deliberate cliff."
+            }
+          ],
+          "outcomeRules": [
+            {
+              "id": "watch-spent",
+              "when": {
+                "budget": "exhausted"
+              },
+              "outcome": "failure"
+            },
+            {
+              "id": "crew-with-you",
+              "when": {
+                "objective": "met"
+              },
+              "outcome": "success"
+            },
+            {
+              "id": "crew-gone",
+              "outcome": "partial"
+            }
+          ],
+          "routes": [
+            {
+              "id": "choose-the-ending",
+              "on": "success",
+              "to": {
+                "kind": "chain"
+              }
+            },
+            {
+              "id": "quiet-core",
+              "on": "*",
+              "to": {
+                "kind": "ending",
+                "cardId": "le-end-quiet"
+              }
+            }
+          ],
+          "losses": [
+            {
+              "id": "hull-sacrificed",
+              "on": "failure",
+              "field": "hull",
+              "amount": 1,
+              "statement": "Breaking for the core on the last of the watch costs the hull."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

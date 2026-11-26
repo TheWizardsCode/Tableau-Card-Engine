@@ -5,6 +5,7 @@
  *   - DOM-mode tooltip show/hide (HTML overlay)
  *   - Phaser-mode tooltip with game-object containers
  *   - Live tooltip positioning relative to interactive objects
+ *   - Hover-intent delay (1500 ms dwell; 500 ms for a press-and-hold)
  *   - Toggle between modes at runtime
  *
  * Layout is managed declaratively via the Screen Layout Language (SLL).
@@ -52,6 +53,8 @@ import {
   TOOLTIP_LOG_FONT_SIZE,
   TOOLTIP_LOG_BASE_Y_OFFSET,
   TOOLTIP_LOG_LINE_HEIGHT,
+  TOOLTIP_DEMO_HOVER_DELAY_MS,
+  TOOLTIP_DEMO_TOUCH_DELAY_MS,
 } from './GymConstants';
 
 // Parse the shared Tooltip scene layout once at module load.
@@ -109,11 +112,11 @@ export class GymTooltipScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'Demonstrates the shared TooltipManager component in two rendering modes: DOM overlay (HTML div) and Phaser GameObject (in-scene containers). Tooltips provide contextual information when hovering over interactive elements, such as card ability descriptions, rule explanations, or score previews. In a real card game, tooltips let players quickly understand card effects without cluttering the main UI. Both modes keep the tooltip fully on-screen: the DOM overlay is clamped to the browser viewport (it uses fixed positioning, so it never extends the page or causes scrollbars), and the Phaser GameObject is clamped to the game canvas.'
+        body: 'Demonstrates the shared TooltipManager component in two rendering modes: DOM overlay (HTML div) and Phaser GameObject (in-scene containers). Tooltips provide contextual information when hovering over interactive elements, such as card ability descriptions, rule explanations, or score previews. In a real card game, tooltips let players quickly understand card effects without cluttering the main UI. Both modes keep the tooltip fully on-screen: the DOM overlay is clamped to the browser viewport (it uses fixed positioning, so it never extends the page or causes scrollbars), and the Phaser GameObject is clamped to the game canvas. Both managers also opt into a hover-intent delay (' + TOOLTIP_DEMO_HOVER_DELAY_MS + ' ms for a mouse dwell, ' + TOOLTIP_DEMO_TOUCH_DELAY_MS + ' ms for a press-and-hold), so a pointer merely sweeping across a card no longer flashes overlay text — the tooltip only appears once the pointer has dwelled on a target. The engine default is 0 ms (immediate), so games that do not opt in behave exactly as before.'
       },
       {
         heading: 'Controls',
-        body: '[ DOM Mode ]: Switch tooltip rendering to DOM overlay mode (HTML div on top of canvas).\n[ Phaser Mode ]: Switch tooltip rendering to Phaser GameObject mode (in-scene containers with custom styling).\n[ Show Demo ]: Force-show a demo tooltip at the centre of the screen.\n[ Disable/Enable ]: Toggle all tooltips on or off. When disabled, tooltips do not appear on hover or demo.\nHover over coloured cards (Red, Blue, Green) below the controls to see contextual tooltips describing each card\'s ability. Move the pointer within a card to follow the tooltip position.'
+        body: '[ DOM Mode ]: Switch tooltip rendering to DOM overlay mode (HTML div on top of canvas).\n[ Phaser Mode ]: Switch tooltip rendering to Phaser GameObject mode (in-scene containers with custom styling).\n[ Show Demo ]: Schedule a demo tooltip at the centre of the screen (it appears after the configured dwell).\n[ Disable/Enable ]: Toggle all tooltips on or off. When disabled, tooltips do not appear on hover or demo.\nHover over coloured cards (Red, Blue, Green) below the controls and hold the pointer still for ' + TOOLTIP_DEMO_HOVER_DELAY_MS + ' ms to see contextual tooltips describing each card\'s ability. Moving the pointer within a card keeps the pending show alive and refreshes its anchor — the delay does not restart.'
       },
       {
         heading: 'Usage Example',
@@ -121,7 +124,7 @@ export class GymTooltipScene extends GymSceneBase {
       },
       {
         heading: 'Test Plan',
-        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Hover over the red card → tooltip appears showing "Red Card" description\n3. Move pointer within the card → tooltip follows the pointer position\n4. Move pointer away from card → tooltip disappears\n5. Move the pointer to the right or bottom edge of the canvas → the DOM tooltip stays fully visible and the page does not gain a scrollbar\n6. Press [ Phaser Mode ] → mode label updates\n7. Hover over the blue card → Phaser GameObject tooltip appears with border styling\n8. Move the pointer to the canvas edge → the Phaser tooltip stays inside the game canvas\n9. Press [ Show Demo ] → demo tooltip appears at centre\n10. Press [ Disable ] → tooltips stop appearing; button shows "[ Enable ]"\n11. Press [ Enable ] → tooltips reappear on hover'
+        body: '1. Press [ DOM Mode ] → mode label updates to "Mode: DOM overlay"\n2. Sweep the pointer quickly across the red card and away → no tooltip appears (the ' + TOOLTIP_DEMO_HOVER_DELAY_MS + ' ms dwell was not reached)\n3. Rest the pointer on the red card → after about ' + TOOLTIP_DEMO_HOVER_DELAY_MS + ' ms a tooltip appears showing the "Red Card" description\n4. Move the pointer within the card → the pending/visible tooltip follows the pointer position\n5. Move pointer away from card → the pending show is cancelled and any visible tooltip disappears\n6. Move the pointer to the right or bottom edge of the canvas → the DOM tooltip stays fully visible and the page does not gain a scrollbar\n7. Press [ Phaser Mode ] → mode label updates\n8. Rest the pointer on the blue card → after the dwell a Phaser GameObject tooltip appears with border styling\n9. Move the pointer to the canvas edge → the Phaser tooltip stays inside the game canvas\n10. Press [ Show Demo ] → the demo tooltip appears at centre after the dwell\n11. Press [ Disable ] → tooltips stop appearing (including a show that is already pending); button shows "[ Enable ]"\n12. Press [ Enable ] → tooltips reappear on hover'
       }
     ]);
 
@@ -165,10 +168,17 @@ export class GymTooltipScene extends GymSceneBase {
     // Event log header — at log anchor y
     createHudText(this, logAnchor.x, logAnchor.y, '── Event Log ──', '#6699aa', { fontSize: TOOLTIP_LOG_HEADER_FONT_SIZE }).setOrigin(0.5);
 
-    // Create tooltip managers
-    this.domTooltipManager = new TooltipManager(this);
+    // Create tooltip managers. Both opt into a hover-intent delay so the
+    // demo can be checked by hand: a quick pointer sweep shows nothing, a
+    // deliberate dwell shows the overlay (engine default is 0 = immediate).
+    this.domTooltipManager = new TooltipManager(this, undefined, {
+      delayMs: TOOLTIP_DEMO_HOVER_DELAY_MS,
+      touchDelayMs: TOOLTIP_DEMO_TOUCH_DELAY_MS,
+    });
 
     this.phaserTooltipManager = new TooltipManager(this, undefined, {
+      delayMs: TOOLTIP_DEMO_HOVER_DELAY_MS,
+      touchDelayMs: TOOLTIP_DEMO_TOUCH_DELAY_MS,
       phaserRender: (container, scene, _hideTooltip, ctx) => {
         const cardName = ctx.cardName as string | undefined;
         if (!cardName) return container;
@@ -307,7 +317,7 @@ export class GymTooltipScene extends GymSceneBase {
         borderColor: 0xffaa00,
       });
     }
-    this.logEvent('Demo tooltip shown');
+    this.logEvent('Demo tooltip scheduled (dwell ' + TOOLTIP_DEMO_HOVER_DELAY_MS + ' ms)');
   }
 
   private hideTooltip(): void {

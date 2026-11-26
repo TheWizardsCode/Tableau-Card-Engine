@@ -15,9 +15,11 @@
  * `--dry-run` support is part of the API (`dryRun`): the candidate text is
  * returned for preview but nothing is written.
  *
- * The pure in-memory mutations (`addContentCard`, `updateContentCard`,
- * `updateContentCards`, `readContentCards`, `hasContentCard` and their
- * result/spec types) live in {@link ../mutate} and are re-exported here so
+ * The pure in-memory mutations (`addContentCard`, `addOptionToContentCard`,
+ * `addLinkedContentCard`, `updateContentCard`, `updateContentCards`,
+ * `readContentCards`, `hasContentCard` and their result/spec types) live in
+ * {@link ../mutate} and are
+ * re-exported here so
  * existing callers keep one import surface — but a browser or form pipeline
  * that only needs preview/validation should import the pure module directly,
  * never this one (it binds `node:fs`).
@@ -37,12 +39,18 @@ import type { ContentEditResult, ContentMutation } from './mutate';
 
 export type {
   AddContentCardSpec,
+  AddLinkedCardSpec,
+  AddOptionContentCardSpec,
   ContentEditResult,
   ContentMutation,
   UpdateContentCardSpec,
 } from './mutate';
 export {
   addContentCard,
+  addLinkedContentCard,
+  addOptionToContentCard,
+  appendOptionEncoding,
+  encodeOptionEntry,
   hasContentCard,
   readContentCards,
   updateContentCard,

@@ -1,0 +1,3 @@
+id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+le-b-open,A Quiet Start,Nothing happens.,Walk on|le-b-end,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,,
+le-b-end,The End,It ends.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,1,,

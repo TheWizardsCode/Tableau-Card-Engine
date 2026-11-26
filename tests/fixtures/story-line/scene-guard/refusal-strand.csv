@@ -1,0 +1,6 @@
+#resources: hull,supply
+id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+sg-hold-open,The Hold Opens,The hold has one door and it does not open.,Wait for the signal|sg-hold-wait,scene-guard-fixture,Scene Guard Fixture,"hull,supply",I,1,,
+sg-hold-wait,The Long Watch,The signal does not come and the clock runs.,Keep waiting|sg-hold-open,scene-guard-fixture,Scene Guard Fixture,"hull,supply",I,2,,
+sg-loop-open,The Loop Opens,Every road out of the loop comes back to it.,Turn back|sg-hold-open,scene-guard-fixture,Scene Guard Fixture,"hull,supply",II,2,,
+sg-end-quiet,A Quiet End,The run stops here.,,scene-guard-fixture,Scene Guard Fixture,"hull,supply",Ending,0,,"Nothing reaches this room. The door stays shut and the ending stays unread."

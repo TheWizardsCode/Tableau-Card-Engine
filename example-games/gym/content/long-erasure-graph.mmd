@@ -1,0 +1,58 @@
+%%{ init: { "flowchart": { "curve": "basis" } } }%%
+flowchart TD
+  le_end_abandon("The Voyage Abandoned<br/>le-end-abandon<br/>You turn for home and the erasure follows you there.")
+  le_end_quiet("A Quiet Chart<br/>le-end-quiet<br/>The Loom is unwritten; the homeland stays drowned and the chart…")
+  le_end_ram("Ashlight, Ends<br/>le-end-ram<br/>The ship becomes the argument the crew could not make any other…")
+  le_end_reset{"The Long Erasure<br/>le-end-reset<br/>The Loom completes; the drowned homeland returns and the survey…"}
+  le_i_log{"Dead Reckoning<br/>le-i-log<br/>The log is a warning nobody has read and the Loom has already r…"}
+  le_i_open{"The First Unwriting<br/>le-i-open<br/>A volume of space stops having happened and the ship's charts f…"}
+  le_i_rally{"The Missing Berth<br/>le-i-rally<br/>A crew member's home port never existed; they remember it anywa…"}
+  le_i_silent{"The Quiet Chart<br/>le-i-silent<br/>The survey continues and the crew stops asking about the berth…"}
+  le_i_transmit{"The Answering Silence<br/>le-i-transmit<br/>The warning is answered by nobody who can still be answered."}
+  le_ii_bargain{"Terms in Bad Faith<br/>le-ii-bargain<br/>The terms are a promise with a clause quietly removed."}
+  le_ii_derelict{"The Derelict<br/>le-ii-derelict<br/>A hull with no crew and a full locker drifting since before the…"}
+  le_ii_keep{"The Weave Advances<br/>le-ii-keep<br/>The bargain holds and the ship is spared something older is spe…"}
+  le_ii_offer{"The Archivist's Offer<br/>le-ii-offer<br/>Vane offers the ship's survival for one more revision of the wo…"}
+  le_ii_refuse{"Mutiny<br/>le-ii-refuse<br/>The captain refuses Vane and the crew must choose what refusing…"}
+  le_ii_sabotage{"The Loom Bleeds<br/>le-ii-sabotage<br/>A revision comes apart and the Loom's core is briefly unguarded."}
+  le_ii_salvage{"Salvage Rights<br/>le-ii-salvage<br/>The ally who guided you here asks only to keep their berth."}
+  le_ii_shelter{"The Dead Zone<br/>le-ii-shelter<br/>Systems fail one at a time and the Loom's voice arrives on ever…"}
+  le_iii_ahead{"Ahead of the Weave<br/>le-iii-ahead<br/>The ship arrives before the revision closes and a charge is alr…"}
+  le_iii_approach{"The Core<br/>le-iii-approach<br/>The Loom's core is a room that remembers every version of you."}
+
+  le_end_reset ==>|Begin the survey again| le_i_open
+  le_i_log -->|Stay silent| le_i_silent
+  le_i_log ==>|Transmit the warning| le_i_transmit
+  le_i_open ==>|Log the erasure| le_i_log
+  le_i_open -->|Rally the survey crew| le_i_rally
+  le_i_rally -->|Hold the survey line| le_i_transmit
+  le_i_rally -->|Turn for the muster| le_i_silent
+  le_i_silent -->|Push deeper| le_ii_derelict
+  le_i_silent -->|Shelter in the dead zone| le_ii_shelter
+  le_i_transmit -->|Push deeper| le_ii_derelict
+  le_i_transmit ==>|Shelter in the dead zone| le_ii_shelter
+  le_ii_bargain -->|Keep the bargain| le_ii_keep
+  le_ii_bargain ==>|Sabotage the Loom| le_ii_sabotage
+  le_ii_derelict -->|Leave it be| le_ii_offer
+  le_ii_derelict -->|Strip the locker| le_ii_salvage
+  le_ii_keep -->|Follow the thread| le_iii_approach
+  le_ii_offer -->|Abandon the voyage| le_end_abandon
+  le_ii_offer ==>|Bargain in bad faith| le_ii_bargain
+  le_ii_offer -->|Refuse him| le_ii_refuse
+  le_ii_refuse -->|Side with the captain| le_iii_approach
+  le_ii_refuse -->|Side with the crew| le_iii_approach
+  le_ii_sabotage ==>|Break for the core| le_iii_approach
+  le_ii_sabotage -.->|Break for the core| le_iii_ahead
+  le_ii_sabotage ==>|Follow the unravelling| le_iii_approach
+  le_ii_salvage -->|Share the berth| le_ii_offer
+  le_ii_salvage -->|Take the ally's berth| le_ii_offer
+  le_ii_shelter ==>|Ration the stores| le_ii_offer
+  le_ii_shelter -->|Strip the derelict| le_ii_salvage
+  le_iii_ahead -->|Hit the core now| le_end_ram
+  le_iii_ahead -->|Set the charge| le_iii_approach
+  le_iii_approach ==>|Finish the weave| le_end_reset
+  le_iii_approach -->|Ram the core| le_end_ram
+  le_iii_approach -->|Unwrite the Loom| le_end_quiet
+
+  %% Intentional cycle(s):
+  %% le-end-reset -> le-i-log -> le-i-open -> le-i-transmit -> le-ii-bargain -> le-ii-offer -> le-ii-sabotage -> le-ii-shelter -> le-iii-approach -> le-end-reset

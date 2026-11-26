@@ -40,19 +40,66 @@ npx vitest run --project browser tests/gym/*.browser.test.ts
 | Screen Layout Language (SLL) | `GymSllScene` | `validateScreenLayoutDocument`, `parseScreenLayoutDocument`, `normalizedToPixels`, `getZoneRect`, `anchorPoint` | [`scenes/GymSllScene.ts`](../../example-games/gym/scenes/GymSllScene.ts) | [`GymSllLayout.test.ts`](../../tests/gym/GymSllLayout.test.ts), [`GymSllScene.browser.test.ts`](../../tests/gym/GymSllScene.browser.test.ts) |
 | SVG Rasterisation Pipeline | `GymSvgHelpersScene` | `fetchSvgText`, `rasteriseSvgToTexture`, `getOrCreateTexture`, `makeTextureKey`, `markSceneValid`, `markSceneInvalid` | [`scenes/GymSvgHelpersScene.ts`](../../example-games/gym/scenes/GymSvgHelpersScene.ts) | [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 | DPR Resolution Comparison | `GymDprResolutionScene` | `rasteriseSvgToTexture`, `makeTextureKey`, `MIN_QUALITY_SCALE`, `markSceneValid`, `markSceneInvalid`, SLL `anchorPoint` | [`scenes/GymDprResolutionScene.ts`](../../example-games/gym/scenes/GymDprResolutionScene.ts) | [`GymDprResolutionScene.browser.test.ts`](../../tests/gym/GymDprResolutionScene.browser.test.ts) |
-| Card Type Index & Synergy Groups | `GymCardIndexScene` | Main Street template getters (`getBusinessTemplates`, `getCommunitySpaceTemplates`, `getEventTemplates`, `getUpgradeTemplates`, `getStaffCardTemplates`), `buildCardTooltipInfo`, `TooltipManager`, `createOverlayDialog`, SLL `anchorPoint` | [`scenes/GymCardIndexScene.ts`](../../example-games/gym/scenes/GymCardIndexScene.ts), [`GymCardIndex.ts`](../../example-games/gym/GymCardIndex.ts) | [`GymCardIndex.test.ts`](../../tests/gym/GymCardIndex.test.ts), [`GymCardIndexScene.browser.test.ts`](../../tests/gym/GymCardIndexScene.browser.test.ts), [`GymRegistry.test.ts`](../../tests/gym/GymRegistry.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| Tooltip Modes & Hover Intent | `GymTooltipScene` | `TooltipManager` (DOM + Phaser render modes, `clampTooltipToBounds`, viewport clamping), hover-intent delay (`delayMs` / `touchDelayMs`, opt-in non-zero demo so the dwell is observable by hand), `SettingsStore.getTooltips` / `setTooltips` suppression | [`scenes/GymTooltipScene.ts`](../../example-games/gym/scenes/GymTooltipScene.ts) | [`TooltipManager.test.ts`](../../tests/ui/TooltipManager.test.ts), [`TooltipManager.browser.test.ts`](../../tests/ui/TooltipManager.browser.test.ts), [`GymTooltipToggle.browser.test.ts`](../../tests/gym/GymTooltipToggle.browser.test.ts), [`GymTooltipLayout.test.ts`](../../tests/gym/GymTooltipLayout.test.ts) |
+| Card Type Index & Synergy Groups *(moved)* | `GymCardIndexScene` | Main Street template getters (`getBusinessTemplates`, `getCommunitySpaceTemplates`, `getEventTemplates`, `getUpgradeTemplates`, `getStaffCardTemplates`), `buildCardTooltipInfo`, `TooltipManager`, `createOverlayDialog`, SLL `anchorPoint` — it browses the Main Street card pool, not a core feature | *Moved to the Main Street game repo* (`example-games/main-street/gym/` in `tce-main-street`; see [multi-repo architecture](../dev/multi-repo-architecture.md#4-coregame-coupling-resolution-f2)) | *Moved with the scene* (Main Street repo) |
 | In-game DLC Gate | `GymDlcUnlockScene` | `createDlcGate` (`DlcGate`, `DlcUnlockReader`), `contentUnlockClientFromWindow` (F5 total read client), SLL `anchorPoint` | [`scenes/GymDlcUnlockScene.ts`](../../example-games/gym/scenes/GymDlcUnlockScene.ts) | [`DlcGate.test.ts`](../../tests/core-engine/DlcGate.test.ts), [`GymDlcUnlock.browser.test.ts`](../../tests/gym/GymDlcUnlock.browser.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
-| Storyline | `GymStorylineScene` | `createStorylineSystem`, `compileStorylineFromEvent`, `resolveStorylineOption`, `createPendingStorylineChoice`, `defaultStorylineUiAdapter`; demo fixture + transitions (`DEMO_CARDS`, `createDemoState`, `createDemoEngine`, `createDemoRuntime`, `startDemo`, `drawDemoCard`, `applyDemoChoice`) in [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`scenes/GymStorylineScene.ts`](../../example-games/gym/scenes/GymStorylineScene.ts), [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`GymStorylineDemo.test.ts`](../../tests/gym/GymStorylineDemo.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| Storyline | `GymStorylineScene` | `createStorylineSystem`, `compileStorylineFromEvent`, `resolveStorylineOption`, `createPendingStorylineChoice`, `defaultStorylineUiAdapter`; authored prose (`context` column + `#says=` option outcomes) through `revealNarration`; CSV-driven catalogue + transitions (`demoCardsFromCsv`, `createDemoState`, `createDemoEngine`, `createDemoRuntime`, `startDemo`, `drawDemoCard`, `applyDemoChoice`) in [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`scenes/GymStorylineScene.ts`](../../example-games/gym/scenes/GymStorylineScene.ts), [`GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts) | [`GymStorylineDemo.test.ts`](../../tests/gym/GymStorylineDemo.test.ts), [`GymStorylineContent.test.ts`](../../tests/gym/GymStorylineContent.test.ts) (authored prose + frozen mechanics), [`GymStorylineScene.browser.test.ts`](../../tests/gym/GymStorylineScene.browser.test.ts) (context panel, outcome narration), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
+| The Long Erasure | `GymLongErasureScene` | Full story-line spike: `createLongErasureRun`, `availableOptions`, `chooseOption`, `advanceClock`, `isComplete`, `runJournal`, `scoreRun` / `buildEpilogue` (all in [`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)); SLL `anchorPoint` over [`gym-long-erasure.layout.json`](../../example-games/gym/layouts/gym-long-erasure.layout.json); `revealNarration` (authored outcome prose, animated + SFX) and `paginateProse` (the `[ more… ]` narrative panel); `SoundManager` + `COMMON_SFX_KEYS`; `shakeIllegalMove` reason toast; `popTextOrIcon` score pop | [`scenes/GymLongErasureScene.ts`](../../example-games/gym/scenes/GymLongErasureScene.ts), [`GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts) | [`GymLongErasureGame.test.ts`](../../tests/gym/GymLongErasureGame.test.ts), [`GymLongErasureScene.browser.test.ts`](../../tests/gym/GymLongErasureScene.browser.test.ts), [`GymLongErasureLayout.test.ts`](../../tests/gym/GymLongErasureLayout.test.ts), [`LongErasureContent.test.ts`](../../tests/gym/LongErasureContent.test.ts) (structure + prohibited-term scan), [`LongErasureProse.test.ts`](../../tests/gym/LongErasureProse.test.ts) (prose contract on real content), [`narration-reveal.test.ts`](../../tests/ui/narration-reveal.test.ts) / [`narration-reveal.browser.test.ts`](../../tests/ui/narration-reveal.browser.test.ts), [`prose-pagination.test.ts`](../../tests/ui/prose-pagination.test.ts), [`GymSceneSmoke.browser.test.ts`](../../tests/gym/GymSceneSmoke.browser.test.ts) |
 
+
+The Long Erasure is the full story-line spike: a three-act authored narrative
+with a pressure clock, resource-gated branches, a deliberate terminal
+"abandon the voyage" option and a journal-derived journey score on the reset
+epilogue. Its complete game design — the scene beat sheet, economy,
+presentation contract, engine-gap backlog and v1 scope — is the
+[Long Erasure GDD](../design/storyline-game-gdd.md); the spike's measurements
+are recorded in the [observation log](./long-erasure-observation-log.md) with
+the re-measurement in the
+[playtest evaluation](../design/storyline-playtest-evaluation.md). Its content
+lives in
+[`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv),
+its rules in the Phaser-free
+[`example-games/gym/GymLongErasureGame.ts`](../../example-games/gym/GymLongErasureGame.ts)
+(unit-tested by `tests/gym/GymLongErasureGame.test.ts`), and the scene only
+renders that state and forwards the player's choice. Every cost, extra effect
+and conditional successor in that file is authored in the CSV itself
+(`#cost` / `#extra` / `#when` option attributes) with no TypeScript
+registration — the authoring workflow is documented in
+[Authoring options in CSV](../core-engine/story-line.md#authoring-options-in-csv).
+
+The scene renders the authored **prose** surfaces the story-line content model
+carries: the beat's `context` paragraph above the options (paged behind a
+visible `[ more… ]` control when it exceeds the panel budget, via
+`paginateProse()`), the chosen option's `#says=` outcome narrated through
+`revealNarration()`, and the terminal card's `epilogue` on the closing screen
+(falling back to the pre-prose framing line when none is authored). See
+[docs/ui-animations.md](../ui-animations.md#paginateprose-prose-panels).
+The setting is original
+and carries no third-party IP; the prohibited-term constraint is checked
+mechanically by `tests/gym/LongErasureContent.test.ts`.
 
 The Storyline demo's generic engine is documented in
 [`docs/core-engine/story-line.md`](../core-engine/story-line.md) (module API,
-engine/UI adapters and this demo). The demo's own branching fixture and its
-pure draw/choice transitions live in the Phaser-free
+engine/UI adapters and this demo). Its content is
+[`storylines.csv`](../../example-games/gym/content/storylines.csv), which
+authors a `context` paragraph on every card and a `#says=` outcome on the
+first-beat options, so the demo shows the prose surfaces alongside the Long
+Erasure. The scene plays that CSV directly: `GymStorylineScene` imports it with
+Vite's `?raw` suffix and projects it through `demoCardsFromCsv`, so an edit made
+in `npm run storylines:editor` changes the demo with no code change — there is
+no hand-maintained card catalogue to keep in step. The pure draw/choice
+transitions live in the Phaser-free
 [`example-games/gym/GymStorylineDemo.ts`](../../example-games/gym/GymStorylineDemo.ts)
 and are unit-tested by `tests/gym/GymStorylineDemo.test.ts` — the scene only
-renders what those transitions return, so the fixture can be verified without
-a browser.
+renders what those transitions return, so the demo can be verified without a
+browser. A card's authored `cost` column is a **real payment**: it is shown on
+the scene's card line (`Public Investment — Gain 120 coins (costs 100 coins)`)
+and charged when the beat resolves, settled together with that beat's own coin
+delta, so the invest branch is a +20 trade rather than an unrewarded cost.
+[`GymStorylineContent.test.ts`](../../tests/gym/GymStorylineContent.test.ts)
+proves the scene catalogue is the CSV projection (deltas and the beat `cost`)
+and freezes the mechanics (the author-editable prose columns are deliberately
+not pinned).
 
 ## Scene Navigation
 

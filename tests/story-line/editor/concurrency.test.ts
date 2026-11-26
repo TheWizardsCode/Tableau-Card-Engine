@@ -63,10 +63,12 @@ describe('editor write bridge concurrency guard', () => {
   it('refuses to write when the content changed on disk since load and instructs a reload', () => {
     const loadedChecksum = loadChecksum(fixture);
 
-    // Someone else edits the file after the editor loaded it.
+    // Someone else edits the file after the editor loaded it. The mutation is
+    // deliberately structural (a card id) rather than a prose word, so an
+    // author's rename in the content cannot silently no-op this test.
     const external = `${readFileSync(fixture.csvPath, 'utf-8')}`.replace(
-      'Town Meeting',
-      'Town Assembly',
+      'gym-story-invest',
+      'gym-story-x',
     );
     writeFileSync(fixture.csvPath, external, 'utf-8');
     const externalChecksum = computeContentChecksum(external);

@@ -1,0 +1,111 @@
+{
+  "manifestVersion": 1,
+  "id": "scene-guard-clean",
+  "title": "Scene Guard Control: Clean",
+  "content": {
+    "adapter": "long-erasure",
+    "file": "tests/fixtures/story-line/scene-guard/clean.csv"
+  },
+  "resources": {
+    "declared": ["hull", "supply"],
+    "irreversible": ["hull"],
+    "start": { "hull": 2, "supply": 1 },
+    "bounds": {
+      "hull": { "min": 0, "max": 4 },
+      "supply": { "min": 0, "max": 3 }
+    }
+  },
+  "start": { "act": "sg-act-one", "scene": "sg-hall", "beat": "sg-hall-open" },
+  "endings": ["sg-end-quiet"],
+  "acts": [
+    {
+      "id": "sg-act-one",
+      "title": "The Guard House",
+      "order": 1,
+      "entryScene": "sg-hall",
+      "scenes": [
+        {
+          "id": "sg-hall",
+          "title": "The Hall",
+          "objective": {
+            "statement": "Leave the hall with supply still in hand.",
+            "check": { "field": "supply", "op": ">=", "value": 1 }
+          },
+          "budget": { "clock": 3 },
+          "entryBeat": "sg-hall-open",
+          "beats": [
+            { "cardId": "sg-hall-open", "clockCost": 1 },
+            {
+              "cardId": "sg-hall-wait",
+              "clockCost": 3,
+              "note": "Refusable: entering sg-hall-open leaves 2 of the hall's 3 ticks."
+            }
+          ],
+          "outcomeRules": [
+            { "id": "hall-spent", "when": { "budget": "exhausted" }, "outcome": "failure" },
+            { "id": "hall-held", "when": { "objective": "met" }, "outcome": "success" },
+            { "id": "hall-quiet", "outcome": "partial" }
+          ],
+          "routes": [
+            {
+              "id": "hall-to-crossing",
+              "on": "success",
+              "to": { "kind": "beat", "act": "sg-act-one", "scene": "sg-crossing", "beat": "sg-crossing-open" }
+            },
+            {
+              "id": "hall-to-rest",
+              "on": "*",
+              "to": { "kind": "beat", "act": "sg-act-one", "scene": "sg-rest", "beat": "sg-rest-open" }
+            }
+          ]
+        },
+        {
+          "id": "sg-crossing",
+          "title": "The Crossing",
+          "objective": {
+            "statement": "Cross with a spare supply.",
+            "check": { "field": "supply", "op": ">=", "value": 2 }
+          },
+          "budget": { "clock": 2 },
+          "entryBeat": "sg-crossing-open",
+          "beats": [{ "cardId": "sg-crossing-open", "clockCost": 1 }],
+          "outcomeRules": [
+            { "id": "crossing-spent", "when": { "budget": "exhausted" }, "outcome": "failure" },
+            { "id": "crossing-met", "when": { "objective": "met" }, "outcome": "success" },
+            { "id": "crossing-quiet", "outcome": "partial" }
+          ],
+          "routes": [
+            {
+              "id": "crossing-to-quiet-end",
+              "on": "*",
+              "to": { "kind": "ending", "cardId": "sg-end-quiet" }
+            }
+          ]
+        },
+        {
+          "id": "sg-rest",
+          "title": "The Rest",
+          "objective": {
+            "statement": "Rest with supply still in hand.",
+            "check": { "field": "supply", "op": ">=", "value": 1 }
+          },
+          "budget": { "clock": 2 },
+          "entryBeat": "sg-rest-open",
+          "beats": [{ "cardId": "sg-rest-open", "clockCost": 2 }],
+          "outcomeRules": [
+            { "id": "rest-spent", "when": { "budget": "exhausted" }, "outcome": "failure" },
+            { "id": "rest-met", "when": { "objective": "met" }, "outcome": "success" },
+            { "id": "rest-quiet", "outcome": "partial" }
+          ],
+          "routes": [
+            {
+              "id": "rest-to-quiet-end",
+              "on": "*",
+              "to": { "kind": "ending", "cardId": "sg-end-quiet" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

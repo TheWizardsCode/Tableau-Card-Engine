@@ -1,6 +1,6 @@
 {
   "name": "tableau-card-engine",
-  "version": "0.1.24",
+  "version": "0.2.0",
   "description": "Tableau Card Engine (TCE) -- a modular game engine for building single-player tableau card games using Phaser 4 RC and TypeScript",
   "author": "TheWizardsCode",
   "private": true,
@@ -27,6 +27,9 @@
     "storylines:author": "tsx scripts/storyline-author.ts",
     "storylines:editor": "tsx scripts/storyline-editor-cli.ts",
     "storylines:graph": "tsx scripts/storyline-graph.ts",
+    "storylines:guard": "tsx scripts/storyline-guard.ts",
+    "storylines:ip-scan": "tsx scripts/ip-scan.ts",
+    "storylines:manifest": "tsx scripts/storyline-manifest.ts",
     "storylines:validate": "tsx scripts/validate-storylines.ts",
     "publish:repos": "tsx scripts/publish-repos.ts",
     "setup:distribution": "tsx scripts/setup-distribution.ts",

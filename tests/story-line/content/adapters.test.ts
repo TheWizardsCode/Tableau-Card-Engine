@@ -15,6 +15,7 @@ import {
   CONTENT_ADAPTERS,
   DEFAULT_CONTENT_ADAPTER,
   GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
   getContentAdapter,
   resolveContentAdapter,
 } from '../../../src/story-line/content/adapters';
@@ -58,7 +59,7 @@ describe('shipped adapters', () => {
     );
     // The exact column / mapping / default key sets are the contract: the
     // adapter declares, maps and defaults nothing outside them.
-    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(10);
+    expect(GYM_CONTENT_ADAPTER.columns).toHaveLength(12);
     expect(Object.keys(GYM_CONTENT_ADAPTER.fields)).toEqual([
       'id',
       'name',
@@ -66,6 +67,8 @@ describe('shipped adapters', () => {
       'options',
       'storylineId',
       'storylineTitle',
+      'resources',
+      'context',
     ]);
     expect(Object.keys(GYM_CONTENT_ADAPTER.newCardDefaults ?? {})).toEqual([
       'options',
@@ -75,7 +78,27 @@ describe('shipped adapters', () => {
       'cost',
       'coinDelta',
       'reputationDelta',
+      'context',
     ]);
+  });
+
+  it('maps only the prose columns an adapter opts into', () => {
+    // The Gym demo authors the beat `context` paragraph, so it maps that
+    // column. It authors no ending epilogue, so that column stays unmapped.
+    expect(GYM_CONTENT_ADAPTER.fields.context).toBe('context');
+    expect(GYM_CONTENT_ADAPTER.fields.epilogue).toBeUndefined();
+    expect(mappedFieldColumns(GYM_CONTENT_ADAPTER)).toContainEqual(['context', 'context']);
+
+    // The Long Erasure content declares (and may blank) both prose columns.
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).toEqual(
+      expect.arrayContaining(['context', 'epilogue']),
+    );
+    expect(mappedFieldColumns(LONG_ERASURE_CONTENT_ADAPTER)).toEqual(
+      expect.arrayContaining([
+        ['context', 'context'],
+        ['epilogue', 'epilogue'],
+      ]),
+    );
   });
 
   it('describes the Gym impact from its game columns', () => {
@@ -95,16 +118,28 @@ describe('adapter seam with two differently shaped adapters', () => {
       TAVERN_CONTENT_ADAPTER,
     );
 
-    // Different files, different columns, identical generic keys.
+    // Different files, different columns: the shared generic keys are
+    // identical, and only the Gym card carries the prose key it opted into.
     expect(TAVERN_CONTENT_ADAPTER.columns).not.toEqual(GYM_CONTENT_ADAPTER.columns);
     const keys = (card: object): string[] => Object.keys(card).sort();
-    expect(keys(gymCards[0])).toEqual(keys(tavernCards[0]));
     expect(keys(gymCards[0])).toEqual([
+      'context',
       'effect',
       'fields',
       'id',
       'name',
       'options',
+      'resourceKeys',
+      'storylineId',
+      'storylineTitle',
+    ]);
+    expect(keys(tavernCards[0])).toEqual([
+      'effect',
+      'fields',
+      'id',
+      'name',
+      'options',
+      'resourceKeys',
       'storylineId',
       'storylineTitle',
     ]);

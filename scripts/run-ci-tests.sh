@@ -53,10 +53,30 @@
 # requestAnimationFrame loop is starved of frames under CPU contention, or a
 # Phaser game destroy that never completes — is aborted with exit 124 and a
 # [hang-timeout] diagnostic instead of stalling the gate indefinitely. Hangs
-# are never retried. Bounds: 5 min for unit (nominal <2 min), 20 min for
-# browser (115 files; ~13-15 min nominal, longer under heavy concurrent-suite
-# contention — the previous 15 min bound sat within normal run-to-run variance
-# and could abort an otherwise green stage). Tune with --timeout-ms if needed.
+# are never retried.
+#
+# Unit bound is HYBRID and load-aware (SA-0MWEURUYL004I470): a 600 s static
+# floor scaled up to a 1200 s ceiling by the sampled 1-min load average per
+# core (factor = clamp((load1m/cpuCount)/0.75, 1, 2)). Measured green unit
+# stages: 88, 96, 106, 111, 128, 141, 147, 149, 206, 217 s (worst 217 s =
+# 72 % of the old fixed 300 s bound) — so the unit stage deliberately does
+# NOT pass --timeout-ms and lets the runner size its own bound per host. On
+# Windows (no load average) the 600 s floor applies.
+#
+# Browser is pinned at 20 min (1200 s = the hybrid ceiling; 115 files,
+# ~13-15 min nominal, longer under heavy concurrent-suite contention — the
+# previous 15 min bound sat within normal run-to-run variance and could abort
+# an otherwise green stage). Any stage can still be pinned with --timeout-ms,
+# which wins verbatim over the computed bound.
+#
+# Inner bounds must stay strictly inside the outer gate budget
+# (.pi/test-config.json timeoutPerCommand = 3000 s). Worst-case arithmetic:
+#   unit ceiling 1200 + browser 1200 + two vitest list pre-flights 240
+#   = 2640 s of stage bounds; terminology guard + browser-env pre-checks +
+#   orchestration ~60 s ⇒ ~2700 s worst case, leaving ~300 s margin so the
+#   outer suite_timeout can never truncate a legitimately slow stage (zero
+#   slack was the original defect this bound fixes). Raise the outer value in
+#   the same change as any inner bound.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -89,7 +109,10 @@ npx tsx scripts/check-browser-test-env.ts
 echo ""
 
 echo "=== Unit Tests ==="
-npx tsx scripts/vitest-run-with-retry.ts --expect-project-coverage --project unit --timeout-ms 300000 2>&1
+# No --timeout-ms: the runner applies the hybrid load-aware unit bound
+# (floor 600 s, ceiling 1200 s). Pin explicitly only to override that on a
+# specific host.
+npx tsx scripts/vitest-run-with-retry.ts --expect-project-coverage --project unit 2>&1
 echo ""
 
 echo "=== Browser Tests (non-tutorial) ==="

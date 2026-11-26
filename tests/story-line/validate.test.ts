@@ -285,6 +285,157 @@ describe('validateStorylineOptions — reported scope', () => {
   });
 });
 
+describe('validateStorylineOptions — declared resources', () => {
+  it('reports an undeclared cost key with the card id, the key and a reason', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Pay', effectPolicy: 'apply', cost: { hull: 5 } }],
+      { cardId: 'evt-toll' },
+    );
+
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({
+      path: 'options[0].cost.hull',
+      code: 'unknown-resource-key',
+      cardId: 'evt-toll',
+      resource: 'hull',
+    });
+    expect(result.issues[0].message).toContain('hull');
+    expect(result.issues[0].message).toContain('coins, reputation');
+  });
+
+  it('reports an undeclared extra-effect key', () => {
+    const result = validateStorylineOptions([
+      { label: 'Gain', effectPolicy: 'apply', extraEffect: { morale: 2 } },
+    ]);
+    expect(result.issues.map((issue) => [issue.path, issue.code, issue.resource])).toEqual([
+      ['options[0].extraEffect.morale', 'unknown-resource-key', 'morale'],
+    ]);
+  });
+
+  it('accepts declared keys in costs, extra effects and conditions', () => {
+    const declared = ['coins', 'reputation', 'hull', 'morale'];
+    const result = validateStorylineOptions(
+      [
+        {
+          label: 'All declared',
+          effectPolicy: 'apply',
+          cost: { hull: 2 },
+          extraEffect: { morale: 3 },
+          conditionalSuccessors: [
+            { when: { field: 'hull', op: '<=', value: 1 }, successorId: null },
+          ],
+        },
+      ],
+      { resources: declared },
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects a negative extra effect on any declared key, naming the key', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Bleed', effectPolicy: 'apply', extraEffect: { morale: -2 } }],
+      { resources: ['coins', 'reputation', 'morale'] },
+    );
+    expect(result.issues.map((issue) => [issue.path, issue.code, issue.resource])).toEqual([
+      ['options[0].extraEffect.morale', 'negative-extra-effect', 'morale'],
+    ]);
+  });
+
+  it('defaults the vocabulary to the coins/reputation projection', () => {
+    expect(
+      validateStorylineOptions([
+        { label: 'Coins', effectPolicy: 'apply', cost: { coins: 1 } },
+      ]).valid,
+    ).toBe(true);
+    expect(
+      validateStorylineOptions([
+        { label: 'Rep', effectPolicy: 'apply', extraEffect: { reputation: 1 } },
+      ]).valid,
+    ).toBe(true);
+    expect(
+      validateStorylineOptions([
+        {
+          label: 'Unknown field',
+          effectPolicy: 'skip',
+          conditionalSuccessors: [
+            { when: { field: 'stores', op: '>=', value: 1 }, successorId: null },
+          ],
+        },
+      ]).issues.map((issue) => issue.code),
+    ).toEqual(['unknown-condition-field']);
+  });
+});
+
+describe('validateStorylineOptions — irreversible grants', () => {
+  const DECLARED = ['coins', 'reputation', 'hull'] as const;
+
+  it('rejects a positive extra effect on a declared irreversible key', () => {
+    const result = validateStorylineOptions(
+      [{ label: 'Patch', effectPolicy: 'apply', extraEffect: { hull: 1 } }],
+      { resources: DECLARED, irreversible: ['hull'], cardId: 'evt-wreck' },
+    );
+
+    expect(result.valid).toBe(false);
+    expect(result.issues).toHaveLength(1);
+    expect(result.issues[0]).toMatchObject({
+      path: 'options[0].extraEffect.hull',
+      code: 'irreversible-grant',
+      cardId: 'evt-wreck',
+      resource: 'hull',
+    });
+    expect(result.issues[0].message).toContain('hull');
+    expect(result.issues[0].message).toContain('irreversible');
+  });
+
+  it('leaves a zero extra effect alone (only a gain is refused)', () => {
+    expect(
+      validateStorylineOptions(
+        [{ label: 'No-op', effectPolicy: 'apply', extraEffect: { hull: 0 } }],
+        { resources: DECLARED, irreversible: ['hull'] },
+      ).valid,
+    ).toBe(true);
+  });
+
+  it('accepts spending an irreversible key and granting a recoverable one', () => {
+    const result = validateStorylineOptions(
+      [
+        {
+          label: 'Trade',
+          effectPolicy: 'apply',
+          cost: { hull: 1 },
+          extraEffect: { coins: 2 },
+        },
+      ],
+      { resources: DECLARED, irreversible: ['hull'] },
+    );
+    expect(result).toEqual({ valid: true, issues: [] });
+  });
+
+  it('reports nothing extra when no irreversible set is supplied', () => {
+    const hullGain = validateStorylineOptions(
+      [{ label: 'Gain', effectPolicy: 'apply', extraEffect: { hull: 1 } }],
+      { resources: DECLARED },
+    );
+    expect(hullGain.valid).toBe(true);
+
+    // The default projection is unchanged too: a positive `coins` extra effect
+    // is still a gain, never an irreversible one.
+    const coinsGain = validateStorylineOptions([
+      { label: 'Gain', effectPolicy: 'apply', extraEffect: { coins: 1 } },
+    ]);
+    expect(coinsGain.valid).toBe(true);
+  });
+
+  it('keeps the negative rule dominant for an irreversible key', () => {
+    expect(
+      validateStorylineOptions(
+        [{ label: 'Bleed', effectPolicy: 'apply', extraEffect: { hull: -1 } }],
+        { resources: DECLARED, irreversible: ['hull'] },
+      ).issues.map((issue) => issue.code),
+    ).toEqual(['negative-extra-effect']);
+  });
+});
+
 /** A system instance bound to an empty template catalogue + adapter. */
 function makeSystem() {
   const system = createStorylineSystem({ engine: makeAdapter(new Map()) });

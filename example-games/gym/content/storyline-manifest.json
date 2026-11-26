@@ -15,6 +15,7 @@
       "optionCount": 0,
       "options": [],
       "effect": "Gain 60 reputation",
+      "context": "The new road opens, and the town begins to feel less like a place the world forgot. Whatever comes next will come by this road.",
       "impact": "+60 reputation",
       "fields": {
         "trigger": "Incident",
@@ -45,6 +46,7 @@
         }
       ],
       "effect": "Lose 80 coins",
+      "context": "The roads are left to the weather, and the first complaints arrive with the first frost. The town begins to feel smaller than it did in spring.",
       "impact": "−80 coins",
       "fields": {
         "trigger": "Incident",
@@ -75,17 +77,18 @@
         }
       ],
       "effect": "Gain 120 coins",
+      "context": "The road crews move out under a thin winter sun. For the first time in years, the town can see past its own gate. The investment helps the town trade beyond its borders.",
       "impact": "+120 coins",
       "fields": {
         "trigger": "Incident",
-        "cost": "0",
+        "cost": "100",
         "coinDelta": "120",
         "reputationDelta": "0"
       }
     },
     {
       "id": "gym-story-start",
-      "name": "Town Meeting",
+      "name": "Town Roads",
       "storylineId": "gym-story",
       "storylineTitle": "Gym Storyline",
       "isChoice": true,
@@ -106,7 +109,8 @@
           "effectPolicy": "apply"
         }
       ],
-      "effect": "Lose 50 coins",
+      "effect": "Lose 50 coins in expenses for the meeting.",
+      "context": "The people of the town are warning that the roads are in disrepair and the winter is coming to make them worse. The town meets in the hall above the market, with the road budget on the table and rain coming in off the hills. Everyone is waiting to see who will pay for the roads this year.",
       "impact": "−50 coins",
       "fields": {
         "trigger": "Incident",

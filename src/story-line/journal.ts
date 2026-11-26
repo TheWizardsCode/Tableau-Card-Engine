@@ -17,6 +17,45 @@ import type {
 /** Prefix of the narrative lines written when a story-line choice resolves. */
 export const STORY_UPDATE_PREFIX = 'Story update — ';
 
+/** Default display budget for a journal outcome line, in characters. */
+export const DEFAULT_OUTCOME_MAX_LENGTH = 80;
+
+/**
+ * Cuts an outcome summary to one display-safe line of at most `maxLength`
+ * characters.
+ *
+ * The journal overlay has room for a single line, so a long authored outcome
+ * prose must be shortened for **display only** — the untruncated text stays
+ * on the journal entry (`outcomeFull` / `text`) for the transcript artefact.
+ *
+ * Rules:
+ *
+ * - text within the budget is returned unchanged;
+ * - over-budget text is cut on a word boundary (never mid-word), without a
+ *   trailing space, and ends with a single `…`;
+ * - a space-less over-budget string is hard-cut to `maxLength - 1` characters
+ *   plus `…` (the budget is exactly `maxLength`);
+ * - embedded newlines are collapsed to spaces, so the result is one line.
+ *
+ * @param text      The outcome summary (usually the authored prose).
+ * @param maxLength Maximum displayed length, including the ellipsis.
+ */
+export function truncateOutcome(
+  text: string,
+  maxLength: number = DEFAULT_OUTCOME_MAX_LENGTH,
+): string {
+  if (maxLength <= 0) return '';
+  const singleLine = text.replace(/\s*\r?\n+\s*/g, ' ');
+  if (singleLine.length <= maxLength) return singleLine;
+  if (maxLength === 1) return '…';
+
+  const budget = maxLength - 1; // one character is reserved for the ellipsis
+  let cut = singleLine.slice(0, budget);
+  const lastSpace = cut.lastIndexOf(' ');
+  if (lastSpace > 0) cut = cut.slice(0, lastSpace);
+  return `${cut.trimEnd()}…`;
+}
+
 /**
  * Parses a story-update log line into `{ storyline, outcome }`, or null when
  * the text is not a story update.
@@ -49,7 +88,10 @@ export function buildJournal<TState, TCard extends import('./types').StorylineCa
     entries.push({
       turn: log.turn,
       storyline: parsed.storyline,
-      outcome: parsed.outcome,
+      // Display copy: one line, ellipsis, never mid-word.
+      outcome: truncateOutcome(parsed.outcome),
+      // Untruncated copy for the transcript artefact.
+      outcomeFull: parsed.outcome,
       text: log.text,
     });
   }

@@ -18,14 +18,41 @@
  * markup resolve under `/Tableau-Card-Engine/` (Pages), `/` (dev), and `./`
  * (Electron) without per-mode code — `vite-base-gating.test.ts` covers the
  * script/asset half of that contract.
+ *
+ * Every build copies a private snapshot of `public/` (never the shared tree),
+ * so a concurrent `npm run dev`/`build` cannot change what is asserted
+ * (CG-0MWW8D6N6006ZR49).
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { build } from 'vite';
+import { createPublicSnapshot } from '../helpers/public-snapshot';
 
 const REPO_ROOT = process.cwd();
+
+/**
+ * Pin one deterministic preset for the whole file (CG-0MWW8D6N6006ZR49).
+ *
+ * These builds exercise the launcher shell, not the game catalogue, so
+ * `core-only` is the always-available preset (the merged core is
+ * sibling-only). Pinning once at file scope — instead of saving and restoring
+ * an ambient value around each build — means the preset cannot differ
+ * mid-run and the result never depends on the caller's `GAMES_CONFIG`.
+ */
+const FORCED_PRESET = 'core-only';
+let ambientPreset: string | undefined;
+
+beforeAll(() => {
+  ambientPreset = process.env.GAMES_CONFIG;
+  process.env.GAMES_CONFIG = FORCED_PRESET;
+});
+
+afterAll(() => {
+  if (ambientPreset === undefined) delete process.env.GAMES_CONFIG;
+  else process.env.GAMES_CONFIG = ambientPreset;
+});
 
 /** The icon/manifest files that must exist in every build output. */
 const REQUIRED_PUBLIC_FILES = [
@@ -40,19 +67,25 @@ interface BuildOutput {
   indexHtml: string;
   notFoundHtml: string | null;
   outDir: string;
+  /** Releases the temp outDir and the `public/` snapshot; call in `finally`. */
+  cleanup: () => void;
 }
 
 async function buildToTemp(mode: 'electron' | 'production' | 'development'): Promise<BuildOutput> {
   const outDir = fs.mkdtempSync(path.join(os.tmpdir(), `tce-icons-${mode}-`));
-  // Build the always-available core-only preset so the test does not depend on
-  // any sibling game checkout (merged core is Option A / sibling-only).
-  const previousPreset = process.env.GAMES_CONFIG;
-  process.env.GAMES_CONFIG = 'core-only';
+  // Vite copies `publicDir` into the output; point it at a private snapshot so
+  // no other process can change the icon/manifest files mid-build.
+  const snapshot = createPublicSnapshot();
+  const cleanup = (): void => {
+    snapshot.cleanup();
+    fs.rmSync(outDir, { recursive: true, force: true });
+  };
   try {
     await build({
       mode,
       root: REPO_ROOT,
       configFile: path.join(REPO_ROOT, 'vite.config.ts'),
+      publicDir: snapshot.publicDir,
       logLevel: 'silent',
       build: { outDir, emptyOutDir: true, sourcemap: false },
     });
@@ -61,13 +94,11 @@ async function buildToTemp(mode: 'electron' | 'production' | 'development'): Pro
       indexHtml: fs.readFileSync(path.join(outDir, 'index.html'), 'utf-8'),
       notFoundHtml: fs.existsSync(notFoundPath) ? fs.readFileSync(notFoundPath, 'utf-8') : null,
       outDir,
+      cleanup,
     };
   } catch (e) {
-    fs.rmSync(outDir, { recursive: true, force: true });
+    cleanup();
     throw e;
-  } finally {
-    if (previousPreset === undefined) delete process.env.GAMES_CONFIG;
-    else process.env.GAMES_CONFIG = previousPreset;
   }
 }
 
@@ -92,7 +123,7 @@ describe.each(['electron', 'production', 'development'] as const)(
   'app-icon wiring (%s build)',
   (mode) => {
     it('emits every icon/manifest file declared as public', async () => {
-      const { outDir } = await buildToTemp(mode);
+      const { outDir, cleanup } = await buildToTemp(mode);
       try {
         for (const file of REQUIRED_PUBLIC_FILES) {
           expect(fs.existsSync(path.join(outDir, file)), `${file} must be in the build output`).toBe(
@@ -100,12 +131,12 @@ describe.each(['electron', 'production', 'development'] as const)(
           );
         }
       } finally {
-        fs.rmSync(outDir, { recursive: true, force: true });
+        cleanup();
       }
     }, 120_000);
 
     it('index.html references the favicon, Apple touch icon, and manifest', async () => {
-      const { indexHtml, outDir } = await buildToTemp(mode);
+      const { indexHtml, outDir, cleanup } = await buildToTemp(mode);
       try {
         const favicon = linkHref(indexHtml, 'icon');
         expect(favicon, 'index.html must declare a favicon link').toBeTruthy();
@@ -129,12 +160,12 @@ describe.each(['electron', 'production', 'development'] as const)(
           expect(href.startsWith('./'), `${href} must not be dot-relative`).toBe(false);
         }
       } finally {
-        fs.rmSync(outDir, { recursive: true, force: true });
+        cleanup();
       }
     }, 120_000);
 
     it('404.html carries the favicon link', async () => {
-      const { notFoundHtml, outDir } = await buildToTemp(mode);
+      const { notFoundHtml, outDir, cleanup } = await buildToTemp(mode);
       try {
         expect(notFoundHtml, '404.html must be copied into the output').not.toBeNull();
         const favicon = linkHref(notFoundHtml!, 'icon');
@@ -143,12 +174,12 @@ describe.each(['electron', 'production', 'development'] as const)(
         expect(favicon!.startsWith('/')).toBe(false);
         expect(favicon!.startsWith('./')).toBe(false);
       } finally {
-        fs.rmSync(outDir, { recursive: true, force: true });
+        cleanup();
       }
     }, 120_000);
 
     it('site.webmanifest names the app and only references icons present in the output', async () => {
-      const { outDir } = await buildToTemp(mode);
+      const { outDir, cleanup } = await buildToTemp(mode);
       try {
         const manifest = JSON.parse(
           fs.readFileSync(path.join(outDir, 'site.webmanifest'), 'utf-8'),
@@ -178,7 +209,7 @@ describe.each(['electron', 'production', 'development'] as const)(
           ).toBe(true);
         }
       } finally {
-        fs.rmSync(outDir, { recursive: true, force: true });
+        cleanup();
       }
     }, 120_000);
   },

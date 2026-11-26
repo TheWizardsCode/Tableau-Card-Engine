@@ -1,0 +1,3 @@
+id,name,effect,options,storylineId,storylineTitle,resources,trigger,cost,coinDelta,reputationDelta,context
+bad-a,Bad A,Malformed cost pair,Go|bad-b#cost=coins,bad,Bad,"coins,reputation",Incident,0,0,0,
+bad-b,Bad B,Terminal card,,bad,Bad,"coins,reputation",Incident,0,0,0,

@@ -1,0 +1,3 @@
+#resources: hull,morale,stores,goodwill,charge
+id,name,effect,options,resources,storylineId
+le-i-open,The First Unwriting,The charts forget the volume with it.,,long-erasure

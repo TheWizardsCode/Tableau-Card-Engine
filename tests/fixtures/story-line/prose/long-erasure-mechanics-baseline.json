@@ -1,0 +1,784 @@
+{
+  "note": "Pre-rewrite mechanics of The Long Erasure (CG-0MWO7CX0V000PR5K). Captured from HEAD before any prose was authored; the rewrite must not change any of it. Re-frozen for the authorised goodwill-gated survivability nudge (CG-0MWPVYTSU0065BXC): `le-ii-bargain` clockCost 3 -> 2 and `le-ii-sabotage` clockCost 2 -> 1, so the gated `Sabotage the Loom` route survives to an ending with 1 clock unspent instead of expiring on `le-iii-ahead`. No other mechanics value, edge or cycle changed.",
+  "cards": [
+    {
+      "id": "le-i-open",
+      "storylineId": "long-erasure",
+      "act": "I",
+      "clockCost": 1,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Log the erasure",
+          "successorIds": [
+            "le-i-log"
+          ],
+          "cost": {
+            "stores": 1
+          }
+        },
+        {
+          "label": "Rally the survey crew",
+          "successorIds": [
+            "le-i-rally"
+          ],
+          "extraEffect": {
+            "morale": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-i-log",
+      "storylineId": "long-erasure",
+      "act": "I",
+      "clockCost": 1,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Transmit the warning",
+          "successorIds": [
+            "le-i-transmit"
+          ],
+          "cost": {
+            "charge": 1
+          },
+          "extraEffect": {
+            "goodwill": 2
+          }
+        },
+        {
+          "label": "Stay silent",
+          "successorIds": [
+            "le-i-silent"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-i-rally",
+      "storylineId": "long-erasure",
+      "act": "I",
+      "clockCost": 1,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Hold the survey line",
+          "successorIds": [
+            "le-i-transmit"
+          ],
+          "extraEffect": {
+            "morale": 1
+          }
+        },
+        {
+          "label": "Turn for the muster",
+          "successorIds": [
+            "le-i-silent"
+          ],
+          "cost": {
+            "stores": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-i-transmit",
+      "storylineId": "long-erasure",
+      "act": "I",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Shelter in the dead zone",
+          "successorIds": [
+            "le-ii-shelter"
+          ]
+        },
+        {
+          "label": "Push deeper",
+          "successorIds": [
+            "le-ii-derelict"
+          ],
+          "extraEffect": {
+            "stores": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-i-silent",
+      "storylineId": "long-erasure",
+      "act": "I",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Shelter in the dead zone",
+          "successorIds": [
+            "le-ii-shelter"
+          ],
+          "cost": {
+            "morale": 1
+          }
+        },
+        {
+          "label": "Push deeper",
+          "successorIds": [
+            "le-ii-derelict"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-ii-shelter",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Ration the stores",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "extraEffect": {
+            "morale": 1
+          }
+        },
+        {
+          "label": "Strip the derelict",
+          "successorIds": [
+            "le-ii-salvage"
+          ],
+          "cost": {
+            "hull": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-ii-derelict",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Strip the locker",
+          "successorIds": [
+            "le-ii-salvage"
+          ],
+          "cost": {
+            "hull": 1
+          },
+          "extraEffect": {
+            "stores": 2
+          }
+        },
+        {
+          "label": "Leave it be",
+          "successorIds": [
+            "le-ii-offer"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-ii-salvage",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Take the ally's berth",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "cost": {
+            "goodwill": 2
+          },
+          "extraEffect": {
+            "stores": 1
+          }
+        },
+        {
+          "label": "Share the berth",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "extraEffect": {
+            "goodwill": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-ii-offer",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Bargain in bad faith",
+          "successorIds": [
+            "le-ii-bargain"
+          ],
+          "extraEffect": {
+            "stores": 1
+          }
+        },
+        {
+          "label": "Refuse him",
+          "successorIds": [
+            "le-ii-refuse"
+          ],
+          "extraEffect": {
+            "morale": 1
+          }
+        },
+        {
+          "label": "Abandon the voyage",
+          "successorIds": [
+            "le-end-abandon"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-ii-bargain",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Sabotage the Loom",
+          "successorIds": [
+            "le-ii-sabotage"
+          ],
+          "cost": {
+            "goodwill": 3
+          }
+        },
+        {
+          "label": "Keep the bargain",
+          "successorIds": [
+            "le-ii-keep"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-ii-sabotage",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 1,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Break for the core",
+          "successorIds": [
+            "le-iii-approach",
+            "le-iii-ahead"
+          ],
+          "conditionalSuccessors": [
+            {
+              "when": {
+                "field": "charge",
+                "op": ">=",
+                "value": 2
+              },
+              "successorId": "le-iii-ahead"
+            }
+          ]
+        },
+        {
+          "label": "Follow the unravelling",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "extraEffect": {
+            "charge": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-ii-keep",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 3,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Follow the thread",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "extraEffect": {
+            "charge": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-ii-refuse",
+      "storylineId": "long-erasure",
+      "act": "II",
+      "clockCost": 2,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Side with the captain",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "extraEffect": {
+            "goodwill": 2
+          }
+        },
+        {
+          "label": "Side with the crew",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "cost": {
+            "morale": 1
+          },
+          "extraEffect": {
+            "stores": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-iii-ahead",
+      "storylineId": "long-erasure",
+      "act": "III",
+      "clockCost": 3,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Set the charge",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "extraEffect": {
+            "charge": 2
+          }
+        },
+        {
+          "label": "Hit the core now",
+          "successorIds": [
+            "le-end-ram"
+          ],
+          "cost": {
+            "hull": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-iii-approach",
+      "storylineId": "long-erasure",
+      "act": "III",
+      "clockCost": 3,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Finish the weave",
+          "successorIds": [
+            "le-end-reset"
+          ]
+        },
+        {
+          "label": "Unwrite the Loom",
+          "successorIds": [
+            "le-end-quiet"
+          ],
+          "cost": {
+            "charge": 2
+          }
+        },
+        {
+          "label": "Ram the core",
+          "successorIds": [
+            "le-end-ram"
+          ],
+          "cost": {
+            "hull": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "le-end-abandon",
+      "storylineId": "long-erasure",
+      "act": "Ending",
+      "clockCost": 0,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": []
+    },
+    {
+      "id": "le-end-reset",
+      "storylineId": "long-erasure",
+      "act": "Ending",
+      "clockCost": 0,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": [
+        {
+          "label": "Begin the survey again",
+          "successorIds": [
+            "le-i-open"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-end-quiet",
+      "storylineId": "long-erasure",
+      "act": "Ending",
+      "clockCost": 0,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": []
+    },
+    {
+      "id": "le-end-ram",
+      "storylineId": "long-erasure",
+      "act": "Ending",
+      "clockCost": 0,
+      "resourceKeys": [
+        "hull",
+        "morale",
+        "stores",
+        "goodwill",
+        "charge"
+      ],
+      "options": []
+    }
+  ],
+  "edges": [
+    {
+      "from": "le-end-reset",
+      "to": "le-i-open",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-i-log",
+      "to": "le-i-silent",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-log",
+      "to": "le-i-transmit",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-i-open",
+      "to": "le-i-log",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-i-open",
+      "to": "le-i-rally",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-rally",
+      "to": "le-i-transmit",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-rally",
+      "to": "le-i-silent",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-silent",
+      "to": "le-ii-derelict",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-silent",
+      "to": "le-ii-shelter",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-transmit",
+      "to": "le-ii-derelict",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-i-transmit",
+      "to": "le-ii-shelter",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-bargain",
+      "to": "le-ii-keep",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-bargain",
+      "to": "le-ii-sabotage",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-derelict",
+      "to": "le-ii-offer",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-derelict",
+      "to": "le-ii-salvage",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-keep",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-offer",
+      "to": "le-end-abandon",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-offer",
+      "to": "le-ii-bargain",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-offer",
+      "to": "le-ii-refuse",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-refuse",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-refuse",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-sabotage",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-sabotage",
+      "to": "le-iii-ahead",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-sabotage",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-salvage",
+      "to": "le-ii-offer",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-salvage",
+      "to": "le-ii-offer",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-ii-shelter",
+      "to": "le-ii-offer",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-ii-shelter",
+      "to": "le-ii-salvage",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-iii-ahead",
+      "to": "le-end-ram",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-iii-ahead",
+      "to": "le-iii-approach",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-iii-approach",
+      "to": "le-end-reset",
+      "choice": null,
+      "cycle": true
+    },
+    {
+      "from": "le-iii-approach",
+      "to": "le-end-ram",
+      "choice": null,
+      "cycle": false
+    },
+    {
+      "from": "le-iii-approach",
+      "to": "le-end-quiet",
+      "choice": null,
+      "cycle": false
+    }
+  ],
+  "cycles": [
+    [
+      "le-end-reset",
+      "le-i-log",
+      "le-i-open",
+      "le-i-transmit",
+      "le-ii-bargain",
+      "le-ii-offer",
+      "le-ii-sabotage",
+      "le-ii-shelter",
+      "le-iii-approach"
+    ]
+  ]
+}

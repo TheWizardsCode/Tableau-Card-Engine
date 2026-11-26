@@ -29,7 +29,10 @@ import { readFileSync } from 'node:fs';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
+import {
+  GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
+} from '../../../src/story-line/content/adapters';
 import { buildStorylineManifestFromCsv } from '../../../src/story-line/content/manifest';
 import { readContentCards } from '../../../src/story-line/content/mutate';
 import type { ContentAdapter } from '../../../src/story-line/content/types';
@@ -86,9 +89,11 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
       'id',
       'name',
       'effect',
+      'context',
       'options',
       'storylineId',
       'storylineTitle',
+      'resources',
       'column:trigger',
       'column:cost',
       'column:coinDelta',
@@ -101,19 +106,27 @@ describe('card field descriptors — adapter-driven, not hard-coded', () => {
     expect(id.value).toBe('gym-story-start');
 
     const fields = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
-    expect(fields.get('name')?.value).toBe('Town Meeting');
-    expect(fields.get('effect')?.value).toBe('Lose 50 coins');
-    expect(fields.get('options')?.value).toBe(
-      'Invest|gym-story-invest;Ignore|gym-story-ignore',
-    );
-    expect(fields.get('storylineId')?.value).toBe('gym-story');
-    expect(fields.get('storylineTitle')?.value).toBe('Gym Storyline');
+    // Each descriptor surfaces the card's *own* value: the expectation is read
+    // off the loaded card, so authoring prose is not pinned here.
+    expect(fields.get('name')?.value).toBe(target.name);
+    expect(fields.get('effect')?.value).toBe(target.effect);
+    expect(fields.get('context')?.value).toBe(target.context);
+    expect(fields.get('options')?.value).toBe(target.options);
+    // The extended grammar is discoverable from the field hint itself.
+    expect(fields.get('options')?.hint).toContain('#cost=coins:5');
+    expect(fields.get('options')?.hint).toContain('#extra=reputation:+2');
+    expect(fields.get('options')?.hint).toContain('#when=coins>=3>cardX');
+    expect(fields.get('storylineId')?.value).toBe(target.storylineId);
+    expect(fields.get('storylineTitle')?.value).toBe(target.storylineTitle);
+    // The declared-resource column is a first-class descriptor with its own hint.
+    expect(fields.get('resources')?.value).toBe('coins,reputation');
+    expect(fields.get('resources')?.hint).toContain('resource keys');
     // Adapter columns are plain text fields, carrying their raw values.
     expect(fields.get('column:coinDelta')?.group).toBe('adapter');
     expect(fields.get('column:coinDelta')?.value).toBe('-50');
     // The exact descriptor key list above is the contract: `options` is the
     // only choice control, and no extra choices-related keys exist.
-    expect(fields.size).toBe(10);
+    expect(fields.size).toBe(12);
     // The options field offers the known card ids as suggestions.
     expect(fields.get('options')?.suggestions).toEqual([
       'gym-story-start',
@@ -179,9 +192,11 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const edits: Record<string, string> = {
       name: 'The Endgame',
       effect: 'Everything changes.',
-      options: 'Reinvest|gym-story-invest;Finish|',
+      options:
+        'Reinvest|gym-story-invest#cost=coins:2#extra=reputation:+1#when=coins>=50>gym-story-end;Finish|',
       storylineId: 'edited-arc',
       storylineTitle: 'Edited Arc',
+      resources: 'coins,reputation,hull',
       'column:trigger': 'Event',
       'column:cost': '3',
       'column:coinDelta': '-25',
@@ -219,6 +234,7 @@ describe('edit round-trip — every core-generic and adapter field', () => {
         'options',
         'storylineId',
         'storylineTitle',
+        'resources',
         'trigger',
         'cost',
         'coinDelta',
@@ -243,9 +259,12 @@ describe('edit round-trip — every core-generic and adapter field', () => {
     const written = card(GYM_CONTENT_ADAPTER, readFileSync(fixture.csvPath, 'utf-8'), 'gym-story-end');
     expect(written.name).toBe('The Endgame');
     expect(written.effect).toBe('Everything changes.');
-    expect(written.options).toBe('Reinvest|gym-story-invest;Finish|');
+    expect(written.options).toBe(
+      'Reinvest|gym-story-invest#cost=coins:2#extra=reputation:+1#when=coins>=50>gym-story-end;Finish|',
+    );
     expect(written.storylineId).toBe('edited-arc');
     expect(written.storylineTitle).toBe('Edited Arc');
+    expect(written.resourceKeys).toEqual(['coins', 'reputation', 'hull']);
     expect(written.fields.trigger).toBe('Event');
     expect(written.fields.cost).toBe('3');
     expect(written.fields.coinDelta).toBe('-25');
@@ -522,6 +541,30 @@ describe('validation errors — attributed inline and the write is blocked', () 
     expect(unknownTarget[0].field).toBe('options');
   });
 
+  it('attributes an irreversible grant to the Options field', () => {
+    const csv = readFileSync(fixture.csvPath, 'utf-8');
+    const start = card(GYM_CONTENT_ADAPTER, csv, 'gym-story-start');
+    const descriptors = buildCardFieldDescriptors(GYM_CONTENT_ADAPTER, start);
+
+    const errors = attributeEditErrors({
+      descriptors,
+      draft: draftFromDescriptors(descriptors),
+      cardId: start.id,
+      errors: [],
+      issues: [
+        {
+          code: 'irreversible-grant',
+          cardId: start.id,
+          resource: 'hull',
+          message: 'extraEffect.hull grants 1 to "hull", which is declared irreversible.',
+        },
+      ],
+    });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toMatchObject({ field: 'options', code: 'irreversible-grant' });
+  });
+
   it('attributes a duplicate new-card id to the id field', () => {
     const descriptors = buildNewCardFieldDescriptors(GYM_CONTENT_ADAPTER);
     const draft = draftFromDescriptors(descriptors);
@@ -608,5 +651,75 @@ describe('the committed Gym content is never mutated', () => {
     expect(csv).toContain('Transport Infrastructure');
     expect(csv).not.toContain('The Endgame');
     expect(csv).not.toContain('gym-story-detour');
+  });
+});
+
+describe('authored prose fields (context / epilogue)', () => {
+  const PROSE_CSV = [
+    'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue',
+    'le-x-open,The Opening,Nothing happens.,,q,Q,"hull",I,1,"A ship at anchor; nothing moves.","The anchor holds."',
+    '',
+  ].join('\n');
+
+  /** The prose-bearing card read through the Long Erasure adapter. */
+  function proseCard() {
+    const [card] = readContentCards(PROSE_CSV, LONG_ERASURE_CONTENT_ADAPTER);
+    return card!;
+  }
+
+  it('renders both prose fields as long-text only when the adapter maps them', () => {
+    const descriptors = buildCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER, proseCard());
+    const byKey = new Map(descriptors.map((descriptor) => [descriptor.key, descriptor]));
+
+    expect(byKey.get('context')).toMatchObject({
+      kind: 'long-text',
+      group: 'core',
+      column: 'context',
+      value: 'A ship at anchor; nothing moves.',
+      editable: true,
+    });
+    expect(byKey.get('epilogue')).toMatchObject({
+      kind: 'long-text',
+      group: 'core',
+      column: 'epilogue',
+      value: 'The anchor holds.',
+      editable: true,
+    });
+    // The mapped prose columns are core fields, never duplicated as game columns.
+    expect(descriptors.some((descriptor) => descriptor.key === 'column:context')).toBe(false);
+    expect(descriptors.some((descriptor) => descriptor.key === 'column:epilogue')).toBe(false);
+
+    // The Gym adapter maps `context` (the demo authors it) but not `epilogue`,
+    // so only the context control renders on its new-card form.
+    const gymKeys = buildNewCardFieldDescriptors(GYM_CONTENT_ADAPTER).map(
+      (descriptor) => descriptor.key,
+    );
+    expect(gymKeys).toContain('context');
+    expect(gymKeys).not.toContain('epilogue');
+  });
+
+  it('starts both prose controls empty on the new-card form', () => {
+    const byKey = new Map(
+      buildNewCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER).map((descriptor) => [
+        descriptor.key,
+        descriptor,
+      ]),
+    );
+    expect(byKey.get('context')?.value).toBe('');
+    expect(byKey.get('epilogue')?.value).toBe('');
+  });
+
+  it('builds an update spec carrying edited prose and clears it when blank', () => {
+    const descriptors = buildCardFieldDescriptors(LONG_ERASURE_CONTENT_ADAPTER, proseCard());
+    const draft = draftFromDescriptors(descriptors);
+    draft.context = 'A ship at anchor; the crew have gone quiet.';
+    draft.epilogue = '';
+
+    const spec = buildUpdateSpec(descriptors, draft);
+    expect(spec).not.toBeNull();
+    expect(spec?.context).toBe('A ship at anchor; the crew have gone quiet.');
+    expect(spec?.epilogue).toBeNull();
+    // Prose is a core field, not a game-field bag entry.
+    expect(spec?.fields).toBeUndefined();
   });
 });

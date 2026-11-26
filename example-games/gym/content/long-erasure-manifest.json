@@ -1,0 +1,871 @@
+{
+  "version": 1,
+  "source": "Generated from the long-erasure content CSV via the story-line content adapter (deterministic).",
+  "gameId": "long-erasure",
+  "storylineIds": [
+    "long-erasure"
+  ],
+  "nodes": [
+    {
+      "id": "le-end-abandon",
+      "name": "The Voyage Abandoned",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": false,
+      "optionCount": 0,
+      "options": [],
+      "effect": "You turn for home and the erasure follows you there.",
+      "context": "You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.",
+      "epilogue": "The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left.",
+      "impact": "",
+      "fields": {
+        "act": "Ending",
+        "clockCost": "0"
+      }
+    },
+    {
+      "id": "le-end-quiet",
+      "name": "A Quiet Chart",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": false,
+      "optionCount": 0,
+      "options": [],
+      "effect": "The Loom is unwritten; the homeland stays drowned and the chart stays honest.",
+      "context": "The Loom is unwritten and the room around you stops remembering. Its work stays done: the drowned homeland keeps its water, the berths stay erased, and the chart ends exactly where the chart ends. The Ashlight turns for home carrying a survey that agrees with itself and nothing else.",
+      "epilogue": "The Loom is gone and its work stays done: the drowned homeland keeps its water and the erasures keep their silence. You file a survey that agrees with itself and nothing else, and the survey service accepts it without comment. Nobody ever raises the volume again, which is what winning looks like out here, a quiet chart, a full log, and a crew who will not talk about what they saw.",
+      "impact": "",
+      "fields": {
+        "act": "Ending",
+        "clockCost": "0"
+      }
+    },
+    {
+      "id": "le-end-ram",
+      "name": "Ashlight, Ends",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": false,
+      "optionCount": 0,
+      "options": [],
+      "effect": "The ship becomes the argument the crew could not make any other way.",
+      "context": "You put the Ashlight's remaining hull into the core at full burn and the ship stops being a ship. The Loom comes apart around the impact, and every revision it held comes loose at once, filling the volume with versions of the world that cannot agree with one another.",
+      "epilogue": "The Ashlight enters the core and stops being a ship, and the Loom fails around the impact. Somewhere in the wreckage there is a record with your hull number on it, and it will be the only salvage that matters in this volume for a hundred years. Nobody who reads it will know what you were refusing. The frame still turns, a little, in the shape the ship left in it.",
+      "impact": "",
+      "fields": {
+        "act": "Ending",
+        "clockCost": "0"
+      }
+    },
+    {
+      "id": "le-end-reset",
+      "name": "The Long Erasure",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 1,
+      "options": [
+        {
+          "label": "Begin the survey again",
+          "successorIds": [
+            "le-i-open"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The Loom completes; the drowned homeland returns and the survey never happened.",
+      "context": "The Loom completes and the volume closes like a book being put away. The drowned homeland rises out of the record whole, streets, tide and names, and the Ashlight's survey is struck from every library that held it. You are the only thing left that remembers the room. If the story begins again it begins here, with a ship that has not yet learned why her charts are wrong.",
+      "epilogue": "The timeline closes over the erasure like water over a stone, and the last thing to go is the sound of the Loom turning. The voyage survives only as a record that nobody will read, scored against an arc that no longer exists. Whatever the crew paid to reach the core, they paid it to a version of the world that has just been spared the knowing. The chart is whole. The survey never happened. You remember both.",
+      "impact": "",
+      "fields": {
+        "act": "Ending",
+        "clockCost": "0"
+      }
+    },
+    {
+      "id": "le-i-log",
+      "name": "Dead Reckoning",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Transmit the warning",
+          "successorIds": [
+            "le-i-transmit"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Stay silent",
+          "successorIds": [
+            "le-i-silent"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The log is a warning nobody has read and the Loom has already read it.",
+      "context": "The log is finished, and it says what no survey manual covers: the volume ahead is being unwritten from its edges inward. Vane's Revision Loom reads every signal you broadcast, so a warning sent home also announces where the Ashlight is. The crew are waiting for the order, and the silence on the deep band has started to feel deliberate.",
+      "impact": "",
+      "fields": {
+        "act": "I",
+        "clockCost": "1"
+      }
+    },
+    {
+      "id": "le-i-open",
+      "name": "The First Unwriting",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Log the erasure",
+          "successorIds": [
+            "le-i-log"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Rally the survey crew",
+          "successorIds": [
+            "le-i-rally"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "A volume of space stops having happened and the ship's charts forget it with it.",
+      "context": "The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
+      "impact": "",
+      "fields": {
+        "act": "I",
+        "clockCost": "1"
+      }
+    },
+    {
+      "id": "le-i-rally",
+      "name": "The Missing Berth",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Hold the survey line",
+          "successorIds": [
+            "le-i-transmit"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Turn for the muster",
+          "successorIds": [
+            "le-i-silent"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "A crew member's home port never existed; they remember it anyway.",
+      "context": "The crew are at the muster board, and a berth clerk from a station two sectors back cannot find their home port on any chart. It was not destroyed, it never was, and they remember the house, the street and the smell of the harbour. They are asking you which of those things is real. Half the crew are watching you instead of the board.",
+      "impact": "",
+      "fields": {
+        "act": "I",
+        "clockCost": "1"
+      }
+    },
+    {
+      "id": "le-i-silent",
+      "name": "The Quiet Chart",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Shelter in the dead zone",
+          "successorIds": [
+            "le-ii-shelter"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Push deeper",
+          "successorIds": [
+            "le-ii-derelict"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The survey continues and the crew stops asking about the berth that never was.",
+      "context": "You chose silence, and the ship has settled into a working quiet. The chart is clean, the berth clerk has stopped asking, and the crew speak to one another in short, careful sentences. Ahead, the dead zone offers cover and the deeper volume offers answers, and the clock is not waiting for either.",
+      "impact": "",
+      "fields": {
+        "act": "I",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-i-transmit",
+      "name": "The Answering Silence",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Shelter in the dead zone",
+          "successorIds": [
+            "le-ii-shelter"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Push deeper",
+          "successorIds": [
+            "le-ii-derelict"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The warning is answered by nobody who can still be answered.",
+      "context": "Your transmission reaches three stations and each answers with static, a timestamp and no voice. One reply was relayed from a berth the crew now believe never existed. The Ashlight is close to the edge of the charted volume, where the Loom's carrier is strongest and the dark stops pretending to be empty.",
+      "impact": "",
+      "fields": {
+        "act": "I",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-bargain",
+      "name": "Terms in Bad Faith",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Sabotage the Loom",
+          "successorIds": [
+            "le-ii-sabotage"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Keep the bargain",
+          "successorIds": [
+            "le-ii-keep"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The terms are a promise with a clause quietly removed.",
+      "context": "Vane's terms arrive as a document: your ship survives, your crew survives, the Unwriting closes behind you, provided you stand down and let the weave finish. The second reading shows what the first one missed, the clause that defines who the weave excludes. The stores he promised are already aboard, and the crew are waiting to hear how you mean to honour a bargain you have not signed.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-derelict",
+      "name": "The Derelict",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Strip the locker",
+          "successorIds": [
+            "le-ii-salvage"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Leave it be",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "A hull with no crew and a full locker drifting since before the chart.",
+      "context": "A hull drifts beside you that predates every chart in the library, unpowered, sealed, its locker still full. There is no name on the plate and no bodies inside, which is worse than finding either. Stripping it means cutting your own hull open to bridge the gap; leaving it means admitting you cannot afford to look.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-keep",
+      "name": "The Weave Advances",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 1,
+      "options": [
+        {
+          "label": "Follow the thread",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The bargain holds and the ship is spared something older is spent instead.",
+      "context": "The bargain holds and the Ashlight is untouched, which is not the same as safe. Vane's weave is advancing through the volume behind you, spending something older than the crew's berths to pay for your survival. There is one way left into the story, and it is the thread he left you, and it is already warm on the hull.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "3"
+      }
+    },
+    {
+      "id": "le-ii-offer",
+      "name": "The Archivist's Offer",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 3,
+      "options": [
+        {
+          "label": "Bargain in bad faith",
+          "successorIds": [
+            "le-ii-bargain"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Refuse him",
+          "successorIds": [
+            "le-ii-refuse"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Abandon the voyage",
+          "successorIds": [
+            "le-end-abandon"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "Vane offers the ship's survival for one more revision of the world.",
+      "context": "Archivist Vane opens a channel from a room the Ashlight is not near and speaks as though you are already colleagues. He offers to strike the Unwriting from your hull and your crew's history, at the cost of one more revision somewhere you will never visit. Behind him the Revision Loom turns, and you can see what it is turning, and the crew are watching you decide.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-refuse",
+      "name": "Mutiny",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Side with the captain",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Side with the crew",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The captain refuses Vane and the crew must choose what refusing costs.",
+      "context": "Refusing Vane was the captain's decision and the crew did not get a vote. Half of them want to cut the channel and burn for home before the survey service calls it prudential; the other half want to finish what the Ashlight came for. Both halves are looking at you, and the deck has gone very quiet.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-sabotage",
+      "name": "The Loom Bleeds",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Break for the core",
+          "successorIds": [
+            "le-iii-approach",
+            "le-iii-ahead"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Follow the unravelling",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "A revision comes apart and the Loom's core is briefly unguarded.",
+      "context": "The charge takes the Loom's frame apart in a slow bright way, and for a few minutes its core stands unguarded. Vane is shouting on a channel he has stopped caring who hears. You can break for the core before the weave closes over it, or follow the unravelling further in while it is still open, and the Ashlight has the fuel for exactly one of those.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "1"
+      }
+    },
+    {
+      "id": "le-ii-salvage",
+      "name": "Salvage Rights",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Take the ally's berth",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Share the berth",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The ally who guided you here asks only to keep their berth.",
+      "context": "The salvage was guided by a free-hauler who has run this volume longer than the survey service has charted it, and they have come to collect on the favour. They ask for one berth in the locker before it is divided, which is a small thing, and the whole crew knows what a berth means out here now. The Loom's signal has been getting closer while you argue.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-ii-shelter",
+      "name": "The Dead Zone",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Ration the stores",
+          "successorIds": [
+            "le-ii-offer"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Strip the derelict",
+          "successorIds": [
+            "le-ii-salvage"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "Systems fail one at a time and the Loom's voice arrives on every band.",
+      "context": "The dead zone is a bubble of old interference forty hours across, and the Ashlight is running dark inside it. Systems drop and come back one at a time, and the Loom's voice arrives on every band regardless, reciting coordinates in a patient voice. Two courses remain: ration what you have, or take what the drifting hull beside you is carrying.",
+      "impact": "",
+      "fields": {
+        "act": "II",
+        "clockCost": "2"
+      }
+    },
+    {
+      "id": "le-iii-ahead",
+      "name": "Ahead of the Weave",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 2,
+      "options": [
+        {
+          "label": "Set the charge",
+          "successorIds": [
+            "le-iii-approach"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Hit the core now",
+          "successorIds": [
+            "le-end-ram"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The ship arrives before the revision closes and a charge is already spooling.",
+      "context": "The Ashlight comes out of the tear ahead of the weave, close enough to the Loom that its frame fills the forward port. A charge is already spooling in the ship's own cells, and the core is a room away behind a door that is still remembering how to open. Set the charge properly, or spend the hull you have left and hit the core now.",
+      "impact": "",
+      "fields": {
+        "act": "III",
+        "clockCost": "3"
+      }
+    },
+    {
+      "id": "le-iii-approach",
+      "name": "The Core",
+      "storylineId": "long-erasure",
+      "storylineTitle": "The Long Erasure",
+      "isChoice": true,
+      "optionCount": 3,
+      "options": [
+        {
+          "label": "Finish the weave",
+          "successorIds": [
+            "le-end-reset"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Unwrite the Loom",
+          "successorIds": [
+            "le-end-quiet"
+          ],
+          "effectPolicy": "apply"
+        },
+        {
+          "label": "Ram the core",
+          "successorIds": [
+            "le-end-ram"
+          ],
+          "effectPolicy": "apply"
+        }
+      ],
+      "effect": "The Loom's core is a room that remembers every version of you.",
+      "context": "The core is a room the size of a chapel, and it remembers every version of you that has ever walked in, including the ones that have not happened yet. Vane is not here; his work is. Three things can be done to it, and the Ashlight's clock, charge and hull decide which of them you can still afford.",
+      "impact": "",
+      "fields": {
+        "act": "III",
+        "clockCost": "3"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "le-end-reset",
+      "label": "Begin the survey again",
+      "to": "le-i-open",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-log",
+      "label": "Stay silent",
+      "to": "le-i-silent",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-log",
+      "label": "Transmit the warning",
+      "to": "le-i-transmit",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-open",
+      "label": "Log the erasure",
+      "to": "le-i-log",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-open",
+      "label": "Rally the survey crew",
+      "to": "le-i-rally",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-rally",
+      "label": "Hold the survey line",
+      "to": "le-i-transmit",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-rally",
+      "label": "Turn for the muster",
+      "to": "le-i-silent",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-silent",
+      "label": "Push deeper",
+      "to": "le-ii-derelict",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-silent",
+      "label": "Shelter in the dead zone",
+      "to": "le-ii-shelter",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-transmit",
+      "label": "Push deeper",
+      "to": "le-ii-derelict",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-i-transmit",
+      "label": "Shelter in the dead zone",
+      "to": "le-ii-shelter",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-bargain",
+      "label": "Keep the bargain",
+      "to": "le-ii-keep",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-bargain",
+      "label": "Sabotage the Loom",
+      "to": "le-ii-sabotage",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-derelict",
+      "label": "Leave it be",
+      "to": "le-ii-offer",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-derelict",
+      "label": "Strip the locker",
+      "to": "le-ii-salvage",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-keep",
+      "label": "Follow the thread",
+      "to": "le-iii-approach",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-offer",
+      "label": "Abandon the voyage",
+      "to": "le-end-abandon",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-offer",
+      "label": "Bargain in bad faith",
+      "to": "le-ii-bargain",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-offer",
+      "label": "Refuse him",
+      "to": "le-ii-refuse",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-refuse",
+      "label": "Side with the captain",
+      "to": "le-iii-approach",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-refuse",
+      "label": "Side with the crew",
+      "to": "le-iii-approach",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-sabotage",
+      "label": "Break for the core",
+      "to": "le-iii-approach",
+      "random": true,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-sabotage",
+      "label": "Break for the core",
+      "to": "le-iii-ahead",
+      "random": true,
+      "candidateIndex": 1,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-sabotage",
+      "label": "Follow the unravelling",
+      "to": "le-iii-approach",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-salvage",
+      "label": "Share the berth",
+      "to": "le-ii-offer",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-salvage",
+      "label": "Take the ally's berth",
+      "to": "le-ii-offer",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-shelter",
+      "label": "Ration the stores",
+      "to": "le-ii-offer",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-ii-shelter",
+      "label": "Strip the derelict",
+      "to": "le-ii-salvage",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-iii-ahead",
+      "label": "Hit the core now",
+      "to": "le-end-ram",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-iii-ahead",
+      "label": "Set the charge",
+      "to": "le-iii-approach",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-iii-approach",
+      "label": "Finish the weave",
+      "to": "le-end-reset",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": true,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-iii-approach",
+      "label": "Ram the core",
+      "to": "le-end-ram",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    },
+    {
+      "from": "le-iii-approach",
+      "label": "Unwrite the Loom",
+      "to": "le-end-quiet",
+      "random": false,
+      "candidateIndex": 0,
+      "cycle": false,
+      "effectPolicy": "apply"
+    }
+  ],
+  "cycles": [
+    [
+      "le-end-reset",
+      "le-i-log",
+      "le-i-open",
+      "le-i-transmit",
+      "le-ii-bargain",
+      "le-ii-offer",
+      "le-ii-sabotage",
+      "le-ii-shelter",
+      "le-iii-approach"
+    ]
+  ]
+}

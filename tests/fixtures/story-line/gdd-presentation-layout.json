@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "id": "gdd-long-erasure-layout",
+  "baseViewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "requiredZones": [
+    "statusBar",
+    "sceneBanner",
+    "objectivePanel",
+    "narrative",
+    "options",
+    "feedback",
+    "journal",
+    "epilogue",
+    "controls"
+  ],
+  "zones": {
+    "statusBar": {
+      "rect": { "x": 0.03, "y": 0.1 },
+      "anchors": {
+        "act": { "x": 0.05, "y": 0.11 },
+        "clock": { "x": 0.42, "y": 0.11 },
+        "nextBeatCost": { "x": 0.56, "y": 0.11 },
+        "resources": { "x": 0.72, "y": 0.11 },
+        "losses": { "x": 0.95, "y": 0.11 }
+      }
+    },
+    "sceneBanner": {
+      "rect": { "x": 0.03, "y": 0.145 },
+      "anchors": {
+        "actTitle": { "x": 0.05, "y": 0.155 },
+        "sceneTitle": { "x": 0.05, "y": 0.18 },
+        "outcome": { "x": 0.95, "y": 0.155 },
+        "route": { "x": 0.95, "y": 0.18 }
+      }
+    },
+    "objectivePanel": {
+      "rect": { "x": 0.03, "y": 0.2 },
+      "anchors": {
+        "statement": { "x": 0.05, "y": 0.21 },
+        "status": { "x": 0.95, "y": 0.21 }
+      }
+    },
+    "narrative": {
+      "rect": { "x": 0.5, "y": 0.25 },
+      "anchors": {
+        "beat": { "x": 0.5, "y": 0.255 },
+        "title": { "x": 0.5, "y": 0.278 },
+        "effect": { "x": 0.5, "y": 0.3 },
+        "context": { "x": 0.5, "y": 0.335 },
+        "contextMore": { "x": 0.5, "y": 0.42 }
+      }
+    },
+    "options": {
+      "rect": { "x": 0.5, "y": 0.635 },
+      "anchors": {
+        "option1": { "x": 0.5, "y": 0.475 },
+        "option2": { "x": 0.5, "y": 0.537 },
+        "option3": { "x": 0.5, "y": 0.599 },
+        "option4": { "x": 0.5, "y": 0.661 },
+        "option5": { "x": 0.5, "y": 0.723 },
+        "option6": { "x": 0.5, "y": 0.785 }
+      }
+    },
+    "feedback": {
+      "rect": { "x": 0.5, "y": 0.815 },
+      "anchors": {
+        "center": { "x": 0.5, "y": 0.815 }
+      }
+    },
+    "journal": {
+      "rect": { "x": 0.03, "y": 0.85 },
+      "anchors": {
+        "heading": { "x": 0.05, "y": 0.852 },
+        "body": { "x": 0.05, "y": 0.872 }
+      }
+    },
+    "epilogue": {
+      "rect": { "x": 0.5, "y": 0.5 },
+      "anchors": {
+        "endingTitle": { "x": 0.5, "y": 0.28 },
+        "epilogueProse": { "x": 0.5, "y": 0.36 },
+        "score": { "x": 0.5, "y": 0.58 },
+        "band": { "x": 0.5, "y": 0.63 },
+        "ledger": { "x": 0.5, "y": 0.7 },
+        "journalSummary": { "x": 0.5, "y": 0.77 },
+        "restart": { "x": 0.5, "y": 0.9 }
+      }
+    },
+    "controls": {
+      "rect": { "x": 0.5, "y": 0.94 },
+      "anchors": {
+        "journal": { "x": 0.3, "y": 0.94 },
+        "help": { "x": 0.5, "y": 0.94 },
+        "settings": { "x": 0.7, "y": 0.94 }
+      }
+    }
+  }
+}

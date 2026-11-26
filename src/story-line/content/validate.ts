@@ -14,9 +14,12 @@
  * | `missing-required-field` | The id, name or a required adapter column is empty. |
  * | `missing-storyline-id` | A choice card declares no storyline id. |
  * | `invalid-option` | Malformed `options` encoding, or an empty/duplicate option label. |
- * | `unknown-successor` | An `options` candidate names a card id that does not exist. |
+ * | `unknown-resource-key` | A `#cost` / `#extra` / `#when` attribute names a key outside the card's declared resources. |
+ * | `unknown-successor` | An `options` candidate (or conditional successor) names a card id that does not exist. |
  * | `unreachable-card` | A story-line member is unreachable from its story-line's entry card. |
  * | `cycle-error` | A cycle treated as invalid — **opt-in** via `failOnCycle`. |
+ * | `missing-column` | The adapter maps a prose column the file's header does not contain. |
+ * | `irreversible-grant` | A `#extra` grants a key the adapter declares irreversible (never restored), so the runtime guard would refuse it. |
  *
  * Informational findings (never fail validation by default):
  *
@@ -24,6 +27,12 @@
  * |---|---|
  * | `cycle` | A cycle in the choice graph (a first-class, intentional shape). |
  * | `self-link` | A card whose successor is itself (still a cycle). |
+ *
+ * Non-fatal **warnings** (reported, never invalidating):
+ *
+ * | Code | Meaning |
+ * |---|---|
+ * | `prose-budget` | Authored `context` / `epilogue` prose exceeds its adopted budget. |
  *
  * @module
  */
@@ -35,7 +44,11 @@ import {
   optionSuccessorIds,
   parseCsv,
 } from './csv';
+import { StorylineOptionsEncodingError } from '../compile';
+import { DEFAULT_RESOURCE_KEYS } from '../resources';
+import { PROSE_FIELD_SPECS } from './prose';
 import type { StorylineOption } from '../types';
+import { validateStorylineOptions } from '../validate';
 import { baseIdOf, type ContentAdapter, type ContentCard } from './types';
 
 // ── Result types ────────────────────────────────────────────
@@ -46,9 +59,12 @@ export type ContentIssueCode =
   | 'missing-required-field'
   | 'missing-storyline-id'
   | 'invalid-option'
+  | 'unknown-resource-key'
   | 'unknown-successor'
   | 'unreachable-card'
-  | 'cycle-error';
+  | 'cycle-error'
+  | 'missing-column'
+  | 'irreversible-grant';
 
 /** A single hard validation issue. */
 export interface ContentIssue {
@@ -58,12 +74,58 @@ export interface ContentIssue {
   readonly cardId: string;
   /** The offending successor/link target, when applicable. */
   readonly target?: string;
+  /**
+   * 1-based content record number (the header is row 1, the first data record
+   * row 2). Embedded newlines inside a quoted cell do not add rows — this is
+   * the logical CSV record, so it matches the row an editor shows.
+   */
+  readonly row?: number;
+  /**
+   * The offending CSV **column name** (e.g. `options` for an option attribute
+   * fault, `resources` for a declaration fault).
+   */
+  readonly column?: string;
+  /**
+   * Stable reason code (`unknown-attribute`, `malformed-cost-pair`,
+   * `unknown-resource-key`, `unparseable-condition`, …) so a tool can match
+   * the fault without parsing the message.
+   */
+  readonly reason?: string;
+  /**
+   * Dotted path to the offending value within the compiled option model
+   * (e.g. `options[1].cost.coins`), when the fault is scoped to one field.
+   */
+  readonly path?: string;
+  /** The resource key the fault concerns, when applicable. */
+  readonly resource?: string;
   /** Human-readable explanation naming the offending card/link. */
   readonly message: string;
 }
 
 /** Machine-readable category of an informational finding. */
 export type ContentFindingKind = 'cycle' | 'self-link';
+
+/** Machine-readable category of a non-fatal warning. */
+export type ContentWarningCode = 'prose-budget';
+
+/**
+ * A single **non-fatal** warning: something the author should look at that
+ * does not make the content invalid.
+ */
+export interface ContentWarning {
+  /** Stable machine-readable category. */
+  readonly code: ContentWarningCode;
+  /** The (base) card id the warning was found on. */
+  readonly cardId: string;
+  /** 1-based logical CSV record number (see {@link ContentIssue.row}). */
+  readonly row?: number;
+  /** The offending CSV column name (e.g. `context`). */
+  readonly column?: string;
+  /** Stable reason code (`prose-over-budget`) for tooling. */
+  readonly reason?: string;
+  /** Human-readable explanation quoting the length and the budget. */
+  readonly message: string;
+}
 
 /** A single informational finding (cycles etc.). */
 export interface ContentFinding {
@@ -95,6 +157,8 @@ export interface ContentValidationResult {
   readonly issues: readonly ContentIssue[];
   /** Informational findings (cycles) — never fail validation by default. */
   readonly findings: readonly ContentFinding[];
+  /** Non-fatal warnings (prose budgets, …) — never affect {@link valid}. */
+  readonly warnings: readonly ContentWarning[];
   /** True when there are no hard errors. */
   readonly valid: boolean;
 }
@@ -120,6 +184,7 @@ export function validateContentCards(
 ): ContentValidationResult {
   const issues: ContentIssue[] = [];
   const findings: ContentFinding[] = [];
+  const warnings: ContentWarning[] = [];
 
   const base = (id: string): string => baseIdOf(adapter, id);
 
@@ -140,12 +205,14 @@ export function validateContentCards(
   }
 
   // ── Required fields ──
-  for (const card of cards) {
+  cards.forEach((card, index) => {
     const id = base(card.id);
+    const row = index + 2;
     if (card.id.trim() === '') {
       issues.push({
         code: 'missing-required-field',
         cardId: id,
+        row,
         message: 'A card row has an empty id.',
       });
     }
@@ -153,32 +220,69 @@ export function validateContentCards(
       issues.push({
         code: 'missing-required-field',
         cardId: id,
+        row,
         message: `Card "${id}" has an empty name.`,
       });
     }
-  }
+  });
 
   const knownIds = new Set(cards.map((card) => base(card.id)));
+
+  // ── Authored prose budgets (non-fatal, so never an `issue`) ──
+  cards.forEach((card, index) => {
+    for (const spec of PROSE_FIELD_SPECS) {
+      const column = adapter.fields[spec.field];
+      if (column === undefined) continue;
+      const value = card[spec.field] ?? null;
+      if (value === null || value.length <= spec.budget) continue;
+      const id = base(card.id);
+      warnings.push({
+        code: 'prose-budget',
+        cardId: id,
+        row: index + 2,
+        column,
+        reason: 'prose-over-budget',
+        message:
+          `Card "${id}" ${column} prose is ${value.length} characters, ` +
+          `over the ${spec.budget}-character budget.`,
+      });
+    }
+  });
 
   // ── Per-card option validation ──
   const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
   const choiceCards: ContentCard[] = [];
   const storylineIds = new Set<string>();
+  const optionsColumn = adapter.fields.options;
 
-  for (const card of cards) {
+  cards.forEach((card, index) => {
     const id = base(card.id);
+    const row = index + 2;
     if (card.storylineId) storylineIds.add(card.storylineId);
 
     let options: StorylineOption<unknown>[] = [];
     try {
       options = compileContentOptions(card);
     } catch (err) {
+      const isEncodingError = err instanceof StorylineOptionsEncodingError;
       issues.push({
         code: 'invalid-option',
         cardId: id,
+        row,
+        ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
+        ...(isEncodingError
+          ? {
+              reason: err.reason,
+              ...(err.reason === 'unescaped-says-delimiter'
+                ? { path: `options[${err.optionIndex ?? 0}].says` }
+                : err.attribute !== undefined
+                  ? { path: `#${err.attribute}` }
+                  : {}),
+            }
+          : { reason: 'malformed-options' }),
         message: `Choice card "${id}" has a malformed options column: ${(err as Error).message}`,
       });
-      continue;
+      return;
     }
     optionsByCard.set(card, options);
 
@@ -189,28 +293,39 @@ export function validateContentCards(
         issues.push({
           code: 'missing-storyline-id',
           cardId: id,
+          row,
+          ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
           message: `Choice card "${id}" declares no storyline id.`,
         });
       }
     }
 
-    if (!isChoice) continue;
+    if (!isChoice) return;
+
+    const optionContext = {
+      row,
+      ...(optionsColumn !== undefined ? { column: optionsColumn } : {}),
+    };
 
     // Duplicate labels make the label unusable as a stable choice token.
     const seenLabels = new Set<string>();
-    for (const option of options) {
+    options.forEach((option, optionIndex) => {
       const label = option.label.trim();
       const labelKey = label.toLowerCase();
       if (label === '') {
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].label`,
           message: `Choice card "${id}" has an option with an empty label.`,
         });
       } else if (seenLabels.has(labelKey)) {
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].label`,
           message: `Choice card "${id}" declares the option label "${option.label}" more than once.`,
         });
       }
@@ -220,6 +335,8 @@ export function validateContentCards(
         issues.push({
           code: 'invalid-option',
           cardId: id,
+          ...optionContext,
+          path: `options[${optionIndex}].effectPolicy`,
           message: `Choice card "${id}" option "${option.label}" has invalid effect policy "${String(option.effectPolicy)}".`,
         });
       }
@@ -230,25 +347,65 @@ export function validateContentCards(
             code: 'unknown-successor',
             cardId: id,
             target,
+            ...optionContext,
+            path: `options[${optionIndex}].successorIds`,
             message: `Choice card "${id}" option "${option.label}" links to unknown card "${target}".`,
           });
         }
       }
+
+      // Conditional successors are authored in the same cell, so an unknown
+      // target is reported like any other dangling link.
+      (option.conditionalSuccessors ?? []).forEach((rule, ruleIndex) => {
+        if (rule.successorId === null) return;
+        const target = base(rule.successorId);
+        if (knownIds.has(target)) return;
+        issues.push({
+          code: 'unknown-successor',
+          cardId: id,
+          target,
+          ...optionContext,
+          path: `options[${optionIndex}].conditionalSuccessors[${ruleIndex}].successorId`,
+          message: `Choice card "${id}" option "${option.label}" conditional successor links to unknown card "${target}".`,
+        });
+      });
+    });
+
+    // Declarative option metadata (cost / extra effect / condition keys) is
+    // validated against the card's declared resource set — the resources
+    // column when it declares any, otherwise the engine's default projection.
+    const declared =
+      card.resourceKeys.length > 0 ? card.resourceKeys : DEFAULT_RESOURCE_KEYS;
+    const metadata = validateStorylineOptions(options, {
+      resources: declared,
+      cardId: id,
+      ...(adapter.irreversibleResources === undefined
+        ? {}
+        : { irreversible: adapter.irreversibleResources }),
+    });
+    for (const issue of metadata.issues) {
+      const isResourceKey =
+        issue.code === 'unknown-resource-key' ||
+        issue.code === 'unknown-condition-field';
+      const code: ContentIssueCode = isResourceKey
+        ? 'unknown-resource-key'
+        : issue.code === 'irreversible-grant'
+          ? 'irreversible-grant'
+          : 'invalid-option';
+      issues.push({
+        code,
+        cardId: id,
+        ...optionContext,
+        reason: issue.code,
+        path: issue.path,
+        ...(issue.resource !== undefined ? { resource: issue.resource } : {}),
+        message: issue.message,
+      });
     }
-  }
+  });
 
   // ── Adjacency over the choice graph (base ids, known targets only) ──
-  const adjacency = new Map<string, string[]>();
-  for (const card of choiceCards) {
-    const from = base(card.id);
-    const next: string[] = [];
-    for (const option of optionsByCard.get(card) ?? []) {
-      for (const target of optionSuccessorIds(option, adapter)) {
-        if (knownIds.has(target)) next.push(target);
-      }
-    }
-    if (next.length > 0) adjacency.set(from, next);
-  }
+  const adjacency = buildChoiceAdjacency(choiceCards, optionsByCard, knownIds, adapter);
 
   // ── Cycle detection (informational unless failOnCycle) ──
   for (const cycle of findCycles(adjacency)) {
@@ -286,8 +443,136 @@ export function validateContentCards(
     storylineIds: [...storylineIds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
     issues,
     findings,
+    warnings,
     valid: issues.length === 0,
   };
+}
+
+/**
+ * Groups story-line members by storyline id, in file order (base ids).
+ *
+ * Shared by the reachability check and the authoring seam's entry-card guard,
+ * so both resolve membership exactly the same way.
+ *
+ * @param cards   All content cards.
+ * @param adapter The game content adapter.
+ * @returns Members per storyline id, in file order.
+ */
+function storylineMembers(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const membersByStoryline = new Map<string, string[]>();
+  for (const card of cards) {
+    if (!card.storylineId) continue;
+    const members = membersByStoryline.get(card.storylineId) ?? [];
+    const id = baseIdOf(adapter, card.id);
+    if (!members.includes(id)) members.push(id);
+    membersByStoryline.set(card.storylineId, members);
+  }
+  return membersByStoryline;
+}
+
+/**
+ * The ids within one story-line that another member links to.
+ *
+ * @param members   The story-line's member ids, in file order.
+ * @param adjacency The choice-graph adjacency (base ids).
+ * @returns Ids with an incoming edge from a different member.
+ */
+function incomingMemberIds(
+  members: readonly string[],
+  adjacency: ReadonlyMap<string, readonly string[]>,
+): Set<string> {
+  const memberSet = new Set(members);
+  const incoming = new Set<string>();
+  for (const from of members) {
+    for (const to of adjacency.get(from) ?? []) {
+      if (memberSet.has(to) && to !== from) incoming.add(to);
+    }
+  }
+  return incoming;
+}
+
+/**
+ * Resolves the **entry card** of each story-line.
+ *
+ * A story-line's entry card is its first member (in file order) with no
+ * incoming edge from another member; a closed cycle has no such member, so its
+ * first card becomes the entry. This is the single definition of "entry card":
+ * the validator's reachability check and the authoring seam's re-point guard
+ * both use it, so an authored insert can never disagree with validation about
+ * which card starts a story-line.
+ *
+ * Cards whose `options` cell cannot be compiled contribute no edges —
+ * validation reports the malformation itself, and this resolver never throws.
+ *
+ * @param cards   All content cards.
+ * @param adapter The game content adapter.
+ * @returns Entry card id per story-line id (story-lines with no members omitted).
+ */
+export function storylineEntryCards(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): ReadonlyMap<string, string> {
+  const adjacency = contentAdjacency(cards, adapter);
+  const entries = new Map<string, string>();
+  for (const [storylineId, members] of storylineMembers(cards, adapter)) {
+    const incoming = incomingMemberIds(members, adjacency);
+    const entry = members.find((id) => !incoming.has(id)) ?? members[0];
+    if (entry !== undefined) entries.set(storylineId, entry);
+  }
+  return entries;
+}
+
+/** Choice adjacency over a card list (compiles every choice card's options). */
+function contentAdjacency(
+  cards: readonly ContentCard[],
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const knownIds = new Set(cards.map((card) => baseIdOf(adapter, card.id)));
+  const choiceCards: ContentCard[] = [];
+  const optionsByCard = new Map<ContentCard, StorylineOption<unknown>[]>();
+  for (const card of cards) {
+    if (!contentCardHasChoice(card)) continue;
+    choiceCards.push(card);
+    try {
+      optionsByCard.set(card, compileContentOptions(card));
+    } catch {
+      // Malformed options are reported by validation; they contribute no
+      // edges here so entry-card resolution stays total.
+    }
+  }
+  return buildChoiceAdjacency(choiceCards, optionsByCard, knownIds, adapter);
+}
+
+/**
+ * Builds the choice-graph adjacency (base ids) from already-compiled options.
+ *
+ * @param choiceCards   Cards that present a choice.
+ * @param optionsByCard Compiled options per card.
+ * @param knownIds      Every known base card id (dangling targets are dropped).
+ * @param adapter       The game content adapter.
+ * @returns Adjacency map; cards with no known successor are omitted.
+ */
+function buildChoiceAdjacency(
+  choiceCards: readonly ContentCard[],
+  optionsByCard: ReadonlyMap<ContentCard, readonly StorylineOption<unknown>[]>,
+  knownIds: ReadonlySet<string>,
+  adapter: ContentAdapter,
+): Map<string, string[]> {
+  const adjacency = new Map<string, string[]>();
+  for (const card of choiceCards) {
+    const from = baseIdOf(adapter, card.id);
+    const next: string[] = [];
+    for (const option of optionsByCard.get(card) ?? []) {
+      for (const target of optionSuccessorIds(option, adapter)) {
+        if (knownIds.has(target)) next.push(target);
+      }
+    }
+    if (next.length > 0) adjacency.set(from, next);
+  }
+  return adjacency;
 }
 
 /**
@@ -295,10 +580,9 @@ export function validateContentCards(
  * entry card.
  *
  * Each storyline group's entry card is the first member (in file order) with
- * no incoming edge from another member; a closed cycle has no such member, so
- * its first card becomes the entry. Members outside the entry's reachable set
- * are a disconnected fragment — an authoring error that no runtime path can
- * ever visit.
+ * no incoming edge from another member (see {@link storylineEntryCards});
+ * members outside the entry's reachable set are a disconnected fragment — an
+ * authoring error that no runtime path can ever visit.
  *
  * @param cards     All content cards.
  * @param adjacency The choice-graph adjacency (base ids).
@@ -310,27 +594,12 @@ function findUnreachableIssues(
   adjacency: ReadonlyMap<string, readonly string[]>,
   adapter: ContentAdapter,
 ): ContentIssue[] {
-  const base = (id: string): string => baseIdOf(adapter, id);
-  const membersByStoryline = new Map<string, string[]>();
-  for (const card of cards) {
-    if (!card.storylineId) continue;
-    const members = membersByStoryline.get(card.storylineId) ?? [];
-    const id = base(card.id);
-    if (!members.includes(id)) members.push(id);
-    membersByStoryline.set(card.storylineId, members);
-  }
-
   const issues: ContentIssue[] = [];
-  for (const [storylineId, members] of membersByStoryline) {
+  for (const [storylineId, members] of storylineMembers(cards, adapter)) {
     if (members.length <= 1) continue;
     const memberSet = new Set(members);
-    const hasIncoming = new Set<string>();
-    for (const from of members) {
-      for (const to of adjacency.get(from) ?? []) {
-        if (memberSet.has(to) && to !== from) hasIncoming.add(to);
-      }
-    }
-    const entry = members.find((id) => !hasIncoming.has(id)) ?? members[0];
+    const incoming = incomingMemberIds(members, adjacency);
+    const entry = members.find((id) => !incoming.has(id)) ?? members[0];
 
     const reached = new Set<string>([entry]);
     const queue = [entry];
@@ -440,10 +709,27 @@ export function formatContentValidationReport(
   if (result.issues.length > 0) {
     lines.push(`ERRORS (${result.issues.length}):`);
     for (const issue of result.issues) {
-      lines.push(`  ✗ [${issue.code}] ${issue.message}`);
+      const location = issue.row === undefined ? '' : ` row ${issue.row}`;
+      const column = issue.column === undefined ? '' : `, column "${issue.column}"`;
+      const reason = issue.reason === undefined ? '' : ` (${issue.reason})`;
+      lines.push(
+        `  ✗ [${issue.code}]${location}${column}${reason}: ${issue.message}`,
+      );
     }
   } else {
     lines.push('ERRORS (0): none');
+  }
+  lines.push('');
+  lines.push(`Warnings (${result.warnings.length}):`);
+  if (result.warnings.length === 0) {
+    lines.push('  (none)');
+  } else {
+    for (const warning of result.warnings) {
+      const location = warning.row === undefined ? '' : ` row ${warning.row}`;
+      const column = warning.column === undefined ? '' : `, column "${warning.column}"`;
+      const reason = warning.reason === undefined ? '' : ` (${warning.reason})`;
+      lines.push(`  ! [${warning.code}]${location}${column}${reason}: ${warning.message}`);
+    }
   }
   lines.push('');
   lines.push(`Informational findings (${result.findings.length}):`);
@@ -480,6 +766,7 @@ export function contentValidationToJson(
       storylineIds: result.storylineIds,
       issues: result.issues,
       findings: result.findings,
+      warnings: result.warnings,
     },
     null,
     2,
@@ -487,7 +774,44 @@ export function contentValidationToJson(
 }
 
 /**
+ * Reports prose columns the adapter maps but the file's header lacks.
+ *
+ * A mapped column is a contract: the adapter says "this file has prose here",
+ * so an absent header column means the file and its adapter disagree — a hard
+ * (fatal) authoring error rather than a silently empty card list.
+ *
+ * @param header  Parsed CSV header.
+ * @param adapter The game content adapter.
+ * @returns One `missing-column` issue per mapped-but-absent prose column.
+ */
+function missingProseColumnIssues(
+  header: readonly string[],
+  adapter: ContentAdapter,
+): ContentIssue[] {
+  const present = new Set(header);
+  const issues: ContentIssue[] = [];
+  for (const spec of PROSE_FIELD_SPECS) {
+    const column = adapter.fields[spec.field];
+    if (column === undefined || present.has(column)) continue;
+    issues.push({
+      code: 'missing-column',
+      cardId: '',
+      column,
+      reason: 'missing-mapped-column',
+      message:
+        `Mapped prose column "${column}" is missing from the content header ` +
+        `(columns: ${header.join(', ') || '(none)'}).`,
+    });
+  }
+  return issues;
+}
+
+/**
  * Validates raw content CSV text through an adapter.
+ *
+ * The header is checked first: an adapter that maps a prose column the file
+ * does not declare is a fatal `missing-column` issue. Card-level validation
+ * (including the non-fatal prose-budget warnings) then runs as usual.
  *
  * @param csvText Raw CSV text.
  * @param adapter The game content adapter.
@@ -499,5 +823,10 @@ export function validateContentCsv(
   adapter: ContentAdapter,
   opts: ContentValidationOptions = {},
 ): ContentValidationResult {
-  return validateContentCards(cardsFromCsv(parseCsv(csvText), adapter), adapter, opts);
+  const parsed = parseCsv(csvText);
+  const result = validateContentCards(cardsFromCsv(parsed, adapter), adapter, opts);
+  const headerIssues = missingProseColumnIssues(parsed.header, adapter);
+  if (headerIssues.length === 0) return result;
+  const issues = [...headerIssues, ...result.issues];
+  return { ...result, issues, valid: issues.length === 0 };
 }

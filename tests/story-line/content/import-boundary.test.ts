@@ -12,7 +12,12 @@
  *   that a game-only toolchain would pull in);
  * - `node:fs` importing is confined to the two sanctioned writers, declared in
  *   the editor write-path guard: `author.ts` (the content CSV) and
- *   `artefacts.ts` (the generated mermaid/json artefacts).
+ *   `artefacts.ts` (the generated mermaid/json artefacts);
+ * - the manifest validator's declared resource set arrives as an argument: it
+ *   never reads the game constant `DEFAULT_RESOURCES`, the engine's
+ *   `coins` / `reputation` projection, or a game module, and it reads the
+ *   manifest's `start` / `bounds` through the pure `../resources`
+ *   read-throughs (CG-0MWSJYLZ3005C2V1).
  *
  * @module
  */
@@ -105,5 +110,36 @@ describe('story-line content import boundaries', () => {
     expect(authorSource).toContain('renameSync');
     const artefactsSource = readFileSync(join(CONTENT_DIR, 'artefacts.ts'), 'utf-8');
     expect(artefactsSource).toContain('writeFileSync');
+  });
+});
+
+describe('the manifest validator reads resources from arguments, never from a game constant', () => {
+  /** The validator module this suite pins the resource boundary on. */
+  const VALIDATOR_PATH = join(CONTENT_DIR, 'episode-manifest.ts');
+
+  /** The pure read-through module the validator delegates the manifest block to. */
+  const RESOURCES_PATH = join(REPO_ROOT, 'src/story-line/resources.ts');
+
+  it('never names a game constant or the engine default projection', () => {
+    const source = readFileSync(VALIDATOR_PATH, 'utf-8');
+    for (const forbidden of ['DEFAULT_RESOURCES', 'DEFAULT_RESOURCE_KEYS', 'example-games']) {
+      expect(source).not.toContain(forbidden);
+    }
+  });
+
+  it('reads the manifest block through the pure resources read-through', () => {
+    const specifiers = importSpecifiers(readFileSync(VALIDATOR_PATH, 'utf-8'));
+    expect(specifiers).toContain('../resources');
+    // Every import still resolves inside the story-line module; nothing from a
+    // game repo or a Phaser/UI alias can reach the validation path.
+    expect(specifiers.filter((specifier) => !specifier.startsWith('.'))).toEqual([]);
+  });
+
+  it('keeps the read-through helpers default-free and Phaser-free', () => {
+    const source = readFileSync(RESOURCES_PATH, 'utf-8');
+    expect(source).toContain('export function readManifestStartBag');
+    expect(source).toContain('export function readManifestBounds');
+    expect(source).not.toContain('DEFAULT_RESOURCES');
+    expect(importSpecifiers(source)).toEqual([]);
   });
 });
