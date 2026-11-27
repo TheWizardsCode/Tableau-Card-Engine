@@ -78,6 +78,8 @@ import {
   paginateProse,
   revealNarration,
   DEFAULT_PROSE_PAGE_CHARS,
+  ResourceHud,
+  formatResourceLabel,
   type NarrationRevealHandle,
 } from '../../../src/ui';
 import { COMMON_SFX_KEYS, SoundManager } from '../../../src/core-engine';
@@ -179,6 +181,21 @@ export function setLongErasureSceneContent(
 export const LONG_ERASURE_EPISODE_MANIFEST = longErasureEpisodeManifest;
 
 /**
+ * Display labels for the manifest's declared resource set.
+ *
+ * Derived once from the committed keys (`hull` → `Hull`) and shared by the
+ * status-bar HUD and the closing screen's "left when the timeline closed"
+ * summary, so a label is spelled one way wherever a resource appears.
+ */
+export const LONG_ERASURE_RESOURCE_LABELS: Readonly<Record<string, string>> =
+  Object.fromEntries(
+    LONG_ERASURE_EPISODE_MANIFEST.resources.declared.map((key) => [
+      key,
+      formatResourceLabel(key),
+    ]),
+  );
+
+/**
  * The content this scene plays (parsed from `content/long-erasure.csv`, the
  * same file the content toolchain validates, bounded by the committed
  * manifest's `resources.bounds`).
@@ -191,11 +208,6 @@ export function longErasureSceneContent(): LongErasureContent {
     });
   }
   return cachedContent;
-}
-
-/** Capitalise a declared resource key for display (`goodwill` → `Goodwill`). */
-function resourceLabel(key: string): string {
-  return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
 /** The signed cost / benefit hint rendered beside an option label. */
@@ -263,7 +275,7 @@ export class GymLongErasureScene extends GymSceneBase {
   // ── Rendered chrome (all positioned through SLL anchors) ──
   private actText!: Phaser.GameObjects.Text;
   private clockText!: Phaser.GameObjects.Text;
-  private resourcesText!: Phaser.GameObjects.Text;
+  private resourceHud!: ResourceHud;
   private beatText!: Phaser.GameObjects.Text;
   private titleText!: Phaser.GameObjects.Text;
   private effectText!: Phaser.GameObjects.Text;
@@ -378,6 +390,16 @@ export class GymLongErasureScene extends GymSceneBase {
     return [...this.playedSfxKeys];
   }
 
+  /** The shared resource HUD rendering the declared economy. @internal */
+  getResourceHud(): ResourceHud {
+    return this.resourceHud;
+  }
+
+  /** The resource HUD's rendered item texts, in declaration order. @internal */
+  getResourceHudTexts(): string[] {
+    return this.resourceHud.getItems().map((item) => item.text.text);
+  }
+
   /** Every text currently rendered in the option/epilogue area. @internal */
   getOptionAreaTexts(): string[] {
     return this.optionTexts.map((text) => text.text);
@@ -419,9 +441,24 @@ export class GymLongErasureScene extends GymSceneBase {
       fontSize: '15px',
     }).setOrigin(0, 0.5);
 
-    this.resourcesText = createHudText(this, resources.x, resources.y, '', '#aaccaa', {
-      fontSize: '14px',
-    }).setOrigin(1, 0.5);
+    // The declared economy renders through the shared HUD at the SLL-resolved
+    // `statusBar.resources` anchor. Every declaration — keys, labels, bounds and
+    // the irreversible subset — is read from the committed manifest, never
+    // copied; `render()` pushes the live run's values through `setResources`.
+    // No `soundManager`/`sfx`: the choice that changes the economy already
+    // plays CARD_SWAP in `applyChoice`, and the HUD's value pop is that same
+    // action's visual partner — wiring a second key would double-play it.
+    this.resourceHud = new ResourceHud(this, {
+      x: resources.x,
+      y: resources.y,
+      align: 'right',
+      declaredKeys: LONG_ERASURE_EPISODE_MANIFEST.resources.declared,
+      resources: LONG_ERASURE_EPISODE_MANIFEST.resources.start,
+      labels: LONG_ERASURE_RESOURCE_LABELS,
+      bounds: LONG_ERASURE_EPISODE_MANIFEST.resources.bounds,
+      irreversible: LONG_ERASURE_EPISODE_MANIFEST.resources.irreversible,
+      reducedMotion: this.reducedMotion,
+    });
 
     this.beatText = createHudText(this, beat.x, beat.y, '', '#7799bb', {
       fontSize: '14px',
@@ -639,7 +676,10 @@ export class GymLongErasureScene extends GymSceneBase {
   private render(): void {
     this.actText.setText(this.run.act === 'Ending' ? 'Ending' : `Act ${this.run.act}`);
     this.clockText.setText(`Clock ${this.run.clock}/${this.run.clockMax}`);
-    this.resourcesText.setText(this.resourcesLine(this.run.resources));
+    // Keep the HUD's update path aligned with the scene's resolved preference
+    // (it can be toggled at runtime) before pushing the new bag.
+    this.resourceHud.setReducedMotion(this.reducedMotion);
+    this.resourceHud.setResources(this.run.resources);
 
     this.clearOptionArea();
     if (isComplete(this.run)) {
@@ -778,7 +818,7 @@ export class GymLongErasureScene extends GymSceneBase {
     const lines = [
       `Journey score: ${score.total} / 100 — ${score.label}`,
       `Acts: ${acts}    Choices: ${score.choiceCount}    Cost paid: ${score.costPaid}`,
-      `Left when the timeline closed: ${this.resourcesLine(score.resourcesLeft)}`,
+      `Left when the timeline closed: ${this.resourcesSummary(score.resourcesLeft)}`,
     ];
 
     lines.slice(0, OPTION_ANCHORS.length - 1).forEach((line, index) => {
@@ -823,10 +863,20 @@ export class GymLongErasureScene extends GymSceneBase {
     this.optionTexts = [];
   }
 
-  /** One-line resource summary in the content's declared key order. */
-  private resourcesLine(resources: Readonly<Record<string, number>>): string {
-    return this.run.content.resources
-      .map((key) => `${resourceLabel(key)} ${resources[key] ?? 0}`)
+  /**
+   * One-line resource summary in the manifest's declared key order.
+   *
+   * The closing screen is plain text, not a second HUD: it shares the HUD's
+   * derived label map so a key is spelled the same on both surfaces, and prints
+   * only the values (no bounds or markers) because the voyage is over.
+   */
+  private resourcesSummary(
+    resources: Readonly<Record<string, number>>,
+  ): string {
+    return LONG_ERASURE_EPISODE_MANIFEST.resources.declared
+      .map(
+        (key) => `${LONG_ERASURE_RESOURCE_LABELS[key]} ${resources[key] ?? 0}`,
+      )
       .join(' · ');
   }
 }

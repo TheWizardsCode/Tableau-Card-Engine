@@ -25,14 +25,20 @@ import Phaser from 'phaser';
 import {
   GymLongErasureScene,
   LONG_ERASURE_EPISODE_MANIFEST,
+  LONG_ERASURE_RESOURCE_LABELS,
   NARRATIVE_PANEL_PAGE_CHARS,
   OPTION_ANCHORS,
   longErasureSceneContent,
   setLongErasureSceneContent,
 } from '../../example-games/gym/scenes/GymLongErasureScene';
 import { longErasureContentFromCsv } from '../../example-games/gym/GymLongErasureGame';
+import { DEFAULT_VIEWPORT } from '../../example-games/gym/scenes/GymConstants';
 import { GYM_LONG_ERASURE_KEY } from '../../example-games/gym/GymRegistry';
+import longErasureLayoutJson from '../../example-games/gym/layouts/gym-long-erasure.layout.json';
+import { RESOURCE_HUD_MARKERS } from '../../src/ui';
 import { COMMON_SFX_KEYS } from '../../src/core-engine';
+import { anchorPoint } from '../../src/ui/screen-layout';
+import { parseScreenLayoutDocument } from '../../src/ui/screen-layout-schema';
 import { waitForScene } from '../helpers/waitForScene';
 
 /** The prose the injected fixture authors, used by the panel/outcome tests. */
@@ -192,6 +198,69 @@ describe('GymLongErasureScene browser test', () => {
     expect(scene.getEpilogue()).toBeNull();
   });
 
+  it('renders the declared economy through the shared ResourceHud', async () => {
+    const scene = await bootScene();
+    const hud = scene.getResourceHud();
+
+    // Exactly one labelled item per declared key, in declaration order.
+    expect(hud.getItems().map((item) => item.key)).toEqual([
+      ...LONG_ERASURE_EPISODE_MANIFEST.resources.declared,
+    ]);
+    expect(hud.getItems().map((item) => item.label)).toEqual(
+      LONG_ERASURE_EPISODE_MANIFEST.resources.declared.map(
+        (key) => LONG_ERASURE_RESOURCE_LABELS[key],
+      ),
+    );
+
+    // Bounded keys print `value / max`; hull sits at its maximum and is the
+    // declared irreversible key, while goodwill sits at its minimum. Both
+    // markers are printed words, so the state survives without colour.
+    expect(scene.getResourceHudTexts()).toEqual([
+      `Hull 5 / 5 ${RESOURCE_HUD_MARKERS.full} ${RESOURCE_HUD_MARKERS.irreversible}`,
+      'Morale 5 / 8',
+      'Stores 4 / 6',
+      `Goodwill 0 / 5 ${RESOURCE_HUD_MARKERS.empty}`,
+      'Charge 2 / 4',
+    ]);
+  });
+
+  it('positions the ResourceHud right-aligned at the status-bar anchor', async () => {
+    const scene = await bootScene();
+    const parsed = parseScreenLayoutDocument(longErasureLayoutJson);
+    expect(parsed.valid).toBe(true);
+    if (!parsed.valid) return;
+
+    const anchor = anchorPoint(
+      parsed.layout,
+      'statusBar',
+      'resources',
+      DEFAULT_VIEWPORT,
+      1,
+    );
+    const hud = scene.getResourceHud();
+    const items = hud.getItems();
+    const last = items[items.length - 1];
+
+    // The block ends on the SLL anchor (no literal coordinate is involved).
+    expect(hud.gameObject.x + last.text.x + last.text.width).toBeCloseTo(
+      anchor.x,
+      0,
+    );
+    expect(hud.gameObject.y).toBeCloseTo(anchor.y, 6);
+  });
+
+  it('updates the HUD values through the component after a choice', async () => {
+    const scene = await bootScene();
+    expect(scene.getResourceHudTexts()[2]).toBe('Stores 4 / 6');
+
+    // `Log the erasure` pays one store; no other declared key moves.
+    scene.chooseByLabel('Log the erasure');
+
+    const texts = scene.getResourceHudTexts();
+    expect(texts[2]).toBe('Stores 3 / 6');
+    expect(texts[1]).toBe('Morale 5 / 8');
+  });
+
   it('plays Act I → Act II → Act III → scored reset epilogue (AC7)', async () => {
     const scene = await bootScene();
 
@@ -212,6 +281,15 @@ describe('GymLongErasureScene browser test', () => {
     expect(rendered).toContain(`Journey score: ${score.total} / 100 — ${score.label}`);
     expect(rendered).toContain(`Choices: ${score.choiceCount}`);
     expect(rendered).toContain('[ Begin a new survey ]');
+
+    // The "left when the timeline closed" summary shares the HUD's derived
+    // label map, so a resource key is spelled the same on both surfaces.
+    const summary = scene
+      .getOptionAreaTexts()
+      .find((line) => line.startsWith('Left when the timeline closed:'));
+    expect(summary).toBeDefined();
+    expect(summary).toContain(`${LONG_ERASURE_RESOURCE_LABELS.hull} `);
+    expect(summary).toContain(`${LONG_ERASURE_RESOURCE_LABELS.goodwill} `);
 
     // The journey is scored, not won/lost: the band label is the module's.
     expect(score.total).toBeGreaterThan(0);
