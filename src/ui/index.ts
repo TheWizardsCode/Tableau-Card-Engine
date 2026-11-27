@@ -588,13 +588,22 @@ export { HintBar } from './HintBar';
 export type { HintBarOptions } from './HintBar';
 
 // ResourceHud – declared resource-set HUD (one labelled item per declared key)
-export { ResourceHud, formatResourceLabel, readResourceValue } from './ResourceHud';
+export {
+  RESOURCE_HUD_MARKERS,
+  ResourceHud,
+  formatResourceAmount,
+  formatResourceLabel,
+  readResourceBounds,
+  readResourceValue,
+  resolveResourceState,
+} from './ResourceHud';
 export type {
   ResourceHudAlign,
   ResourceHudBounds,
   ResourceHudItem,
   ResourceHudOptions,
   ResourceHudSoundPlayer,
+  ResourceHudState,
   ResourceHudStyle,
 } from './ResourceHud';
 

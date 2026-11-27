@@ -17,11 +17,17 @@
  *
  * ## Scope
  *
- * This slice renders the declared set only. The options object is the stable
- * public contract: `bounds`, `irreversible`, `labels`, `reducedMotion`,
+ * This slice renders the declared set, the declared bounds and the
+ * loss-bearing subset. A bounded key prints `value / max` (for example
+ * `Morale 5 / 8`); a key sitting at a declared edge prints a **state marker**
+ * word (`full` / `empty`); and a key in the caller's `irreversible` subset
+ * prints the word `irreversible` beside it. Each printed marker is the primary
+ * channel and carries a secondary colour cue — colour is never the only
+ * channel (GDD §3.4.3).
+ *
+ * The options object is the stable public contract: `reducedMotion`,
  * `soundManager`, `sfx` and `onChange` are declared here so callers can adopt
- * the component once, and are consumed by the follow-on bounds/marker and
- * update-path slices.
+ * the component once, and are consumed by the follow-on update-path slice.
  *
  * `src/ui` is Phaser-bearing and must not import `@story-line`: the resource
  * bag, declared keys, labels and bounds all arrive as plain data (for example
@@ -40,6 +46,8 @@
  *   declaredKeys: projection.resources,
  *   resources: projection.getResources(state),
  *   labels: { hull: 'Hull' },
+ *   bounds: readManifestBounds(manifest),
+ *   irreversible: projection.irreversible,
  * });
  * ```
  *
@@ -55,6 +63,28 @@ import { UIComponentBase, mergeDefaults } from './UIComponentBase';
 /** Horizontal alignment of the rendered block around the SLL anchor point. */
 export type ResourceHudAlign = 'left' | 'centre' | 'right';
 
+/**
+ * The printed state marker a key earns at a declared bound edge.
+ *
+ * `full` when the value sits at (or beyond) the declared maximum, `empty` when
+ * it sits at (or below) the declared minimum. A key strictly between its
+ * bounds prints neither.
+ */
+export type ResourceHudState = 'full' | 'empty';
+
+/**
+ * The printed marker words, in one place so the HUD, its callers and its tests
+ * name the same text. The printed marker is the primary channel; the matching
+ * colour cue is secondary (GDD §3.4.3).
+ */
+export const RESOURCE_HUD_MARKERS: Readonly<
+  Record<ResourceHudState | 'irreversible', string>
+> = {
+  full: 'full',
+  empty: 'empty',
+  irreversible: 'irreversible',
+};
+
 /** Optional visual styling for a {@link ResourceHud}. */
 export interface ResourceHudStyle {
   /** Font size of an item (default: `'14px'`). */
@@ -63,6 +93,16 @@ export interface ResourceHudStyle {
   fontFamily?: string;
   /** Text colour of an item (default: `'#d8e0d8'`). */
   color?: string;
+  /** Secondary colour cue of a key at its declared maximum (default: green). */
+  fullColor?: string;
+  /** Secondary colour cue of a key at its declared minimum (default: amber). */
+  emptyColor?: string;
+  /**
+   * Secondary colour cue of an irreversible key (default: red). Takes
+   * precedence over the edge-state colours, because irreversibility outlives a
+   * transient value.
+   */
+  irreversibleColor?: string;
   /** Gap in pixels between two items (default: `18`). */
   itemGap?: number;
 }
@@ -100,12 +140,13 @@ export interface ResourceHudOptions {
   declaredKeys: readonly string[];
   /**
    * Inclusive per-key bounds, keyed by declared resource key (the manifest's
-   * `resources.bounds` read-through). Consumed by the bounds-marker slice.
+   * `resources.bounds` read-through). A bounded key prints `value / max` and
+   * a key at an edge prints its state marker.
    */
   bounds?: Readonly<Record<string, ResourceHudBounds>>;
   /**
-   * The declared never-restored / loss-bearing keys. Consumed by the
-   * irreversible-marker slice.
+   * The declared never-restored / loss-bearing keys. A key in this subset is
+   * marked, with the printed word `irreversible` as the primary channel.
    */
   irreversible?: readonly string[];
   /**
@@ -133,17 +174,30 @@ export interface ResourceHudItem {
   readonly label: string;
   /** The value read from the supplied resource bag. */
   readonly value: number;
-  /** The Phaser text object showing `"<label> <value>"`. */
+  /** The declared inclusive minimum, when the key is bounded and usable. */
+  readonly min?: number;
+  /** The declared inclusive maximum, when the key is bounded and usable. */
+  readonly max?: number;
+  /** The printed state marker earned at a declared edge, if any. */
+  readonly state?: ResourceHudState;
+  /** Whether the key is declared never-restored / loss-bearing. */
+  readonly irreversible: boolean;
+  /** The resolved text colour (a secondary cue; the printed marker is primary). */
+  readonly color: string;
+  /** The Phaser text object showing the full rendered item. */
   readonly text: Phaser.GameObjects.Text;
 }
 
 // ── Defaults & helpers ─────────────────────────────────────
 
-/** Default item styling and spacing. */
+/** Default item styling, spacing and state colour cues. */
 const RESOURCE_HUD_STYLE_DEFAULTS: Required<ResourceHudStyle> = {
   fontSize: '14px',
   fontFamily: FONT_FAMILY,
   color: '#d8e0d8',
+  fullColor: '#8fd18f',
+  emptyColor: '#e8b45a',
+  irreversibleColor: '#f07a7a',
   itemGap: 18,
 };
 
@@ -179,6 +233,73 @@ export function readResourceValue(
 ): number {
   const value = resources[key];
   return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Reads the usable bounds declared for one key.
+ *
+ * A key with no bounds entry, or one whose `max` is not a finite number, is
+ * treated as unbounded — the HUD never invents a range and never hides a
+ * malformed declaration behind a made-up maximum. A non-finite `min` falls
+ * back to `0`, the conventional floor.
+ *
+ * @param bounds The caller's declared bounds record.
+ * @param key    The declared resource key to read.
+ */
+export function readResourceBounds(
+  bounds: Readonly<Record<string, ResourceHudBounds>> | undefined,
+  key: string,
+): ResourceHudBounds | undefined {
+  const declared = bounds?.[key];
+  if (!declared) return undefined;
+  if (typeof declared.max !== 'number' || !Number.isFinite(declared.max)) {
+    return undefined;
+  }
+  const min =
+    typeof declared.min === 'number' && Number.isFinite(declared.min)
+      ? declared.min
+      : 0;
+  return { min, max: declared.max };
+}
+
+/**
+ * Formats a key's value, appending the declared maximum when the key is
+ * bounded: `5` for an unbounded key, `5 / 8` for a bounded one.
+ *
+ * The value is printed as read from the bag — the HUD is a view and never
+ * silently clamps a value the caller supplied.
+ *
+ * @param value  The current value of the key.
+ * @param bounds The key's usable bounds, if it is bounded. A non-finite
+ *               maximum is treated as unbounded.
+ */
+export function formatResourceAmount(
+  value: number,
+  bounds?: ResourceHudBounds,
+): string {
+  if (bounds === undefined || !Number.isFinite(bounds.max)) return `${value}`;
+  return `${value} / ${bounds.max}`;
+}
+
+/**
+ * Reports the printed state marker a value earns against its declared bounds:
+ * `full` at or beyond the maximum, `empty` at or below the minimum, and
+ * `undefined` in between or when the key is unbounded.
+ *
+ * A key whose bounds are a single point (`min === max`) reports `full`, since
+ * the maximum is checked first.
+ *
+ * @param value  The current value of the key.
+ * @param bounds The key's usable bounds, if it is bounded.
+ */
+export function resolveResourceState(
+  value: number,
+  bounds?: ResourceHudBounds,
+): ResourceHudState | undefined {
+  if (bounds === undefined) return undefined;
+  if (value >= bounds.max) return 'full';
+  if (value <= bounds.min) return 'empty';
+  return undefined;
 }
 
 /** Trims, drops blank and duplicate keys, preserving declaration order. */
@@ -297,18 +418,70 @@ export class ResourceHud extends UIComponentBase {
     for (const key of declaredKeys) {
       const label = this.resolveLabel(key);
       const value = readResourceValue(this.options.resources, key);
-      const content = `${label} ${value}`;
+      const bounds = readResourceBounds(this.options.bounds, key);
+      const state = resolveResourceState(value, bounds);
+      const irreversible = this.isIrreversible(key);
+      const color = this.resolveColor(state, irreversible);
+      const content = this.buildContent(label, value, bounds, state, irreversible);
       const text = this.scene.add
         .text(cursor, 0, content, {
           fontSize: this.style.fontSize,
           fontFamily: this.style.fontFamily,
-          color: this.style.color,
+          color,
         })
         .setOrigin(0, 0.5);
-      items.push({ key, label, value, text });
+      items.push({
+        key,
+        label,
+        value,
+        min: bounds?.min,
+        max: bounds?.max,
+        state,
+        irreversible,
+        color,
+        text,
+      });
       cursor += measureTextWidth(text) + this.style.itemGap;
     }
     return items;
+  }
+
+  /**
+   * Assembles an item's printed text: `label value [/ max]`, then the state
+   * marker word, then the irreversible marker word. Every marker is printed
+   * text, so the item stays legible without colour.
+   */
+  private buildContent(
+    label: string,
+    value: number,
+    bounds: ResourceHudBounds | undefined,
+    state: ResourceHudState | undefined,
+    irreversible: boolean,
+  ): string {
+    const parts = [`${label} ${formatResourceAmount(value, bounds)}`];
+    if (state !== undefined) parts.push(RESOURCE_HUD_MARKERS[state]);
+    if (irreversible) parts.push(RESOURCE_HUD_MARKERS.irreversible);
+    return parts.join(' ');
+  }
+
+  /**
+   * Resolves an item's secondary colour cue. The irreversible cue wins over an
+   * edge-state cue, because a loss-bearing key stays loss-bearing whatever its
+   * current value; the printed word carries the meaning in either case.
+   */
+  private resolveColor(
+    state: ResourceHudState | undefined,
+    irreversible: boolean,
+  ): string {
+    if (irreversible) return this.style.irreversibleColor;
+    if (state === 'full') return this.style.fullColor;
+    if (state === 'empty') return this.style.emptyColor;
+    return this.style.color;
+  }
+
+  /** Whether the caller declared the key never-restored / loss-bearing. */
+  private isIrreversible(key: string): boolean {
+    return this.options.irreversible?.includes(key) ?? false;
   }
 
   /**
