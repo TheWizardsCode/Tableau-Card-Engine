@@ -18,6 +18,16 @@
  *
  * Resolution order for a selected option:
  *
+ * 0. **Affordability refusal (surfaced options only).** An option compiled under
+ *    the `'surface'` policy carries an `affordability` state. When that state
+ *    is unaffordable, resolution re-checks it against the **current**
+ *    resources (`optionAffordability`, the same arithmetic the boolean
+ *    predicate uses) and refuses if it is still unmet: nothing is applied,
+ *    paid, pushed or drawn, one activity-log line names the shortfall, and the
+ *    result carries a structured `refusal` with that shortfall. An option
+ *    without an attached state — every option under the default `'omit'`
+ *    policy — resolves exactly as it always did.
+ *
  * 1. `effectPolicy` — `'apply'` runs the event's intrinsic effect, `'skip'`
  *    ignores it. Unchanged from before cost/extra-effect support.
  * 2. Declarative `cost` — a real payment: the specified resource keys are
@@ -60,6 +70,7 @@ import {
   resolveResourceKeys,
   selectDeclaredDelta,
 } from './resources';
+import { optionAffordability } from './compile';
 import type {
   StorylineResourceKey,
   StorylineResources,
@@ -67,6 +78,7 @@ import type {
 } from './resources';
 import type {
   Condition,
+  OptionShortfall,
   StorylineCard,
   StorylineEngineAdapter,
   StorylineOption,
@@ -142,6 +154,18 @@ function applyDelta<TState, TCard extends StorylineCard>(
     'Story-line cost/extra-effect not applied: the engine adapter does not implement applyResourceDelta.',
     'neutral',
   );
+}
+
+/**
+ * Formats a shortfall for the activity log (`charge: need 2, have 0`).
+ *
+ * Deliberately factual: the human-facing wording ("2 charge needed") is the
+ * presentation surface's job, not the engine's.
+ */
+function formatShortfall(shortfall: readonly OptionShortfall[]): string {
+  return shortfall
+    .map((entry) => `${entry.key}: need ${entry.required}, have ${entry.available}`)
+    .join('; ');
 }
 
 /** Prefix of the refusal activity-log line for each authored-delta label. */
@@ -265,6 +289,32 @@ export function resolveStorylineOption<TState, TCard extends StorylineCard>(
   // none keeps the pre-guard behaviour exactly.
   const irreversible = normaliseResourceKeys(adapter.irreversible ?? []);
   const before = adapter.getResources(state);
+
+  // 0. Refuse an unaffordable surfaced option before anything is applied.
+  //    Re-checked against the *current* resources so an option that became
+  //    affordable since it was drawn (the player earned the price) still
+  //    resolves. No attached affordability state (every 'omit'-policy option)
+  //    means no check at all, so existing behaviour is untouched.
+  if (option.affordability !== undefined && !option.affordability.affordable) {
+    const current = optionAffordability(option, before, declared);
+    if (!current.affordable) {
+      adapter.appendLog(
+        state,
+        `Option refused: unaffordable (${formatShortfall(current.shortfall)}).`,
+        'neutral',
+      );
+      return {
+        pushedCard: null,
+        coinChange: 0,
+        repChange: 0,
+        outcomeProse: null,
+        refusal: Object.freeze({
+          reason: 'unaffordable' as const,
+          shortfall: current.shortfall,
+        }),
+      };
+    }
+  }
 
   // 1. Apply effect if the option's policy says so.
   if (option.effectPolicy === 'apply') {

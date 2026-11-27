@@ -53,7 +53,7 @@ import {
   type SaveSerializer,
   type VersionedPayload,
 } from '../core-engine/SaveLoad';
-import { isOptionAffordable } from './compile';
+import { isOptionAffordable, optionAffordability } from './compile';
 import type {
   EpisodeManifest,
   LossRule,
@@ -94,6 +94,7 @@ import type {
   SceneOutcomeClassification,
   SceneRouteResult,
   SerializedEpisodeRunState,
+  StorylineAffordabilityPolicy,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -686,24 +687,48 @@ function readCardContext<TCard extends StorylineCard>(card: TCard): string | nul
 }
 
 /**
- * Presents only the options the declared-key affordability gate accepts.
+ * Applies the declared-key affordability policy to a beat's options.
  *
- * The gate is the shipped {@link isOptionAffordable} helper over the manifest's
- * declared keys (`storyline.resources`) — the runner never re-derives
- * affordability. Registry-authored options are already filtered at draw time;
- * CSV-authored options are not, so this gate is what makes step A.3 true for
- * the content path.
+ * The gate is the shipped {@link isOptionAffordable} / {@link optionAffordability}
+ * arithmetic over the manifest's declared keys (`storyline.resources`) — the
+ * runner never re-derives affordability.
+ *
+ * - `'omit'` (the default) presents only the options the gate accepts. This is
+ *   what makes step A.3 true for the content path: registry-authored options
+ *   are already filtered at draw time, CSV-authored options are not.
+ * - `'surface'` keeps every option in authored order and attaches its computed
+ *   affordability, so a presenter can render an unaffordable door disabled
+ *   with its shortfall. Resolution then refuses it rather than overspending.
+ *
+ * The policy comes from the choice model's single `affordabilityPolicy`, so
+ * this seam and the registry compile can never disagree.
  *
  * @param options          The beat's compiled options, in authored order.
  * @param resources        Current resource values (the engine projection).
  * @param declaredResources The run's declared resource keys.
+ * @param policy           The affordability policy in force.
  */
 function gateAffordableOptions<TState>(
   options: readonly StorylineOption<TState>[],
   resources: StorylineResources,
   declaredResources: readonly StorylineResourceKey[],
+  policy: StorylineAffordabilityPolicy,
 ): StorylineOption<TState>[] {
-  return options.filter((option) => isOptionAffordable(option, resources, declaredResources));
+  if (policy === 'surface') {
+    return options.map((option) =>
+      Object.freeze({
+        ...option,
+        affordability: optionAffordability(
+          option,
+          resources,
+          declaredResources,
+        ),
+      }),
+    );
+  }
+  return options.filter((option) =>
+    isOptionAffordable(option, resources, declaredResources),
+  );
 }
 
 /**
@@ -1214,6 +1239,7 @@ export function createEpisodeRunner<
       storyline.getStorylineOptions(card, gameState),
       resources,
       storyline.resources,
+      storyline.affordabilityPolicy ?? 'omit',
     );
 
     // A.3 — charge only once the beat can actually be presented.
@@ -1270,6 +1296,22 @@ export function createEpisodeRunner<
       irreversibleKeys,
     );
     recordChainLoss(lossSceneId, lossBeatId, resourcesBefore, resourcesAfter);
+
+    // A refused resolution (an unaffordable surfaced option) pushes nothing
+    // and touches no run state: the run stays at the beat so the caller can
+    // present the choice again. Nothing is classified and no pending chain is
+    // recorded, because there is no card to route.
+    if (resolution.refusal !== undefined) {
+      return Object.freeze({
+        next: 'continue' as const,
+        case: 'none' as const,
+        cardId: null,
+        pendingChain: null,
+        pushedCard: null,
+        resolution,
+        refusal: resolution.refusal,
+      });
+    }
 
     // `@story-line` pushes an instance card (`le-i-log-0`); the manifest, the
     // scene close and the route targets all speak base ids, so classification

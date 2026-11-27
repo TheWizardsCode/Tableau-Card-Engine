@@ -126,6 +126,65 @@ export interface StorylineJournalEntry {
 export type OptionCost = StorylineResourcesDelta;
 
 /**
+ * One unmet component of a declarative {@link OptionCost}.
+ *
+ * `available` is read through the shipped `readResource` rule, so an absent
+ * value and a cost key outside the declared set both read as `0` (the key can
+ * then never be paid until the game declares it — see `validateStorylineOptions`).
+ */
+export interface OptionShortfall {
+  /** The declared resource key the option requires. */
+  readonly key: StorylineResourceKey;
+  /** The amount the option's `cost` requires for this key. */
+  readonly required: number;
+  /** The amount currently held, read through `readResource`. */
+  readonly available: number;
+}
+
+/**
+ * The computed affordability state of one option.
+ *
+ * This is what a presenter renders a disabled option from: the engine hands
+ * over data (`2 charge needed` is a presentation decision) and never renders.
+ * Derived by `optionAffordability` from the option's declarative `cost`, the
+ * current resources and the declared keys — the same arithmetic
+ * `isOptionAffordable` applies, never a parallel copy.
+ *
+ * - `{ affordable: true }` — no cost, or every cost component is met.
+ * - `{ affordable: false, shortfall }` — every **unmet** key, in the option's
+ *   declared cost order (deterministic; a met key is never listed).
+ */
+export type OptionAffordability =
+  | { readonly affordable: true }
+  | {
+      readonly affordable: false;
+      readonly shortfall: readonly OptionShortfall[];
+    };
+
+/**
+ * How draw-time affordability treats an option the player cannot afford.
+ *
+ * - `'omit'` (the **default**) — the shipped behaviour: an unaffordable option
+ *   is deleted from the presented list, so nothing changes for a caller that
+ *   does not ask for the other policy.
+ * - `'surface'` — every condition-passing option is kept and carries its
+ *   computed {@link StorylineOption.affordability}, so a presenter can show
+ *   the door disabled with its requirement.
+ */
+export type StorylineAffordabilityPolicy = 'omit' | 'surface';
+
+/**
+ * Options for one compile call (`compileStorylineFromEvent`).
+ *
+ * Absent means the shipped `'omit'` policy, so every existing caller keeps its
+ * exact behaviour. A `StorylineSystem` threads its own configured policy here.
+ */
+export interface CompileStorylineOptions {
+  /** Draw-time affordability policy (defaults to `'omit'`). */
+  readonly affordabilityPolicy?: StorylineAffordabilityPolicy;
+}
+
+/**
  * Declarative resource delta applied when a story-line option resolves.
  *
  * Keyed by the game's declared resource keys, each a signed delta (`-5`
@@ -229,6 +288,19 @@ export interface StorylineOption<TState = unknown> {
    */
   readonly cost?: OptionCost;
   /**
+   * The computed affordability state of this option, attached when the option
+   * was compiled under the `'surface'` affordability policy.
+   *
+   * Present only when an affordability policy asked for it **and** the compile
+   * call had a resources oracle; under the default `'omit'` policy it is
+   * always absent, so the compiled shape is unchanged for every existing
+   * caller. A presenter reads {@link OptionAffordability} here instead of
+   * re-deriving affordability — and resolution refuses an option whose
+   * attached state is still unaffordable, so surfacing can never drive a
+   * declared resource below zero.
+   */
+  readonly affordability?: OptionAffordability;
+  /**
    * Optional declarative resource delta applied when the option resolves.
    *
    * Declared contract: applied after any {@link cost} deduction and
@@ -290,15 +362,41 @@ export interface PendingStorylineChoice<
    * Draw-time snapshot of the compiled option list. When present, resolution
    * reads this frozen list (condition callbacks are never re-evaluated).
    *
-   * The snapshot is **cost-filtered** as well: an option whose declarative
-   * `cost` exceeded the player's resources for the declared keys at draw time
-   * is absent from this list (registered options are filtered by
-   * compilation; CSV-authored options are gated by the presenting layer with
-   * `isOptionAffordable`). Consumers (e.g. AI scoring) must read this snapshot
-   * — it is the presented list, computed once at draw time and stable
-   * thereafter.
+   * Under the default `'omit'` affordability policy the snapshot is
+   * **cost-filtered** as well: an option whose declarative `cost` exceeded the
+   * player's resources for the declared keys at draw time is absent from this
+   * list (registered options are filtered by compilation; CSV-authored options
+   * are gated by the presenting layer with `isOptionAffordable`). Under
+   * `'surface'` every condition-passing option is kept, with its computed
+   * {@link StorylineOption.affordability} attached, and resolution refuses an
+   * unaffordable one. Consumers (e.g. AI scoring) must read this snapshot — it
+   * is the presented list, computed once at draw time and stable thereafter.
    */
   options?: readonly StorylineOption<TState>[];
+}
+
+/**
+ * Why a story-line option resolution was refused.
+ *
+ * `unaffordable` is currently the only reason: the option was surfaced with an
+ * unaffordable {@link OptionAffordability}, and re-checking it against the
+ * resources at resolution time still finds the price unmet. Nothing is paid,
+ * applied or pushed — the run stays where it is so the player can pick again.
+ */
+export type StorylineResolutionRefusalReason = 'unaffordable';
+
+/**
+ * The structured refusal a resolution reports instead of overspending.
+ *
+ * Carried on {@link StorylineResolution.refusal}. `shortfall` is exactly the
+ * {@link OptionAffordability} shortfall the refusal was based on, so the
+ * presenter can render the same requirement it showed on the disabled option.
+ */
+export interface StorylineResolutionRefusal {
+  /** Why the resolution was refused; always `unaffordable`. */
+  readonly reason: StorylineResolutionRefusalReason;
+  /** Every unmet cost component, in the option's declared cost order. */
+  readonly shortfall: readonly OptionShortfall[];
 }
 
 /** Result of resolving a story-line option. */
@@ -319,6 +417,19 @@ export interface StorylineResolution<TCard extends StorylineCard = StorylineCard
    * exactly.
    */
   readonly outcomeProse?: string | null;
+  /**
+   * The structured refusal, present **only** when the resolution was refused
+   * (an unaffordable surfaced option, see
+   * {@link StorylineOption.affordability}). Absent means the option resolved
+   * normally, which is why this field is additive: every existing consumer
+   * (scene, AI, game adapter) keeps reading `pushedCard` / `coinChange` /
+   * `repChange` unchanged.
+   *
+   * A refused resolution mutates nothing (no effect, no cost, no extra effect,
+   * no successor push, no RNG draw) and reports `pushedCard: null` with zero
+   * deltas, so a caller that ignores `refusal` can never overspend.
+   */
+  readonly refusal?: StorylineResolutionRefusal | undefined;
 }
 
 /**
@@ -461,10 +572,24 @@ export interface StorylineSystem<TState, TCard extends StorylineCard> {
    * keys are reported against the same set the runtime uses.
    */
   readonly resources: readonly StorylineResourceKey[];
+  /**
+   * How draw-time affordability treats an option the player cannot afford.
+   *
+   * `'omit'` (the default) deletes the option, exactly as before; `'surface'`
+   * keeps it with its computed {@link StorylineOption.affordability}. This one
+   * value is threaded into **both** omission seams — the registry compile and
+   * the episode runner's beat-entry gate — so they can never disagree.
+   */
+  readonly affordabilityPolicy: StorylineAffordabilityPolicy;
 
   // ── Compilation ─────────────────────────────────────────────
-  /** Compile a card's story-line into the generalised option model. */
-  compileStorylineFromEvent(card: TCard, state?: TState): CompiledStoryline<TState>;
+  /**
+   * Compile a card's story-line into the generalised option model.
+   *
+   * The system's configured `affordabilityPolicy` applies unless the per-call
+   * `options.affordabilityPolicy` overrides it for this one compile.
+   */
+  compileStorylineFromEvent(card: TCard, state?: TState, options?: CompileStorylineOptions): CompiledStoryline<TState>;
   /** True when the card presents a story-driven choice. */
   eventHasStoryline(card: TCard): boolean;
   /** Ordered options for a card (empty when non-choice). */
@@ -806,8 +931,10 @@ export type BeatEntryRefusalReason = 'budget-exhausted';
  * The record is the presentation payload for GDD §2.3 step 3 — the caller
  * renders `context` as the card prose, the scene banner from `sceneId`, and
  * `options` as the surviving choices. The options are already gated by
- * `isOptionAffordable` over the manifest's declared keys; the caller never
- * re-derives affordability.
+ * `isOptionAffordable` over the manifest's declared keys — or, when the
+ * choice model is configured with `affordabilityPolicy: 'surface'`, kept with
+ * their computed affordability attached — so the caller never re-derives
+ * affordability.
  */
 export interface PresentedBeatEntry<TState = unknown> {
   /** Discriminator: the clock paid for this beat, so it is played. */
@@ -826,8 +953,15 @@ export interface PresentedBeatEntry<TState = unknown> {
    */
   readonly context: string | null;
   /**
-   * The options that survive the declared-key affordability gate, in authored
-   * order. Empty for a non-choice beat.
+   * The options presented for the beat, in authored order. Empty for a
+   * non-choice beat.
+   *
+   * Under the default `'omit'` affordability policy these are the options that
+   * survive the declared-key gate. Under `'surface'` every option the beat's
+   * content authors is kept and carries its computed
+   * {@link StorylineOption.affordability}, so a presenter can render an
+   * unaffordable door disabled with its shortfall instead of hiding it. The
+   * caller never re-derives affordability either way.
    */
   readonly options: readonly StorylineOption<TState>[];
 }
@@ -928,6 +1062,13 @@ export interface ChoiceResolution<TCard extends StorylineCard = StorylineCard> {
    * of it.
    */
   readonly resolution: StorylineResolution<TCard>;
+  /**
+   * The structured refusal, present only when the choice model refused the
+   * option (an unaffordable surfaced option). A refused resolution pushes
+   * nothing: `case` is `'none'`, `next` is `'continue'` and no pending chain is
+   * recorded, so the run stays at the beat and the caller can prompt again.
+   */
+  readonly refusal?: StorylineResolutionRefusal | undefined;
 }
 
 // ── Scene close (GDD §2.3 steps C.6–C.8) ───────────────────

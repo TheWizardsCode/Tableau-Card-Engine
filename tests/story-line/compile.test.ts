@@ -19,6 +19,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createStorylineSystem,
   isOptionAffordable,
+  optionAffordability,
   type StorylineEngineAdapter,
 } from '../../src/story-line';
 import {
@@ -505,7 +506,6 @@ describe('draw-time cost filtering', () => {
 });
 
 // ── eventHasStoryline semantics ─────────────────────────────
-
 describe('eventHasStoryline', () => {
   const { system } = makeSystem();
 
@@ -524,5 +524,253 @@ describe('eventHasStoryline', () => {
       { label: 'X', effectPolicy: 'apply' },
     ]);
     expect(sys.eventHasStoryline(makeCard({ id: 'evt-reg' }))).toBe(true);
+  });
+});
+
+// ── Surfaced affordability: the requirement accessor ────────
+
+describe('optionAffordability', () => {
+  it('reports an option with no cost as affordable', () => {
+    expect(
+      optionAffordability({}, { coins: 0, reputation: 0 }),
+    ).toEqual({ affordable: true });
+  });
+
+  it('treats a cost exactly equal to the balance as affordable', () => {
+    expect(
+      optionAffordability(
+        { cost: { coins: 75, reputation: 3 } },
+        { coins: 75, reputation: 3 },
+      ),
+    ).toEqual({ affordable: true });
+  });
+
+  it('lists every unmet key of a multi-key cost in declared order', () => {
+    const result = optionAffordability(
+      { cost: { coins: 100, reputation: 6, charge: 2 } },
+      { coins: 40, reputation: 5, charge: 0 },
+      ['coins', 'reputation', 'charge'],
+    );
+
+    expect(result).toEqual({
+      affordable: false,
+      shortfall: [
+        { key: 'coins', required: 100, available: 40 },
+        { key: 'reputation', required: 6, available: 5 },
+        { key: 'charge', required: 2, available: 0 },
+      ],
+    });
+  });
+
+  it('lists only the unmet key of a multi-key cost', () => {
+    expect(
+      optionAffordability(
+        { cost: { coins: 100, reputation: 5 } },
+        { coins: 100, reputation: 4 },
+      ),
+    ).toEqual({
+      affordable: false,
+      shortfall: [{ key: 'reputation', required: 5, available: 4 }],
+    });
+  });
+
+  it('reports an undeclared cost key with available 0', () => {
+    // `readResource` rule: a key outside the declared set reads as 0, so it can
+    // never be paid until the game declares it.
+    expect(
+      optionAffordability(
+        { cost: { hull: 2 } },
+        { hull: 3 },
+        ['coins', 'reputation'],
+      ),
+    ).toEqual({
+      affordable: false,
+      shortfall: [{ key: 'hull', required: 2, available: 0 }],
+    });
+  });
+
+  it('never drifts from isOptionAffordable', () => {
+    const declared = ['coins', 'reputation', 'hull'];
+    const cases: { cost?: Record<string, number>; resources: Record<string, number> }[] = [
+      { resources: { coins: 0 } },
+      { cost: { coins: 0 }, resources: { coins: 0 } },
+      { cost: { coins: 5 }, resources: { coins: 5 } },
+      { cost: { coins: 5 }, resources: { coins: 4 } },
+      { cost: { coins: 5, reputation: 2 }, resources: { coins: 5, reputation: 2 } },
+      { cost: { coins: 5, reputation: 2 }, resources: { coins: 5, reputation: 1 } },
+      { cost: { hull: 2 }, resources: { hull: 3 } },
+      { cost: { hull: 2 }, resources: { hull: 1 } },
+    ];
+
+    for (const scenario of cases) {
+      const option = scenario.cost === undefined ? {} : { cost: scenario.cost };
+      const result = optionAffordability(option, scenario.resources, declared);
+      expect(result.affordable).toBe(
+        isOptionAffordable(option, scenario.resources, declared),
+      );
+      // Shape invariant: an affordable result carries no shortfall, and an
+      // unaffordable one always lists at least one unmet key.
+      if (result.affordable) {
+        expect('shortfall' in result).toBe(false);
+      } else {
+        expect(result.shortfall.length).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+// ── Surfaced affordability: the compile policy ──────────────
+
+describe('compile affordability policy', () => {
+  it("omits unaffordable options and attaches no state by default ('omit')", () => {
+    const { system, state } = makeSystem();
+    state.coins = 10;
+    system.registerStorylineOptions('evt-policy-default', [
+      { label: 'Dear', effectPolicy: 'apply', cost: { coins: 11 } },
+      { label: 'Cheap', effectPolicy: 'apply', cost: { coins: 10 } },
+      { label: 'Free', effectPolicy: 'apply' },
+    ]);
+
+    const compiled = system.compileStorylineFromEvent(
+      makeCard({ id: 'evt-policy-default' }),
+      state,
+    );
+
+    expect(compiled.compiledOptions.map((option) => option.label)).toEqual([
+      'Cheap',
+      'Free',
+    ]);
+    for (const option of compiled.compiledOptions) {
+      expect('affordability' in option).toBe(false);
+    }
+  });
+
+  it("keeps every condition-passing option under 'surface' with its affordability", () => {
+    const { system, state } = makeSystem();
+    state.coins = 10;
+    system.registerStorylineOptions('evt-policy-surface', [
+      { label: 'Dear', effectPolicy: 'apply', cost: { coins: 11 } },
+      { label: 'Cheap', effectPolicy: 'apply', cost: { coins: 10 } },
+      { label: 'Free', effectPolicy: 'apply' },
+      { label: 'Hidden', effectPolicy: 'apply', condition: () => false },
+    ]);
+
+    const compiled = system.compileStorylineFromEvent(
+      makeCard({ id: 'evt-policy-surface' }),
+      state,
+      { affordabilityPolicy: 'surface' },
+    );
+
+    // Every condition-passing option survives, in authored order; the
+    // condition-failing one is still omitted.
+    expect(compiled.compiledOptions.map((option) => option.label)).toEqual([
+      'Dear',
+      'Cheap',
+      'Free',
+    ]);
+    expect(compiled.compiledOptions.map((option) => option.affordability)).toEqual([
+      {
+        affordable: false,
+        shortfall: [{ key: 'coins', required: 11, available: 10 }],
+      },
+      { affordable: true },
+      { affordable: true },
+    ]);
+  });
+
+  it("surfaces a multi-key shortfall with every unmet key", () => {
+    const { system, state } = makeSystem();
+    state.coins = 1;
+    state.reputation = 1;
+    system.registerStorylineOptions('evt-policy-multi', [
+      {
+        label: 'Both',
+        effectPolicy: 'apply',
+        cost: { coins: 2, reputation: 3 },
+      },
+    ]);
+
+    const [option] = system.compileStorylineFromEvent(
+      makeCard({ id: 'evt-policy-multi' }),
+      state,
+      { affordabilityPolicy: 'surface' },
+    ).compiledOptions;
+
+    expect(option.affordability).toEqual({
+      affordable: false,
+      shortfall: [
+        { key: 'coins', required: 2, available: 1 },
+        { key: 'reputation', required: 3, available: 1 },
+      ],
+    });
+  });
+
+  it('honours a system-level surface policy and keeps the default omit', () => {
+    const templates: TemplateMap = new Map();
+    const surfaced = createStorylineSystem({
+      engine: makeAdapter(templates),
+      affordabilityPolicy: 'surface',
+    });
+    expect(surfaced.affordabilityPolicy).toBe('surface');
+    surfaced.registerStorylineOptions('evt-system-policy', [
+      { label: 'Dear', effectPolicy: 'apply', cost: { coins: 5000 } },
+    ]);
+
+    const state = makeState({ coins: 10 });
+    expect(
+      surfaced.getStorylineOptions(makeCard({ id: 'evt-system-policy' }), state),
+    ).toHaveLength(1);
+
+    const { system } = makeSystem();
+    expect(system.affordabilityPolicy).toBe('omit');
+  });
+
+  it("attaches affordability to content-authored options under 'surface'", () => {
+    const { system, state } = makeSystem();
+    state.coins = 0;
+    const card = makeCard({
+      id: 'evt-csv-surface',
+      options: 'Pay|evt-pay#cost=coins:2;Walk|',
+    });
+
+    const omitted = system.compileStorylineFromEvent(card, state);
+    // The CSV path is never omitted at compile time (the presenter gates it),
+    // and the default policy attaches nothing.
+    expect(omitted.compiledOptions.map((option) => option.label)).toEqual([
+      'Pay',
+      'Walk',
+    ]);
+    expect(omitted.compiledOptions[0].affordability).toBeUndefined();
+
+    const surfaced = system.compileStorylineFromEvent(card, state, {
+      affordabilityPolicy: 'surface',
+    });
+    expect(surfaced.compiledOptions.map((option) => option.label)).toEqual([
+      'Pay',
+      'Walk',
+    ]);
+    expect(surfaced.compiledOptions[0].affordability).toEqual({
+      affordable: false,
+      shortfall: [{ key: 'coins', required: 2, available: 0 }],
+    });
+    expect(surfaced.compiledOptions[1].affordability).toEqual({
+      affordable: true,
+    });
+  });
+
+  it('leaves the compiled list unchanged when a surface compile has no resources oracle', () => {
+    const { system } = makeSystem();
+    system.registerStorylineOptions('evt-policy-no-state', [
+      { label: 'Dear', effectPolicy: 'apply', cost: { coins: 5000 } },
+    ]);
+
+    const compiled = system.compileStorylineFromEvent(
+      makeCard({ id: 'evt-policy-no-state' }),
+      undefined,
+      { affordabilityPolicy: 'surface' },
+    );
+
+    expect(compiled.compiledOptions.map((option) => option.label)).toEqual(['Dear']);
+    expect(compiled.compiledOptions[0].affordability).toBeUndefined();
   });
 });

@@ -26,15 +26,18 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   createEpisodeRunner,
+  createStorylineSystem,
   type BeatEntry,
 } from '../../src/story-line';
 import type { EpisodeManifest } from '../../src/story-line/content/episode-manifest';
+import type { ContentCard } from '../../src/story-line/content/types';
 import {
   DEFAULT_EPISODE_SEED,
   episodeStep,
   loadEpisodeFixture,
   stepsOwnedBy,
   type EpisodeFixture,
+  type VoyageState,
 } from './helpers/episode-fixture';
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -68,7 +71,27 @@ function manifestStartingAt(
   return { ...fixture.manifest, start: { act: act.id, scene: sceneId, beat: beatId } };
 }
 
-/** Asserts the §2.3 step a test covers is registered against this suite. */
+/**
+ * Builds a runner whose choice model is configured with a given affordability
+ * policy, over the fixture's own engine and content.
+ */
+function makePolicyRunner(
+  fixture: EpisodeFixture,
+  affordabilityPolicy: 'omit' | 'surface',
+  manifest: EpisodeManifest = fixture.manifest,
+) {
+  const storyline = createStorylineSystem<VoyageState, ContentCard>({
+    engine: fixture.engine,
+    affordabilityPolicy,
+  });
+  return createEpisodeRunner({
+    manifest,
+    storyline,
+    content: fixture.cardsById,
+    seed: DEFAULT_EPISODE_SEED,
+  });
+}
+
 function expectOwnsStep(id: string): void {
   const step = episodeStep(id);
   expect(step).toBeDefined();
@@ -183,8 +206,7 @@ describe('episode runner beat entry', () => {
     expect(Object.isFrozen(entry)).toBe(true);
   });
 
-  it('A.3 presents only options the declared-key affordability gate accepts', () => {
-    expectOwnsStep('A.3');
+  it('A.3 presents only options the declared-key affordability gate accepts', () => {    expectOwnsStep('A.3');
 
     const fixture = loadEpisodeFixture();
     const runner = makeRunner(fixture);
@@ -197,6 +219,55 @@ describe('episode runner beat entry', () => {
     expect(entry.status).toBe('presented');
     if (entry.status !== 'presented') throw new Error('expected a presented entry');
     expect(entry.options.map((option) => option.label)).toEqual(['Stay silent']);
+  });
+
+  it('A.3 surfaces an unaffordable option with its shortfall under the surface policy', () => {
+    expectOwnsStep('A.3');
+
+    const fixture = loadEpisodeFixture();
+    const runner = makePolicyRunner(fixture, 'surface');
+    // Transmit the warning costs charge:1; charging is impossible at 0 charge.
+    fixture.state.resources.charge = 0;
+
+    const entry = runner.enterBeat('le-i-log', fixture.state);
+
+    expect(entry.status).toBe('presented');
+    if (entry.status !== 'presented') throw new Error('expected a presented entry');
+
+    // Both authored options are kept, in authored order, with their computed
+    // affordability — the unaffordable door stays visible with its price.
+    expect(entry.options.map((option) => option.label)).toEqual([
+      'Transmit the warning',
+      'Stay silent',
+    ]);
+    expect(entry.options.map((option) => option.affordability)).toEqual([
+      {
+        affordable: false,
+        shortfall: [{ key: 'charge', required: 1, available: 0 }],
+      },
+      { affordable: true },
+    ]);
+
+    // The record stays a frozen, deterministic payload: the array and each
+    // surfaced option are immutable, so a presenter cannot mutate the run.
+    expect(Object.isFrozen(entry.options)).toBe(true);
+    expect(Object.isFrozen(entry.options[0])).toBe(true);
+    expect(Object.isFrozen(entry.options[0].affordability)).toBe(true);
+  });
+
+  it("A.3 keeps the omit policy's presented list when the system states it explicitly", () => {
+    expectOwnsStep('A.3');
+
+    const fixture = loadEpisodeFixture();
+    const runner = makePolicyRunner(fixture, 'omit');
+    fixture.state.resources.charge = 0;
+
+    const entry = runner.enterBeat('le-i-log', fixture.state);
+
+    expect(entry.status).toBe('presented');
+    if (entry.status !== 'presented') throw new Error('expected a presented entry');
+    expect(entry.options.map((option) => option.label)).toEqual(['Stay silent']);
+    expect(entry.options[0].affordability).toBeUndefined();
   });
 
   it('consumes no RNG on an affordable entry or a refusal', () => {

@@ -36,6 +36,7 @@ and returns a {@link StorylineSystem} with:
 | Pending choice | `createPendingStorylineChoice`, `getPendingStorylineOptions`, `markChoiceResolved` |
 | Journal | `parseStoryUpdate`, `buildJournal`, `journalIsEmpty`, `journalTitle` (`truncateOutcome` is exported for display truncation) |
 | Validation | `validateStorylineOptions` (declarative metadata guard) |
+| Affordability | `resources` (declared keys), `affordabilityPolicy` (`'omit'` \| `'surface'`, default `'omit'`) — one value threaded into both omission seams |
 
 ### Story-line options
 
@@ -77,6 +78,7 @@ two sources, and both produce the same model:
 | `successorResolver?` | `(state) => string \| null` | resolution — callback, highest precedence | — (callback; programmatic) |
 | `conditionalSuccessors?` | `ConditionalSuccessorRule[]` | resolution — first matching rule wins | `#when=field<op>number>successor` (repeatable) |
 | `cost?` | `Record<resourceKey, number>` | affordability gate + real payment at resolution | `#cost=key:number,…` |
+| `affordability?` | `{ affordable: true } \| { affordable: false, shortfall: Shortfall[] }` | presentation — computed by the `'surface'` policy so a door can be shown disabled with its price | — (computed, never authored) |
 | `extraEffect?` | `Record<resourceKey, number>` | resolution — additional resource gain | `#extra=key:number,…` |
 | `says?` | `string` | presentation — the authored outcome prose for the option | `#says=<escaped prose>` |
 
@@ -108,10 +110,14 @@ const { valid, issues } = validateStorylineOptions(
 
 Semantics:
 
-- **`cost`** — an affordability *gate* at draw time (an option the player
-  cannot afford is **omitted**, never disabled) and a *real payment* at
+- **`cost`** — an affordability *gate* at draw time and a *real payment* at
   resolution. An unspecified component is unconstrained. Costs are paid in
-  addition to whatever `effectPolicy` does — `skip` still pays.
+  addition to whatever `effectPolicy` does — `skip` still pays. **What
+  happens to an unaffordable option is policy**: `'omit'` (the default)
+  deletes it, `'surface'` keeps it with its computed
+  [`affordability`](#surfaced-affordability-the-requirement-object) so a
+  presenter can render it disabled with its price. See
+  [Surfaced affordability](#surfaced-affordability-the-requirement-object).
 - **`extraEffect`** — a resource *gain* applied after the cost payment,
   independently of `effectPolicy`. Negative extras are rejected by
   `validateStorylineOptions`.
@@ -192,7 +198,10 @@ The declared set is threaded through the whole lifecycle:
 - **Draw-time affordability** gates option-by-option over the declared keys.
   `compileStorylineFromEvent` applies it to registered options; a presenting
   layer applies it to content-authored options (see
-  [Authoring options in CSV](#authoring-options-in-csv)).
+  [Authoring options in CSV](#authoring-options-in-csv)). The default policy
+  **omits** an unaffordable option; `'surface'` keeps it with its computed
+  requirement object (see
+  [Surfaced affordability](#surfaced-affordability-the-requirement-object)).
 - **Cost payment** and **extra effects** are applied per declared key, and
   each activity-log line names the key (`Cost paid: -4 stores.`,
   `Extra effect: +1 morale, +2 goodwill.`).
@@ -223,6 +232,82 @@ declare the pair) and the shipped behaviour is byte-identical. A game with a
 non-monetary vocabulary can override the default UI adapter's
 `storyUpdateLine` to describe its own currencies — the resolution result
 reports the `coins` / `reputation` projections only.
+
+### Surfaced affordability: the requirement object
+
+Draw-time affordability is **policy**, not a fixed omission. `'omit'` is the
+default and the shipped behaviour; `'surface'` keeps every condition-passing
+option and attaches the requirement a presenter needs.
+
+```ts
+// The single affordability source of truth (both exported from @story-line):
+isOptionAffordable(option, resources, declared);   // boolean view
+optionAffordability(option, resources, declared);  // requirement object
+
+// { affordable: true }
+// { affordable: false, shortfall: [{ key: 'charge', required: 2, available: 0 }] }
+```
+
+`optionAffordability` returns `{ affordable: true }` for an option with no
+`cost` or one whose every cost component is met (a cost exactly equal to the
+balance is affordable), and otherwise lists **every unmet key** in the option's
+declared cost order — deterministic, never a met key. `available` is read
+through the shipped `readResource` rule, so an absent value and a cost key
+outside the declared set both read as `0` (an undeclared positive cost is then
+reported with `available: 0` rather than dropped). `isOptionAffordable` is the
+boolean projection of the same arithmetic (`shortfall.length === 0`), so the
+two cannot drift.
+
+Where the policy lives — one value, both omission seams:
+
+```ts
+const storyline = createStorylineSystem({
+  engine,                        // resources + state read / mutate
+  affordabilityPolicy: 'surface', // default: 'omit'
+});
+```
+
+- `StorylineSystem.affordabilityPolicy` reports the value in force (default
+  `'omit'`; `system.affordabilityPolicy` is the one field).
+- `compileStorylineFromEvent(card, state?, { affordabilityPolicy })` accepts a
+  **per-call** override; the system's configured policy applies otherwise.
+- The episode runner reads the same system value for its beat-entry gate, so
+  the registry compile and `PresentedBeatEntry` cannot disagree.
+
+Under `'surface'` every condition-passing option is retained with its computed
+`affordability` field (`{...option, affordability}`), and the presented lists
+are frozen — a deterministic record a presenter cannot mutate. Under `'omit'`
+no `affordability` field is ever attached, so the compiled shape is unchanged.
+
+Content-analysis paths keep omission semantics deliberately: `content/guard.ts`,
+`content/scene-guard.ts` and `content/manifest.ts` call `isOptionAffordable`
+directly (never the policy), because their guarantees — a gated branch is
+survivable on some route, every ending is reachable — depend on pruning illegal
+routes. Surfacing belongs to presentation, not to analysis.
+
+#### Resolution refuses an unaffordable surfaced option
+
+Surfacing widens the set of options a player can *see*, so the resolution seam
+guarantees it cannot widen the set they can *overdraw*. `resolveStorylineOption`
+checks an option that carries an unaffordable attached state **first**, before
+any effect, cost or extra effect:
+
+- it re-checks against the **current** resources, so an option that became
+  affordable since it was drawn still resolves normally (no stale block);
+- still unaffordable ⇒ nothing is applied, paid, pushed or drawn, one
+  activity-log line names the shortfall (`Option refused: unaffordable (charge:
+  need 2, have 0).`), and the result carries a structured
+  `refusal: { reason: 'unaffordable', shortfall }` with `pushedCard: null` and
+  zero deltas;
+- an option with **no** attached state — every option under `'omit'` — is not
+  checked at all, so the shipped resolution behaviour is untouched.
+
+The episode runner carries that refusal on `ChoiceResolution.refusal` with
+`next: 'continue'`, `case: 'none'` and no pending chain: the run stays at the
+beat so the caller can present the choice again rather than losing it to a
+scene close. The engine hands over numbers; the disabled-option visual, the
+shortfall wording (`2 charge needed`) and any toast are the presentation
+surface's job.
 
 ### Resource bounds: spill at the cap, clamp at the floor
 
@@ -335,7 +420,10 @@ Rules the parser and validator enforce:
   authored. A scene that presents CSV-authored options filters with
   `isOptionAffordable(option, resources, declared)` before offering them — the
   Long Erasure run's `availableOptions` is the reference implementation, so an
-  unaffordable branch is never shown.
+  unaffordable branch is never shown. Under `affordabilityPolicy: 'surface'`
+  the same shortfall is handed over instead of the branch being deleted: the
+  option carries `optionAffordability(...)` and resolution refuses it, so a
+  disabled door is visible and still unplayable until the price is met.
 - **`#when` rules keep authored order, first match wins,** and an empty
   successor ends the chain (`#when=morale<1>`). A matching rule consumes no RNG
   draw.
@@ -607,12 +695,16 @@ Precedence: **registered options > CSV `options` encoding**.
   **terminal** option. Every CSV-authored option carries `effectPolicy:
   'apply'`.
 - Draw-time filtering is **combined**: a registered option is omitted when its
-  `condition(state)` callback returns `false` **or** its declarative `cost`
-  exceeds the player's current value of a declared resource. Options without a
-  cost are always included; a cost exactly equal to the balance is affordable.
-  Filtering happens once, when the option list is compiled at draw time, and
-  the result is frozen into `PendingStorylineChoice.options`, where consumers
-  (including AI scoring) read the stable presented list.
+  `condition(state)` callback returns `false` **or**, under the default
+  `'omit'` affordability policy, its declarative `cost` exceeds the player's
+  current value of a declared resource. Options without a cost are always
+  included; a cost exactly equal to the balance is affordable. Filtering
+  happens once, when the option list is compiled at draw time, and the result
+  is frozen into `PendingStorylineChoice.options`, where consumers (including
+  AI scoring) read the stable presented list. Under the `'surface'` policy
+  nothing is omitted for cost: each condition-passing option keeps its
+  computed `affordability` instead
+  ([Surfaced affordability](#surfaced-affordability-the-requirement-object)).
 - Cost filtering applies to **registered** options; a content-compiled list is
   returned as authored, and the presenting layer gates it with
   `isOptionAffordable` over the declared keys (see
@@ -623,6 +715,13 @@ Precedence: **registered options > CSV `options` encoding**.
 `resolveStorylineOption(state, card, option)` runs the full lifecycle for a
 selected option:
 
+0. **Refusal (surfaced options only).** An option that carries an unaffordable
+   `affordability` state is re-checked against the current resources and, if
+   still unaffordable, refused: nothing is applied, paid or pushed, one
+   activity-log line names the shortfall, and the result carries
+   `refusal: { reason: 'unaffordable', shortfall }`. An option with no attached
+   state (every option under the default `'omit'` policy) skips this step, so
+   existing behaviour is unchanged.
 1. **`effectPolicy`** — `apply` runs the card effect, `skip` does not.
 2. **Cost payment** — the option's `cost` is deducted through the engine
    adapter's resource-mutation seam, in addition to the effect.
@@ -1556,8 +1655,8 @@ its steps to it, so a numbered step cannot land without an owner.
 |---|---|---|
 | A.1 | Read the beat's `clockCost` from the validated manifest, never the legacy CSV cell | `episode-runner-beat-entry.test.ts` → “A.1/A.3 charges the manifest cost and presents the beat when affordable” |
 | A.2 | Refuse a beat the clock cannot pay: not played, no options, `budgetExhausted` set, `reason: 'budget-exhausted'` | `episode-runner-beat-entry.test.ts` → “A.2 refuses a beat that costs more than the remaining clock” |
-| A.3 | Charge the cost and present the beat's prose and its affordability-gated options; a cost exactly equal to the remaining clock is affordable | `episode-runner-beat-entry.test.ts` → “A.3 treats a cost exactly equal to the remaining clock as affordable”; “A.3 presents only options the declared-key affordability gate accepts” |
-| B.4 | Resolve the option through `@story-line` unchanged: effect, cost, extra, `pushedCard`, prose, journal and log | `episode-runner-choice.test.ts` → “B.4 delegates every B.5 case to the storyline system unchanged”; “B.4 lets the engine seam apply the option cost, not the runner” |
+| A.3 | Charge the cost and present the beat's prose and its affordability-gated options (or, under the `'surface'` policy, every option with its computed shortfall); a cost exactly equal to the remaining clock is affordable | `episode-runner-beat-entry.test.ts` → “A.3 treats a cost exactly equal to the remaining clock as affordable”; “A.3 presents only options the declared-key affordability gate accepts”; “A.3 surfaces an unaffordable option with its shortfall under the surface policy” |
+| B.4 | Resolve the option through `@story-line` unchanged: effect, cost, extra, `pushedCard`, prose, journal and log; an unaffordable surfaced option is refused and leaves the run at the beat | `episode-runner-choice.test.ts` → “B.4 delegates every B.5 case to the storyline system unchanged”; “B.4 lets the engine seam apply the option cost, not the runner”; “B.4 reports a refused surfaced option without closing the run” |
 | B.5 | Classify `pushedCard`: in-scene beat continues; an out-of-scene beat or ending card closes with `pendingChain`; none closes with `null` | `episode-runner-choice.test.ts` → “B.5 continues the scene when the pushed card is an in-scene beat”; “…beat of another scene”; “…ending card”; “…closes the scene with no pending chain when the choice pushes nothing” |
 | C.6 | Evaluate the objective once against the post-resolution `engine.getResources` snapshot | `episode-runner-scene-close.test.ts` → “evaluates the objective against post-resolution resources”; “reads engine.getResources exactly once for the objective” |
 | C.7 | Classify the outcome first match wins in declaration order, honouring an authored `budget: "exhausted"` rule before the catch-all | `episode-runner-scene-close.test.ts` → “classifies first match wins in declaration order”; “honours an authored budget-exhausted rule before the catch-all” |
@@ -1598,10 +1697,14 @@ current scene** (a beat of another scene is entered by routing, step 12):
    the record carries the card's `context` prose, the scene id (for the scene
    banner) and the surviving options. Options are gated by the shipped
    `isOptionAffordable` over the manifest's declared keys
-   (`storyline.resources`); the runner never re-derives affordability.
-   **A cost exactly equal to the remaining clock is affordable** — spending the
-   last tick on the last beat is a legal, authored climax, so that entry is
-   presented with `clockRemaining: 0`.
+   (`storyline.resources`); the runner never re-derives affordability. When the
+   choice model is configured with `affordabilityPolicy: 'surface'` **every**
+   authored option is kept instead and carries its computed `affordability`
+   (unaffordable ones with their shortfall), so a presenter can show a
+   disabled door with its price — resolution then refuses it. **A cost exactly
+   equal to the remaining clock is affordable** — spending the last tick on the
+   last beat is a legal, authored climax, so that entry is presented with
+   `clockRemaining: 0`.
 
 ```ts
 const entry = runner.enterBeat('le-i-open', gameState);

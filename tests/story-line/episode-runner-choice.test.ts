@@ -36,6 +36,7 @@ import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import {
   createEpisodeRunner,
+  createStorylineSystem,
   type ChoiceResolution,
   type EpisodeRunner,
   type PushedCardCase,
@@ -376,5 +377,48 @@ describe('episode runner choice resolution', () => {
     // The run state is untouched by the rejected classification.
     expect(runner.getState().pendingChain).toBeNull();
     expect(runner.getState().currentSceneId).toBe('s-i-open');
+  });
+
+  it('B.4 reports a refused surfaced option without closing the run', () => {
+    expectOwnsStep('B.4');
+
+    const fixture = loadEpisodeFixture();
+    const storyline = createStorylineSystem<VoyageState, ContentCard>({
+      engine: fixture.engine,
+      affordabilityPolicy: 'surface',
+    });
+    const runner = createEpisodeRunner({
+      manifest: fixture.manifest,
+      storyline,
+      content: fixture.cardsById,
+      seed: DEFAULT_EPISODE_SEED,
+    });
+    // Transmit the warning costs charge:1; the surfaced option stays visible
+    // but cannot be taken at 0 charge.
+    fixture.state.resources.charge = 0;
+
+    const entry = runner.enterBeat('le-i-log', fixture.state);
+    if (entry.status !== 'presented') throw new Error('expected a presented entry');
+    const transmit = entry.options.find(
+      (option) => option.label === 'Transmit the warning',
+    )!;
+    expect(transmit.affordability?.affordable).toBe(false);
+
+    const result = runner.resolveChoice(transmit, fixture.state);
+
+    // Nothing was routed: the refusal keeps the run where it is, so the caller
+    // can present the choice again instead of losing the beat to a scene close.
+    expect(result.refusal?.reason).toBe('unaffordable');
+    expect(result.next).toBe('continue');
+    expect(result.case).toBe('none');
+    expect(result.pendingChain).toBeNull();
+    expect(result.pushedCard).toBeNull();
+    expect(runner.getState().pendingChain).toBeNull();
+    expect(runner.getState().currentSceneId).toBe('s-i-open');
+    expect(runner.getState().currentBeatId).toBe('le-i-log');
+    // Nothing was paid, and the free option still resolves afterwards.
+    expect(fixture.state.resources.charge).toBe(0);
+    const silent = entry.options.find((option) => option.label === 'Stay silent')!;
+    expect(runner.resolveChoice(silent, fixture.state).refusal).toBeUndefined();
   });
 });

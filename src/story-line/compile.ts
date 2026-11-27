@@ -17,11 +17,15 @@ import {
 } from './resources';
 import type { StorylineResourceKey, StorylineResources } from './resources';
 import type {
+  CompileStorylineOptions,
   CompiledStoryline,
   ConditionalSuccessorRule,
   Condition,
+  OptionAffordability,
   OptionCost,
   OptionExtraEffect,
+  OptionShortfall,
+  StorylineAffordabilityPolicy,
   StorylineCard,
   StorylineOption,
 } from './types';
@@ -608,15 +612,62 @@ export function serialiseStorylineOptionsEncoding(
     .join(';');
 }
 
+/** The shared affordable result, frozen so a consumer cannot mutate it. */
+const AFFORDABLE: OptionAffordability = Object.freeze({ affordable: true });
+
+/**
+ * Computes the affordability state of an option: the shortfall a presenter
+ * renders, or a plain "affordable" result.
+ *
+ * The single affordability source of truth. {@link isOptionAffordable} is the
+ * boolean view of this same arithmetic (`shortfall.length === 0`), so the two
+ * can never drift.
+ *
+ * Rules (all shipped `cost` semantics, no new evaluator):
+ *
+ * - An option with no `cost` is always affordable.
+ * - Every specified cost key gates: a key is met when the player has at least
+ *   that much of it. A cost exactly equal to the balance is affordable.
+ * - An unspecified key is unconstrained and never listed.
+ * - `available` is read through {@link readResource} (an absent value reads as
+ *   `0`), and a cost key outside the declared set reads as `0` — so an
+ *   undeclared positive cost is reported with `available: 0` rather than
+ *   silently ignored.
+ * - `shortfall` lists every **unmet** key, in the option's declared cost order,
+ *   so the result is deterministic and never depends on object key sorting.
+ *
+ * @param option            The option to inspect (its `cost` may be absent).
+ * @param resources         Current resource values, keyed by resource key.
+ * @param declaredResources Declared resource keys (defaults to `coins` /
+ *                          `reputation`).
+ */
+export function optionAffordability(
+  option: { cost?: OptionCost },
+  resources: StorylineResources,
+  declaredResources: readonly StorylineResourceKey[] = DEFAULT_RESOURCE_KEYS,
+): OptionAffordability {
+  if (!option.cost) return AFFORDABLE;
+  const declared = new Set(resolveResourceKeys(declaredResources));
+  const shortfall: OptionShortfall[] = [];
+  for (const [key, required] of Object.entries(option.cost)) {
+    if (required === undefined) continue; // unconstrained
+    const available = declared.has(key) ? readResource(resources, key) : 0;
+    if (available < required) {
+      shortfall.push(Object.freeze({ key, required, available }));
+    }
+  }
+  if (shortfall.length === 0) return AFFORDABLE;
+  return Object.freeze({ affordable: false, shortfall: Object.freeze(shortfall) });
+}
+
 /**
  * True when the player's current resources cover the option's declarative
  * `cost`.
  *
- * An option with no `cost` is always affordable. Every specified cost key is
- * a required gate: the option is affordable only when the player has at least
- * that much of *each* named resource. An unspecified key is unconstrained
- * (never defaulted to zero). A cost exactly equal to the current balance is
- * affordable.
+ * The boolean view of {@link optionAffordability}: an option with no `cost` is
+ * always affordable, every specified cost key is a required gate, an
+ * unspecified key is unconstrained (never defaulted to zero), and a cost
+ * exactly equal to the current balance is affordable.
  *
  * A cost key outside the declared set reads as `0` (an absent key reads as
  * zero), so a resource the game never declared can never be paid — the option
@@ -634,14 +685,24 @@ export function isOptionAffordable(
   resources: StorylineResources,
   declaredResources: readonly StorylineResourceKey[] = DEFAULT_RESOURCE_KEYS,
 ): boolean {
-  if (!option.cost) return true;
-  const declared = new Set(resolveResourceKeys(declaredResources));
-  for (const [key, required] of Object.entries(option.cost)) {
-    if (required === undefined) continue; // unconstrained
-    const available = declared.has(key) ? readResource(resources, key) : 0;
-    if (available < required) return false;
-  }
-  return true;
+  return optionAffordability(option, resources, declaredResources).affordable;
+}
+
+/**
+ * Copies an option with its computed {@link OptionAffordability} attached.
+ *
+ * Used by the `'surface'` policy only. The copy is frozen (and its shortfall
+ * already is) so a presented list is a deterministic, immutable record.
+ */
+function withAffordability<TState>(
+  option: StorylineOption<TState>,
+  resources: StorylineResources,
+  declaredResources: readonly StorylineResourceKey[],
+): StorylineOption<TState> {
+  return Object.freeze({
+    ...option,
+    affordability: optionAffordability(option, resources, declaredResources),
+  });
 }
 
 /**
@@ -655,10 +716,26 @@ export function isOptionAffordable(
  * - Non-choice cards (no `options`, no registered list) → empty option list.
  *
  * When `state` **and** a resources oracle are provided, registry options are
- * filtered at draw time: an option is omitted when its `condition` callback
- * returns `false` **or** its declarative `cost` exceeds the current
- * resources ({@link isOptionAffordable}). Without a resources oracle (or
- * without state) no cost filtering happens.
+ * gated at draw time: an option is omitted when its `condition` callback
+ * returns `false` **or** its declarative `cost` exceeds the current resources
+ * ({@link isOptionAffordable}). Without a resources oracle (or without state)
+ * no cost filtering happens.
+ *
+ * `options.affordabilityPolicy` chooses what happens to a condition-passing
+ * option the player cannot afford:
+ *
+ * - `'omit'` (default) — the shipped behaviour: it is deleted from the
+ *   compiled list. Nothing changes for a caller that does not opt in.
+ * - `'surface'` — it is **kept** and its computed
+ *   {@link OptionAffordability} is attached, so a presenter can show the door
+ *   disabled with its requirement. Resolution then refuses it rather than
+ *   driving a declared resource below zero.
+ *
+ * The same policy governs content-authored (`event.options`) lists: they are
+ * never condition-filtered or omitted here, and under `'surface'` (with a
+ * resources oracle) they gain the same attached affordability state.
+ * Content-analysis paths keep `isOptionAffordable` omission semantics; they do
+ * not compile through this policy.
  *
  * @param event             The story-line card.
  * @param registry          The option registry to consult (base-type-id keyed).
@@ -671,6 +748,7 @@ export function isOptionAffordable(
  * @param declaredResources Declared resource keys the affordability gate
  *                          operates over (defaults to `coins` /
  *                          `reputation`).
+ * @param options           Compile options — the affordability policy.
  */
 export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
   event: TCard,
@@ -678,37 +756,62 @@ export function compileStorylineFromEvent<TState, TCard extends StorylineCard>(
   state?: TState,
   getResources?: (state: TState) => StorylineResources,
   declaredResources: readonly StorylineResourceKey[] = DEFAULT_RESOURCE_KEYS,
+  options: CompileStorylineOptions = {},
 ): CompiledStoryline<TState> {
   const storylineId = event.storylineId ?? null;
+  const policy: StorylineAffordabilityPolicy =
+    options.affordabilityPolicy ?? 'omit';
+  const surface = policy === 'surface';
+  const resources = state && getResources ? getResources(state) : null;
+
   const registered = registry.get(event.id);
   if (registered) {
-    const options = registered.map((o) => ({ ...o }));
+    const compiledOptions = registered.map((o) => ({ ...o }));
     if (state) {
       // Filter at draw time: omit options whose condition callback returns
-      // false or whose declarative cost exceeds the current resources.
-      // Options without a condition (or whose condition returns true) and
-      // without an unaffordable cost are included unchanged.
-      const resources = getResources ? getResources(state) : null;
+      // false. An option without a condition (or whose condition returns true)
+      // passes; its affordability is then either attached (`'surface'`) or
+      // gated by omission (`'omit'`).
+      const conditionPassing = compiledOptions.filter(
+        (o) => o.condition == null || o.condition(state),
+      );
+      if (surface) {
+        return {
+          storylineId,
+          compiledOptions:
+            resources == null
+              ? conditionPassing
+              : conditionPassing.map((o) =>
+                  withAffordability(o, resources, declaredResources),
+                ),
+        };
+      }
       return {
         storylineId,
-        compiledOptions: options.filter(
-          (o) =>
-            (o.condition == null || o.condition(state)) &&
-            (resources == null ||
-              isOptionAffordable(o, resources, declaredResources)),
-        ),
+        compiledOptions:
+          resources == null
+            ? conditionPassing
+            : conditionPassing.filter((o) =>
+                isOptionAffordable(o, resources, declaredResources),
+              ),
       };
     }
-    return { storylineId, compiledOptions: options };
+    return { storylineId, compiledOptions };
   }
 
   if (event.options) {
     // CSV-authored arbitrary option list. A non-empty encoding is always a
     // choice node; malformed encodings throw here so a bad CSV value is
     // rejected rather than silently ignored.
+    const compiledOptions = parseStorylineOptionsEncoding<TState>(event.options);
     return {
       storylineId,
-      compiledOptions: parseStorylineOptionsEncoding<TState>(event.options),
+      compiledOptions:
+        surface && state && resources != null
+          ? compiledOptions.map((o) =>
+              withAffordability(o, resources, declaredResources),
+            )
+          : compiledOptions,
     };
   }
 

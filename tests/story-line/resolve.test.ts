@@ -805,3 +805,114 @@ describe('evaluateCondition', () => {
     expect(evaluateCondition({ field: 'reputation', op: '>', value: 5 }, resources)).toBe(false);
   });
 });
+
+// ── Surfaced affordability: resolution refusal ──────────────
+
+describe('refusing an unaffordable surfaced option', () => {
+  it('refuses without applying the effect, the cost or the extra effect', () => {
+    const { system, state } = setup();
+    const card = makeCard({ id: 'evt-refused', coinDelta: 50 });
+    state.coins = 10;
+
+    const res = system.resolveStorylineOption(state, card, {
+      label: 'Dear',
+      effectPolicy: 'apply',
+      cost: { coins: 20 },
+      extraEffect: { reputation: 1 },
+      affordability: {
+        affordable: false,
+        shortfall: [{ key: 'coins', required: 20, available: 99 }],
+      },
+    });
+
+    // Nothing moved — not the effect, not the cost, not the extra effect.
+    expect(state.coins).toBe(10);
+    expect(state.reputation).toBe(50);
+    expect(state.deck).toEqual([]);
+    expect(state.rngCalls).toBe(0);
+
+    // The outcome is structured, and the shortfall is the *current* one.
+    expect(res.refusal).toEqual({
+      reason: 'unaffordable',
+      shortfall: [{ key: 'coins', required: 20, available: 10 }],
+    });
+    expect(res.pushedCard).toBeNull();
+    expect(res.coinChange).toBe(0);
+    expect(res.repChange).toBe(0);
+    expect(res.outcomeProse).toBeNull();
+    expect(state.activityLog.map((entry) => entry.text)).toEqual([
+      'Option refused: unaffordable (coins: need 20, have 10).',
+    ]);
+  });
+
+  it('resolves a surfaced option that became affordable since the draw', () => {
+    const { system, state } = setup();
+    state.coins = 100;
+
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-late' }), {
+      label: 'Now affordable',
+      effectPolicy: 'skip',
+      cost: { coins: 20 },
+      affordability: {
+        affordable: false,
+        shortfall: [{ key: 'coins', required: 20, available: 10 }],
+      },
+    });
+
+    expect(res.refusal).toBeUndefined();
+    expect(state.coins).toBe(80);
+    expect(res.coinChange).toBe(-20);
+    expect(state.activityLog.map((entry) => entry.text)).toEqual([
+      'Cost paid: -20 coins.',
+    ]);
+  });
+
+  it('leaves an option with no attached affordability state exactly as before', () => {
+    const { system, state } = setup();
+    state.coins = 1;
+
+    // Under the default 'omit' policy nothing is attached, so resolution keeps
+    // its shipped behaviour (the presenter is what withheld the option).
+    const res = system.resolveStorylineOption(state, makeCard({ id: 'evt-unattached' }), {
+      label: 'Unaffordable but unattached',
+      effectPolicy: 'skip',
+      cost: { coins: 2 },
+    });
+
+    expect(res.refusal).toBeUndefined();
+    expect(state.coins).toBe(-1);
+  });
+
+  it('refuses the option the surfaced system presented', () => {
+    const templates: TemplateMap = new Map();
+    const system = createStorylineSystem({
+      engine: makeAdapter(templates),
+      affordabilityPolicy: 'surface',
+    });
+    const state = makeState({ coins: 10 });
+    const card = makeCard({ id: 'evt-surfaced-pipeline' });
+    system.registerStorylineOptions('evt-surfaced-pipeline', [
+      { label: 'Dear', effectPolicy: 'skip', cost: { coins: 20 } },
+      { label: 'Free', effectPolicy: 'skip' },
+    ]);
+
+    const pending = system.createPendingStorylineChoice(card, state)!;
+    const [dear] = system.getPendingStorylineOptions(pending, state);
+    expect(dear.affordability).toEqual({
+      affordable: false,
+      shortfall: [{ key: 'coins', required: 20, available: 10 }],
+    });
+
+    const res = system.resolveStorylineOption(state, card, dear);
+
+    expect(res.refusal?.reason).toBe('unaffordable');
+    expect(state.coins).toBe(10);
+    // The affordable sibling still resolves unchanged.
+    const free = system.resolveStorylineOption(
+      state,
+      card,
+      system.getPendingStorylineOptions(pending, state)[1],
+    );
+    expect(free.refusal).toBeUndefined();
+  });
+});

@@ -43,7 +43,9 @@ import { resolveResourceKeys } from './resources';
 import { createDefaultStorylineUiAdapter } from './ui-adapter';
 import type {
   CompiledStoryline,
+  CompileStorylineOptions,
   PendingStorylineChoice,
+  StorylineAffordabilityPolicy,
   StorylineCard,
   StorylineEngineAdapter,
   StorylineJournalEntry,
@@ -55,18 +57,24 @@ import type {
 
 // ── Public types ────────────────────────────────────────────
 export type {
+  CompileStorylineOptions,
   CompiledStoryline,
   Condition,
   ConditionalSuccessorRule,
+  OptionAffordability,
   OptionCost,
   OptionExtraEffect,
+  OptionShortfall,
   PendingStorylineChoice,
+  StorylineAffordabilityPolicy,
   StorylineCard,
   StorylineEngineAdapter,
   StorylineJournalEntry,
   StorylineLogEntry,
   StorylineOption,
   StorylineResolution,
+  StorylineResolutionRefusal,
+  StorylineResolutionRefusalReason,
   StorylineSystem,
   StorylineUiAdapter,
 } from './types';
@@ -144,6 +152,7 @@ export {
   createStorylineOptionRegistry,
   eventHasStoryline,
   isOptionAffordable,
+  optionAffordability,
 } from './compile';
 export type { StorylineOptionRegistry } from './compile';
 
@@ -211,6 +220,15 @@ export interface StorylineSystemConfig<
    * (dialog titles, story-update lines, journal).
    */
   ui?: StorylineUiAdapter<TCard>;
+  /**
+   * How draw-time affordability treats an option the player cannot afford.
+   *
+   * Defaults to `'omit'` — the shipped behaviour, where an unaffordable option
+   * is deleted from the presented list. Set `'surface'` to keep every
+   * condition-passing option with its computed `affordability` attached so a
+   * presenter can show it disabled with its shortfall.
+   */
+  affordabilityPolicy?: StorylineAffordabilityPolicy;
 }
 
 /**
@@ -230,6 +248,8 @@ export function createStorylineSystem<
   const ui =
     config.ui ?? createDefaultStorylineUiAdapter<TCard>();
   const declaredResources = resolveResourceKeys(engine.resources);
+  const affordabilityPolicy: StorylineAffordabilityPolicy =
+    config.affordabilityPolicy ?? 'omit';
   const registry = createStorylineOptionRegistry<TState>((id) =>
     engine.getBaseTypeId(id),
   );
@@ -237,6 +257,7 @@ export function createStorylineSystem<
   const compile = (
     card: TCard,
     state?: TState,
+    compileOptions?: CompileStorylineOptions,
   ): CompiledStoryline<TState> =>
     compileStorylineFromEvent(
       card,
@@ -244,6 +265,10 @@ export function createStorylineSystem<
       state,
       (s) => engine.getResources(s),
       declaredResources,
+      {
+        affordabilityPolicy:
+          compileOptions?.affordabilityPolicy ?? affordabilityPolicy,
+      },
     );
 
   const getStorylineOptions = (
@@ -255,6 +280,7 @@ export function createStorylineSystem<
     engine,
     ui,
     resources: declaredResources,
+    affordabilityPolicy,
 
     // ── Compilation ───────────────────────────────────────────
     compileStorylineFromEvent: compile,

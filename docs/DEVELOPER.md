@@ -1803,7 +1803,7 @@ cell, and `#when` repeats for an ordered rule list:
 
 | Attribute | Authored example | Meaning |
 |---|---|---|
-| `#cost` | `#cost=stores:1,goodwill:1` | Affordability gate + real payment at resolution (the presenting layer filters with `isOptionAffordable`; the Long Erasure run does). |
+| `#cost` | `#cost=stores:1,goodwill:1` | Affordability gate + real payment at resolution (the presenting layer filters with `isOptionAffordable`; the Long Erasure run does). A game that wants the door **shown disabled with its price** sets `affordabilityPolicy: 'surface'` on `createStorylineSystem` (or passes `{ affordabilityPolicy: 'surface' }` to one compile): every option is kept with a computed `affordability` shortfall, and resolution refuses it until it is paid. |
 | `#extra` | `#extra=morale:+2` | Resource gain applied on resolution. |
 | `#when` | `#when=charge>=2>le-iii-ahead` | Ordered conditional successor rule (first match wins; empty successor ends the chain). |
 
@@ -1825,7 +1825,9 @@ writer iterates without reading engine code. The author CLI accepts the same fie
 
 All of it is documented in
 [Core: Generic Story-Line System → Authoring options in CSV](core-engine/story-line.md#authoring-options-in-csv)
-(grammar, worked example, diagnostics).
+(grammar, worked example, diagnostics), and the surfaced-affordability policy
+(requirement objects, the refusal guarantee) in
+[→ Surfaced affordability](core-engine/story-line.md#surfaced-affordability-the-requirement-object).
 
 ### Authoring prose in CSV
 
