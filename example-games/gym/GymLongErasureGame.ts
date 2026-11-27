@@ -29,8 +29,9 @@
  *
  * ## Pressure clock (soft / hard failure)
  *
- * Every beat costs the entered card's `clockCost`. The clock is **soft at the
- * boundary and hard beyond it**:
+ * Every beat costs the entered card's `clockCost`, read from the episode
+ * manifest's `beat.clockCost` (the authoritative pacing home — the retired CSV
+ * column is gone). The clock is **soft at the boundary and hard beyond it**:
  *
  * - A beat whose cost **exactly equals** the remaining clock is payable — the
  *   run continues with `0` remaining ("the last tick").
@@ -194,11 +195,17 @@ export type LongErasureOutcome = 'reset' | 'expired' | 'closed';
 /** Lifecycle of a run: it is either playing or complete. */
 export type LongErasureStatus = 'playing' | 'complete';
 
-/** A single narrative beat, as authored in the content CSV. */
+/** A single narrative beat, as authored in the content CSV and its episode manifest. */
 export interface LongErasureCard extends StorylineCard {
-  /** The act the beat belongs to. */
+  /**
+   * The act the beat belongs to.
+   *
+   * Read from the episode manifest (`acts[].scenes[].beats[]`), never from a
+   * CSV cell: an `Ending` card is terminal, and every other label is the act's
+   * manifest `order` (1 → `I`, 2 → `II`, 3 → `III`).
+   */
   readonly act: LongErasureAct;
-  /** Clock consumed when the beat is entered. */
+  /** Clock consumed when the beat is entered, from the manifest's `beat.clockCost`. */
   readonly clockCost: number;
   /**
    * The beat's situation paragraph — the authored `context` column, verbatim
@@ -355,33 +362,126 @@ const ACT_RANK: Readonly<Record<LongErasureAct, number>> = {
   Ending: 3,
 };
 
-/** Narrows raw CSV text to a known act, throwing on an unknown label. */
-function parseAct(cardId: string, raw: string | undefined): LongErasureAct {
-  const act = (raw ?? '').trim();
-  if (act === 'I' || act === 'II' || act === 'III' || act === 'Ending') {
-    return act;
+/** Narrows a manifest act's `order` to the spike's playable act label. */
+function actLabelOf(order: unknown): LongErasureAct {
+  if (typeof order === 'number' && Number.isInteger(order)) {
+    const label = LONG_ERASURE_ACTS[order - 1];
+    if (label !== undefined) return label;
   }
   throw new LongErasureError(
-    `Long Erasure content: card "${cardId}" declares unknown act "${act}" (expected I, II, III or Ending).`,
+    `Long Erasure content: the episode manifest declares an act order ${JSON.stringify(order)} ` +
+      `that no playable act covers (the episode has ${LONG_ERASURE_ACTS.length} acts, ordered 1..${LONG_ERASURE_ACTS.length}).`,
     'invalid-content',
   );
 }
 
-/** Parses a card's clock cost, throwing on a missing/negative value. */
-function parseClockCost(cardId: string, raw: string | undefined): number {
-  const text = (raw ?? '').trim();
-  const value = Number(text);
-  if (text === '' || !Number.isFinite(value) || value < 0) {
-    throw new LongErasureError(
-      `Long Erasure content: card "${cardId}" declares an invalid clockCost "${text}".`,
-      'invalid-content',
-    );
+/** Validates a manifest beat's clock cost, throwing on a missing/invalid value. */
+function parseManifestClockCost(cardId: string, raw: unknown): number {
+  if (typeof raw === 'number' && Number.isInteger(raw) && raw >= 0) return raw;
+  throw new LongErasureError(
+    `Long Erasure content: card "${cardId}" declares an invalid manifest clockCost "${String(raw)}" (expected an integer of at least 0).`,
+    'invalid-content',
+  );
+}
+
+/** One card's beat-sheet assignment, read from the episode manifest. */
+interface BeatAssignment {
+  readonly act: LongErasureAct;
+  readonly clockCost: number;
+}
+
+/**
+ * Indexes the episode manifest's act membership and pacing by card id.
+ *
+ * Act membership is the act whose `scenes[].beats[]` contains the card, labelled
+ * by the act's `order` (1 → `I`, 2 → `II`, 3 → `III`); every `endings[]` card is
+ * the terminal `Ending` act at zero clock. Act **membership** is the manifest's
+ * structure, never a per-card label, and pacing is `beat.clockCost` — the two
+ * retired CSV columns (G10, `CG-0MWR0BJXI007UINE`).
+ *
+ * A duplicate assignment is refused: the manifest validator already forbids a
+ * repeated `cardId`, so the loader fails closed rather than letting the last
+ * declaration win and silently change a beat's act or cost.
+ */
+function buildBeatAssignments(
+  episode: LongErasureEpisodeBeatSheet,
+): Map<string, BeatAssignment> {
+  const assignments = new Map<string, BeatAssignment>();
+  const assign = (cardId: string, assignment: BeatAssignment): void => {
+    if (assignments.has(cardId)) {
+      throw new LongErasureError(
+        `Long Erasure content: the episode manifest assigns card "${cardId}" more than once.`,
+        'invalid-content',
+      );
+    }
+    assignments.set(cardId, assignment);
+  };
+
+  for (const act of episode.acts) {
+    const actLabel = actLabelOf(act.order);
+    for (const scene of act.scenes) {
+      for (const beat of scene.beats) {
+        assign(beat.cardId, {
+          act: actLabel,
+          clockCost: parseManifestClockCost(beat.cardId, beat.clockCost),
+        });
+      }
+    }
   }
-  return value;
+  for (const endingId of episode.endings) {
+    assign(endingId, { act: 'Ending', clockCost: 0 });
+  }
+  return assignments;
+}
+
+/** One authored beat in the episode manifest's scene listing. */
+export interface LongErasureEpisodeBeat {
+  /** Identity and CSV card id, unique in the episode. */
+  readonly cardId: string;
+  /** Ticks charged when the beat is entered; integer >= 0. */
+  readonly clockCost: number;
+}
+
+/** One scene in the episode manifest's act listing. */
+export interface LongErasureEpisodeScene {
+  /** The scene's beat set, and therefore its boundary. */
+  readonly beats: readonly LongErasureEpisodeBeat[];
+}
+
+/** One act in the episode manifest's act listing. */
+export interface LongErasureEpisodeAct {
+  /** Integer >= 1; the only ordering authority (array order is not play order). */
+  readonly order: number;
+  /** The act's scenes, each carrying its beats. */
+  readonly scenes: readonly LongErasureEpisodeScene[];
+}
+
+/**
+ * The episode manifest slice the run reads for act membership and pacing.
+ *
+ * Structurally satisfied by the committed `long-erasure-episode.json`, so the
+ * scene passes the manifest it already imports. The slice is deliberately
+ * minimal: the run never reads the manifest's objectives, routes or resource
+ * blocks — those stay the episode runner's business.
+ */
+export interface LongErasureEpisodeBeatSheet {
+  /** Non-empty, ordered by `order`. */
+  readonly acts: readonly LongErasureEpisodeAct[];
+  /** Content card ids that finish a run; terminal `Ending` cards at zero clock. */
+  readonly endings: readonly string[];
 }
 
 /** Options controlling {@link longErasureContentFromCsv}. */
 export interface LongErasureContentOptions {
+  /**
+   * The committed episode manifest's act → scene → beat block — the
+   * authoritative home for act membership and pacing (GDD §2.1, G10).
+   *
+   * **Required.** A card the beat sheet does not assign is a loud
+   * `invalid-content` error, never an inferred default: the content file no
+   * longer carries `act` / `clockCost`, so the manifest is the only source.
+   */
+  readonly episode: LongErasureEpisodeBeatSheet;
   /**
    * The raw per-key bounds block to read (`{ hull: { min: 0, max: 5 }, … }`) —
    * normally the committed episode manifest's `resources.bounds`.
@@ -404,6 +504,12 @@ export interface LongErasureContentOptions {
  * resource set is the union of every card's `resources` column, preserving
  * declaration order.
  *
+ * Act membership and pacing come from `options.episode` — the episode
+ * manifest's act → scene → beat block (GDD §2.1, G10) — never from the content
+ * file: the `act` / `clockCost` columns are retired
+ * (`CG-0MWR0BJXI007UINE`). A card the beat sheet does not assign, a duplicated
+ * assignment, or a malformed beat cost is a loud `invalid-content` error.
+ *
  * When `options.bounds` supplies the committed manifest's `resources.bounds`,
  * every declared key must carry a usable `{ min, max }` range; the content then
  * carries those bounds into the run's resource projection, where a gain at the
@@ -411,15 +517,17 @@ export interface LongErasureContentOptions {
  *
  * @param csvText Raw content CSV (the `?raw` import in the scene, or
  *                `readFileSync` in tests).
- * @param options Optional per-key bounds to read (see
- *                {@link LongErasureContentOptions.bounds}).
+ * @param options The episode beat sheet to read act/pacing from, plus the
+ *                optional per-key bounds (see
+ *                {@link LongErasureContentOptions}).
  * @throws LongErasureError (`code: 'invalid-content'`) for empty content, a
- *         duplicate card id, an unknown act, an invalid clock cost, or bounds
- *         that do not cover every declared key.
+ *         duplicate card id, a card absent from the episode beat sheet, an
+ *         invalid manifest beat cost/act order, or bounds that do not cover
+ *         every declared key.
  */
 export function longErasureContentFromCsv(
   csvText: string,
-  options: LongErasureContentOptions = {},
+  options: LongErasureContentOptions,
 ): LongErasureContent {
   const contentCards = cardsFromCsv(
     parseCsv(csvText),
@@ -433,6 +541,7 @@ export function longErasureContentFromCsv(
     );
   }
 
+  const assignments = buildBeatAssignments(options.episode);
   const resources: string[] = [];
   const cards: LongErasureCard[] = [];
   const seen = new Set<string>();
@@ -446,6 +555,14 @@ export function longErasureContentFromCsv(
     }
     seen.add(card.id);
 
+    const assignment = assignments.get(card.id);
+    if (assignment === undefined) {
+      throw new LongErasureError(
+        `Long Erasure content: card "${card.id}" is not assigned to the episode manifest's beat sheet (act membership and pacing are manifest data, never an inferred default).`,
+        'invalid-content',
+      );
+    }
+
     for (const key of card.resourceKeys) {
       if (!resources.includes(key)) resources.push(key);
     }
@@ -457,8 +574,8 @@ export function longErasureContentFromCsv(
       options: card.options,
       storylineId: card.storylineId,
       storylineTitle: card.storylineTitle,
-      act: parseAct(card.id, card.fields.act),
-      clockCost: parseClockCost(card.id, card.fields.clockCost),
+      act: assignment.act,
+      clockCost: assignment.clockCost,
       // Authored prose is optional: a blank cell (or an adapter with no prose
       // column) reads as `null`, never `''`, so "no prose" is one shape.
       context: card.context ?? null,

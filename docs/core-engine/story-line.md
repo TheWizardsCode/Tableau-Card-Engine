@@ -484,7 +484,7 @@ applied only when the file declares nothing.
 (record 2, quoted verbatim):
 
 ```csv
-le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge","The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
 ```
 
 Its `options` cell compiles to:
@@ -560,7 +560,7 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
   gameId: 'long-erasure',
   columns: [
     'id', 'name', 'effect', 'options', 'storylineId', 'storylineTitle',
-    'resources', 'act', 'clockCost', 'context', 'epilogue',
+    'resources', 'context', 'epilogue',
   ],
   fields: {
     id: 'id',
@@ -591,8 +591,12 @@ no-prose parity promise is pinned by
 Erasure* header:
 
 ```csv
-id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue
+id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue
 ```
+
+Act membership and pacing are **not** columns: the episode manifest's
+`acts[].scenes[].beats[]` (membership) and `beat.clockCost` (pacing) are the
+authoritative source (G10 retired the legacy `act` / `clockCost` columns).
 
 A beat with its `context` and both of its options' `#says` values (record 2 of
 [`storylines.csv`](../../example-games/gym/content/storylines.csv)):
@@ -605,7 +609,7 @@ A terminal card carrying its `epilogue` (record 17 of
 [`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)):
 
 ```csv
-le-end-abandon,The Voyage Abandoned,You turn for home and the erasure follows you there.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,0,"You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.","The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left."
+le-end-abandon,The Voyage Abandoned,You turn for home and the erasure follows you there.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge","You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.","The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left."
 ```
 
 #### Escape policy (`#says` only)
@@ -890,8 +894,9 @@ Core ships two adapters: `GYM_CONTENT_ADAPTER` (the default, backed by the
 committed
 [`storylines.csv`](../../example-games/gym/content/storylines.csv)) and
 `LONG_ERASURE_CONTENT_ADAPTER` (backed by
-[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv), whose
-`act` / `clockCost` columns drive the spike scene). `DEFAULT_CONTENT_FILES`
+[`long-erasure.csv`](../../example-games/gym/content/long-erasure.csv); the
+spike scene resolves act membership and pacing from the episode manifest, not
+from CSV columns). `DEFAULT_CONTENT_FILES`
 registers both, so the CLIs validate and drift-check every shipped content
 file, not only the default one. Tests additionally exercise a differently
 shaped fixture adapter, proving the seam is not shaped around one game.
@@ -2190,7 +2195,10 @@ spike's evidence is the
 Its content is
 [`example-games/gym/content/long-erasure.csv`](../../example-games/gym/content/long-erasure.csv)
 with the `long-erasure` adapter: a five-key declared set
-(`hull,morale,stores,goodwill,charge`) plus `act` / `clockCost` game columns.
+(`hull,morale,stores,goodwill,charge`) plus the optional `context` / `epilogue`
+prose columns. Act membership and pacing come from the episode manifest
+(`long-erasure-episode.json`), not from CSV columns — the legacy
+`act` / `clockCost` columns retired in G10.
 Every cost, extra effect and conditional successor in that file is authored in
 CSV with no TypeScript registration — the worked example above is a row from
 it. The run ends with a timeline reset and a scored epilogue, which is the

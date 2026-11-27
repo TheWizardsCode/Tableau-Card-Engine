@@ -1,21 +1,19 @@
 /**
- * Episode manifest legacy clock-cost migration rule (CG-0MWSJYS20005CBQ5).
+ * Episode manifest legacy clock-cost migration rule — **retired** (G10,
+ * `CG-0MWR0BJXI007UINE`; rule delivered by `CG-0MWSJYS20005CBQ5`).
  *
- * While the Long Erasure spike still carries a per-card `clockCost` CSV column,
- * a beat's authoritative `clockCost` in the manifest must agree with that cell:
- * a one-tick disagreement is enough to desynchronise the pressure clock, so
- * `clock-cost-mismatch` refuses it at review time.
+ * The rule compared a beat's authoritative `clockCost` in the episode manifest
+ * with the legacy per-card `clockCost` CSV cell while both existed. G10 retired
+ * that column: `LONG_ERASURE_CONTENT_ADAPTER` no longer declares it, pacing is
+ * manifest-only, and `beat.clockCost` is the single authoritative cost.
  *
- * The rule is **migration-only**. The column is a game column, not a story-line
- * field mapping, so the validator resolves its name from the adapter's declared
- * columns and reads the raw cell from `ContentCard.fields`; it never treats the
- * cell as a beat's cost. Removing the column from the adapter (G10,
- * `CG-0MWR0BJXI007UINE`) therefore switches the rule off as a data change.
- *
- * The committed `fixtures/story-line/clock-cost-drift.csv` carries every card
- * the Appendix A episode references (with blank option cells, so no other
- * content rule has anything to say) and exactly one cell one tick off its beat.
- * The clean control is the shipped `long-erasure.csv`, whose cells all agree.
+ * The rule is deliberately **kept** as a documented, permanently-green no-op
+ * rather than deleted: its code stays part of the §2.4 union and the predicate
+ * is the retirement's audit trail (a reintroduced column reactivates the same
+ * one-tick-agreement check with no new machinery). This suite is the "no
+ * column, no rule" half of that contract — the half the original migration
+ * item promised would stay green. It is **not** extended into a general
+ * legacy-column mechanism.
  *
  * @module
  */
@@ -27,10 +25,10 @@ import { describe, expect, it } from 'vitest';
 import { LONG_ERASURE_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
 import { cardsFromCsv, parseCsv } from '../../../src/story-line/content/csv';
 import {
+  EPISODE_MANIFEST_ISSUE_CODES,
   episodeManifestValidationToJson,
   formatEpisodeManifestReport,
   validateEpisodeManifest,
-  type EpisodeManifestFinding,
   type EpisodeManifestValidationResult,
 } from '../../../src/story-line/content/episode-manifest';
 import {
@@ -40,33 +38,18 @@ import {
 } from '../../../src/story-line/content/types';
 import { REPO_ROOT } from './test-support';
 
-/** The committed Appendix A manifest — the clean control and fixture base. */
+/** The committed Appendix A manifest. */
 const REFERENCE_PATH = resolve(REPO_ROOT, 'example-games/gym/content/long-erasure-episode.json');
 
-/** The shipped story-line content, whose `clockCost` cells agree with the manifest. */
+/** The shipped story-line content (no legacy columns). */
 const CONTENT_PATH = resolve(REPO_ROOT, 'example-games/gym/content/long-erasure.csv');
 
-/** The committed one-tick drift fixture. */
-const DRIFT_PATH = resolve(REPO_ROOT, 'tests/fixtures/story-line/clock-cost-drift.csv');
-
-/** The path of the single drifted beat (`le-i-log`, manifest cost 1). */
-const DRIFT_PATH_IN_MANIFEST = 'acts[0].scenes[0].beats[1].clockCost';
-
-/** The manifest slice the fixture test reads (acts → scenes → beats). */
-interface ActLike {
-  readonly scenes: ReadonlyArray<{
-    readonly beats: ReadonlyArray<{ readonly clockCost: number }>;
-  }>;
-}
+/** The migrated former drift fixture (also no legacy columns). */
+const MIGRATED_FIXTURE_PATH = resolve(REPO_ROOT, 'tests/fixtures/story-line/clock-cost-drift.csv');
 
 /** Reads and parses a JSON file. */
 function readJson(path: string): Record<string, unknown> {
   return JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
-}
-
-/** The reference manifest as a fresh mutable copy. */
-function reference(): Record<string, unknown> {
-  return readJson(REFERENCE_PATH);
 }
 
 /** Parses a CSV file into content cards through the Long Erasure adapter. */
@@ -84,7 +67,7 @@ function declaredResourcesOf(manifest: Record<string, unknown>): readonly string
 function validate(
   cards: readonly ContentCard[],
   adapter: ContentAdapter = LONG_ERASURE_CONTENT_ADAPTER,
-  manifest: Record<string, unknown> = reference(),
+  manifest: Record<string, unknown> = readJson(REFERENCE_PATH),
 ): EpisodeManifestValidationResult {
   return validateEpisodeManifest(manifest, cards, declaredResourcesOf(manifest), adapter);
 }
@@ -94,167 +77,60 @@ function pairs(result: EpisodeManifestValidationResult): string[] {
   return result.findings.map((finding) => `${finding.code}@${finding.path}`);
 }
 
-/** The finding with the given code and path, or `undefined`. */
-function findingAt(
-  result: EpisodeManifestValidationResult,
-  path: string,
-): EpisodeManifestFinding | undefined {
-  return result.findings.find(
-    (finding) => finding.code === 'clock-cost-mismatch' && finding.path === path,
-  );
-}
-
-/** A copy of the cards with one card's legacy `clockCost` cell replaced. */
-function withClockCost(
-  cards: readonly ContentCard[],
-  cardId: string,
-  value: string,
-): ContentCard[] {
-  return cards.map((card) =>
-    card.id === cardId ? { ...card, fields: { ...card.fields, clockCost: value } } : card,
-  );
-}
-
-/** A copy of the cards with the legacy column removed from every raw row. */
-function withoutClockCostColumn(cards: readonly ContentCard[]): ContentCard[] {
-  return cards.map((card) => {
-    const fields = { ...card.fields };
-    delete fields.clockCost;
-    return { ...card, fields };
+describe('retirement — the adapter no longer declares the legacy column', () => {
+  it('leaves the code declared in the §2.4 union as the documented no-op', () => {
+    // The rule's vocabulary survives; only its activation data is gone.
+    expect([...EPISODE_MANIFEST_ISSUE_CODES]).toContain('clock-cost-mismatch');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).not.toContain(LEGACY_CLOCK_COST_COLUMN);
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).not.toContain('act');
   });
-}
 
-describe('clean control — the shipped content agrees with the manifest', () => {
-  it('reports no findings and runs the migration rule', () => {
+  it('reports no findings and does not list the rule as run', () => {
     const result = validate(cardsFrom(CONTENT_PATH));
-    expect(pairs(result)).toEqual([]);
-    expect(result.valid).toBe(true);
-    expect(result.rules).toContain('clock-cost-mismatch');
-  });
-
-  it('resolves the column name from the adapter, not a story-line field mapping', () => {
-    // The legacy column is a game column: declared as a file column and left
-    // unmapped, so the rule reads it from the raw ContentCard row.
-    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).toContain(LEGACY_CLOCK_COST_COLUMN);
-    expect(Object.values(LONG_ERASURE_CONTENT_ADAPTER.fields)).not.toContain(
-      LEGACY_CLOCK_COST_COLUMN,
-    );
-    const [first] = cardsFrom(CONTENT_PATH);
-    expect(first?.fields[LEGACY_CLOCK_COST_COLUMN]).toBe('1');
-  });
-});
-
-describe('the committed one-tick drift fixture', () => {
-  it('reports exactly clock-cost-mismatch at the drifted beat', () => {
-    const result = validate(cardsFrom(DRIFT_PATH));
-    expect(pairs(result)).toEqual([`clock-cost-mismatch@${DRIFT_PATH_IN_MANIFEST}`]);
-    expect(result.valid).toBe(false);
-  });
-
-  it('quotes both values in the finding message', () => {
-    const finding = findingAt(validate(cardsFrom(DRIFT_PATH)), DRIFT_PATH_IN_MANIFEST);
-    expect(finding).toBeDefined();
-    // The manifest's 1 and the fixture's "2" are both named, so a reviewer can
-    // see the one-tick disagreement without opening either file.
-    expect(finding?.message).toContain('clockCost 1');
-    expect(finding?.message).toContain('"2"');
-    expect(finding?.message).toContain('le-i-log');
-  });
-});
-
-describe('any disagreement, one finding per beat', () => {
-  it('reports one finding for each mismatched beat, however large the gap', () => {
-    const cards = withClockCost(
-      withClockCost(cardsFrom(CONTENT_PATH), 'le-i-open', '4'),
-      'le-ii-keep',
-      '0',
-    );
-    const result = validate(cards);
-    expect(pairs(result)).toEqual([
-      'clock-cost-mismatch@acts[0].scenes[0].beats[0].clockCost',
-      'clock-cost-mismatch@acts[1].scenes[1].beats[3].clockCost',
-    ]);
-  });
-
-  it('does not report a beat whose raw cell carries no value to compare', () => {
-    const cards = withClockCost(cardsFrom(CONTENT_PATH), 'le-i-open', '  ');
-    expect(pairs(validate(cards))).toEqual([]);
-  });
-});
-
-describe('retiring the column (G10) switches the rule off without a code change', () => {
-  /** The adapter shape G10 leaves behind: the legacy column is not declared. */
-  const G10_ADAPTER: ContentAdapter = {
-    ...LONG_ERASURE_CONTENT_ADAPTER,
-    columns: LONG_ERASURE_CONTENT_ADAPTER.columns.filter(
-      (column) => column !== LEGACY_CLOCK_COST_COLUMN,
-    ),
-    editableColumns: LONG_ERASURE_CONTENT_ADAPTER.editableColumns?.filter(
-      (column) => column !== LEGACY_CLOCK_COST_COLUMN,
-    ),
-    newCardDefaults: Object.fromEntries(
-      Object.entries(LONG_ERASURE_CONTENT_ADAPTER.newCardDefaults ?? {}).filter(
-        ([column]) => column !== LEGACY_CLOCK_COST_COLUMN,
-      ),
-    ),
-  };
-
-  it('is silent, and not listed as run, once no adapter declares the column', () => {
-    const result = validate(withoutClockCostColumn(cardsFrom(CONTENT_PATH)), G10_ADAPTER);
     expect(pairs(result)).toEqual([]);
     expect(result.valid).toBe(true);
     expect(result.rules).not.toContain('clock-cost-mismatch');
   });
 
-  it('stays silent when a file lacks the column but its adapter still declares it', () => {
-    // The declaration is the rule's activation data; an absent cell is simply
-    // nothing to compare, never an error.
-    const result = validate(withoutClockCostColumn(cardsFrom(CONTENT_PATH)));
+  it('stays a no-op even when a raw row synthetically carries a disagreeing cell', () => {
+    // The adapter's declaration is the activation data. A row that still
+    // carried `clockCost` (an old file, a hand-edited cell) has nothing to
+    // compare against, so the retired rule is silent by construction.
+    const withLegacyCells = cardsFrom(CONTENT_PATH).map((card) => ({
+      ...card,
+      fields: { ...card.fields, [LEGACY_CLOCK_COST_COLUMN]: '99' },
+    }));
+    const result = validate(withLegacyCells);
     expect(pairs(result)).toEqual([]);
-    expect(result.valid).toBe(true);
+    expect(result.rules).not.toContain('clock-cost-mismatch');
+  });
+
+  it('stays a no-op for a content file that never declared the column', () => {
+    const result = validate(cardsFrom(MIGRATED_FIXTURE_PATH));
+    expect(pairs(result)).toEqual([]);
+    expect(result.rules).not.toContain('clock-cost-mismatch');
+    const header = parseCsv(readFileSync(MIGRATED_FIXTURE_PATH, 'utf-8')).header;
+    expect(header).not.toContain(LEGACY_CLOCK_COST_COLUMN);
+    expect(header).not.toContain('act');
   });
 
   it('does not run the rule when no content is bound', () => {
-    const result = validateEpisodeManifest(reference());
+    const result = validateEpisodeManifest(readJson(REFERENCE_PATH));
     expect(result.rules).not.toContain('clock-cost-mismatch');
   });
 });
 
 describe('the reports', () => {
-  it('renders the drift finding in both the text and JSON reports', () => {
-    const result = validate(cardsFrom(DRIFT_PATH));
-    expect(formatEpisodeManifestReport(result)).toContain(
-      `✗ [clock-cost-mismatch] ${DRIFT_PATH_IN_MANIFEST}:`,
-    );
+  it('agree on a clean result and never mention the retired rule', () => {
+    const result = validate(cardsFrom(CONTENT_PATH));
+    const text = formatEpisodeManifestReport(result);
+    expect(text).toContain('RESULT: VALID');
+    expect(text).not.toContain('clock-cost-mismatch');
     const parsed = JSON.parse(episodeManifestValidationToJson(result)) as {
-      findings: EpisodeManifestFinding[];
+      findings: unknown[];
+      rules: string[];
     };
-    expect(parsed.findings).toHaveLength(1);
-    expect(parsed.findings[0]?.code).toBe('clock-cost-mismatch');
-    expect(parsed.findings[0]?.manifestId).toBe('long-erasure');
-  });
-});
-
-/** The legacy clock-cost cells of the drift fixture, in file order. */
-function driftCells(): string[] {
-  const parsed = parseCsv(readFileSync(DRIFT_PATH, 'utf-8'));
-  const index = parsed.header.indexOf(LEGACY_CLOCK_COST_COLUMN);
-  return parsed.rows.map((row) => row[index] ?? '');
-}
-
-describe('the fixture itself', () => {
-  it('carries the legacy column and one cell one tick off the manifest', () => {
-    expect(parseCsv(readFileSync(DRIFT_PATH, 'utf-8')).header).toContain(
-      LEGACY_CLOCK_COST_COLUMN,
-    );
-    const expected = (reference().acts as ActLike[]).flatMap((act) =>
-      act.scenes.flatMap((scene) => scene.beats.map((beat) => String(beat.clockCost))),
-    );
-    const drifts = expected.flatMap((cost, position) =>
-      driftCells()[position] === cost
-        ? []
-        : [{ position, expected: cost, actual: driftCells()[position] }],
-    );
-    expect(drifts).toEqual([{ position: 1, expected: '1', actual: '2' }]);
+    expect(parsed.findings).toEqual([]);
+    expect(parsed.rules).not.toContain('clock-cost-mismatch');
   });
 });

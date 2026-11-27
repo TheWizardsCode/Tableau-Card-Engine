@@ -50,7 +50,31 @@ const AUTHORED_EPILOGUE =
 
 /** Column shape of the Long Erasure content, with prose authored. */
 const PROSE_HEADER =
-  'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue';
+  'id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue';
+
+/**
+ * The fixture's episode beat sheet.
+ *
+ * Act membership and pacing are manifest data (G10 retired the CSV columns),
+ * so the in-browser fixture carries its own minimal manifest slice.
+ */
+const PROSE_EPISODE = {
+  acts: [
+    { order: 1, scenes: [{ beats: [{ cardId: 'le-t-open', clockCost: 1 }] }] },
+    {
+      order: 2,
+      scenes: [
+        {
+          beats: [
+            { cardId: 'le-t-log', clockCost: 1 },
+            { cardId: 'le-t-rally', clockCost: 1 },
+          ],
+        },
+      ],
+    },
+  ],
+  endings: ['le-t-end'],
+};
 
 /**
  * Builds a small playable Long Erasure content file.
@@ -72,10 +96,10 @@ function proseCsv(options: {
 
   return [
     PROSE_HEADER,
-    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log#says=${outcome};Rally the crew|le-t-rally#says=You raise your voice.",long-erasure,The Long Erasure,${resources},I,1,"${context}",`,
-    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end#says=The hatch seals behind you.",long-erasure,The Long Erasure,${resources},II,1,,"${epilogue}"`,
-    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
-    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},Ending,1,,"${epilogue}"`,
+    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log#says=${outcome};Rally the crew|le-t-rally#says=You raise your voice.",long-erasure,The Long Erasure,${resources},"${context}",`,
+    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end#says=The hatch seals behind you.",long-erasure,The Long Erasure,${resources},,"${epilogue}"`,
+    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},,`,
+    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},,"${epilogue}"`,
   ].join('\n');
 }
 
@@ -84,10 +108,10 @@ function bareCsv(): string {
   const resources = '"hull,morale,stores,goodwill,charge"';
   return [
     PROSE_HEADER,
-    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log;Rally the crew|le-t-rally",long-erasure,The Long Erasure,${resources},I,1,,`,
-    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
-    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},II,1,,`,
-    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},Ending,1,,`,
+    `le-t-open,The First Unwriting,An opening happens.,"Log the erasure|le-t-log;Rally the crew|le-t-rally",long-erasure,The Long Erasure,${resources},,`,
+    `le-t-log,The Gauge,The gauge reads zero.,"Seal the hatch|le-t-end",long-erasure,The Long Erasure,${resources},,`,
+    `le-t-rally,The Rally,Voices in the dark.,"Follow them|le-t-end",long-erasure,The Long Erasure,${resources},,`,
+    `le-t-end,Morning,The loom stops.,,long-erasure,The Long Erasure,${resources},,`,
   ].join('\n');
 }
 
@@ -149,7 +173,9 @@ describe('GymLongErasureScene browser test', () => {
 
   async function bootScene(csv?: string): Promise<GymLongErasureScene> {
     setLongErasureSceneContent(
-      csv === undefined ? null : longErasureContentFromCsv(csv),
+      csv === undefined
+        ? null
+        : longErasureContentFromCsv(csv, { episode: PROSE_EPISODE }),
     );
 
     const container = document.createElement('div');

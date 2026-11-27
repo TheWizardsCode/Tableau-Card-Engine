@@ -50,6 +50,7 @@ import { buildStorylineManifestFromCsv } from '../../src/story-line/content/mani
 import { PROSE_FIELD_SPECS } from '../../src/story-line/content/prose';
 import type { ContentCard } from '../../src/story-line/content/types';
 import type { StorylineOption } from '../../src/story-line/types';
+import { longErasureContentFromCsv } from '../../example-games/gym/GymLongErasureGame';
 
 /** Repository root, resolved from this file rather than `process.cwd()`. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -60,6 +61,9 @@ const CONTENT_PATH = LONG_ERASURE_CONTENT_PATH;
 /** The pre-rewrite mechanics baseline captured before any prose was authored. */
 const BASELINE_PATH =
   'tests/fixtures/story-line/prose/long-erasure-mechanics-baseline.json';
+
+/** The committed episode manifest: the authoritative act/pacing beat sheet. */
+const EPISODE_MANIFEST_PATH = 'example-games/gym/content/long-erasure-episode.json';
 
 /** Reads a repository-relative UTF-8 file. */
 function readRepoFile(relativePath: string): string {
@@ -89,15 +93,28 @@ const CARDS: readonly ContentCard[] = cardsFromCsv(
 const CARD_BY_ID = new Map(CARDS.map((card) => [card.id, card]));
 const ENTRY_ID = 'le-i-open';
 
+/**
+ * The content loaded through the run module, which resolves each card's act
+ * and clock cost from the episode manifest (the retired CSV columns are gone).
+ */
+const LOADED = longErasureContentFromCsv(CSV_TEXT, {
+  episode: JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
+    acts: {
+      order: number;
+      scenes: { beats: { cardId: string; clockCost: number }[] }[];
+    }[];
+    endings: string[];
+  },
+});
+const LOADED_BY_ID = new Map(LOADED.cards.map((card) => [card.id, card]));
+
 /** The compiled options of every card, keyed by card id. */
 const OPTIONS_BY_CARD = new Map<string, StorylineOption<unknown>[]>(
   CARDS.map((card) => [card.id, compileContentOptions(card)]),
 );
 
-/** The cards the content declares as endings. */
-const ENDING_CARDS = CARDS.filter(
-  (card) => (card.fields.act ?? '').trim() === 'Ending',
-);
+/** The cards the content declares as endings, via the episode manifest. */
+const ENDING_CARDS = LOADED.cards.filter((card) => card.act === 'Ending');
 
 interface BaselineOption {
   readonly label: string;
@@ -134,11 +151,13 @@ const BASELINE: Baseline = JSON.parse(readRepoFile(BASELINE_PATH)) as Baseline;
 
 /** The mechanics a card contributes, in the shape the baseline stores. */
 function mechanicsOf(card: ContentCard): BaselineCard {
+  const loaded = LOADED_BY_ID.get(card.id);
+  if (loaded === undefined) throw new Error(`card "${card.id}" was not loaded`);
   return {
     id: card.id,
     storylineId: card.storylineId,
-    act: (card.fields.act ?? '').trim(),
-    clockCost: Number((card.fields.clockCost ?? '').trim()),
+    act: loaded.act,
+    clockCost: loaded.clockCost,
     resourceKeys: [...card.resourceKeys],
     options: (OPTIONS_BY_CARD.get(card.id) ?? []).map((option) => ({
       label: option.label,

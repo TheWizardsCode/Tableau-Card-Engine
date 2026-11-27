@@ -13,7 +13,11 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { GYM_CONTENT_ADAPTER } from '../../../src/story-line/content/adapters';
+import {
+  GYM_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_ADAPTER,
+  LONG_ERASURE_CONTENT_PATH,
+} from '../../../src/story-line/content/adapters';
 import {
   addContentCard,
   addOptionToContentCard,
@@ -32,6 +36,7 @@ import { runStorylineAuthorCli } from '../../../scripts/storyline-author';
 import { PROSE_CONTENT_ADAPTER, TAVERN_CONTENT_ADAPTER } from './fixture-adapter';
 import {
   GYM_CONTENT_PATH,
+  REPO_ROOT,
   captureOutput,
   fixturePath,
   makeTempDir,
@@ -183,6 +188,24 @@ describe('addContentCard', () => {
     });
     expect(mapped.ok).toBe(false);
     expect(mapped.errors.join(' ')).toContain('mapped story-line column');
+  });
+
+  it('refuses the retired act / clockCost columns on the Long Erasure content', () => {
+    // G10 (CG-0MWR0BJXI007UINE): beat-sheet data lives in the episode manifest,
+    // so the authoring path must treat both names as unknown columns.
+    const csv = readText(join(REPO_ROOT, LONG_ERASURE_CONTENT_PATH));
+    expect(parseCsv(csv).header).not.toContain('act');
+    expect(parseCsv(csv).header).not.toContain('clockCost');
+
+    for (const column of ['act', 'clockCost'] as const) {
+      const result = updateContentCard(csv, LONG_ERASURE_CONTENT_ADAPTER, {
+        id: 'le-i-open',
+        fields: { [column]: 'II' },
+      });
+      expect(result.ok, `${column} write must be refused`).toBe(false);
+      expect(result.csv).toBe(csv);
+      expect(result.errors.join(' ')).toContain(`unknown content column "${column}"`);
+    }
   });
 
   it('refuses content that fails validation (dangling successor)', () => {

@@ -435,8 +435,9 @@ describe('the declared rule-code union', () => {
   it('declares every GDD §2.4 code, including the families later children implement', () => {
     // The union is declared in full here so a later rule family adds a
     // predicate, never a new code. `clock-cost-mismatch` is the migration-only
-    // rule that G10 retires with the legacy CSV column; it stays declared
-    // until then so the parent epic's migration rule has a home.
+    // rule G10 (`CG-0MWR0BJXI007UINE`) retired with the legacy CSV column; it
+    // stays declared as a documented, permanently-green no-op so the §2.4
+    // table and this union remain the same closed set.
     expect([...EPISODE_MANIFEST_ISSUE_CODES]).toEqual([
       'duplicate-act',
       'duplicate-scene',

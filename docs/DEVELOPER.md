@@ -1760,10 +1760,13 @@ nothing. The committed Gym artefacts (`example-games/gym/content/storyline-manif
 
 The Gym ships two content files: the original demo (`storylines.csv`, the
 `gym` adapter) and `long-erasure.csv` (the `long-erasure` adapter — the
-three-act story-line spike, with `act` / `clockCost` game columns and the
-`hull,morale,stores,goodwill,charge` declared resource set). The two files are
-independent: `long-erasure.csv` uses its own storyline id, so the shipped demo
-rows and their committed options-parity goldens are untouched.
+three-act story-line spike, with the `hull,morale,stores,goodwill,charge`
+declared resource set and optional `context` / `epilogue` prose columns). Act
+membership and pacing are **not** CSV columns: they come from the episode
+manifest (`long-erasure-episode.json`, `acts[].scenes[].beats[]` and
+`beat.clockCost`). The two files are independent: `long-erasure.csv` uses its
+own storyline id, so the shipped demo rows and their committed options-parity
+goldens are untouched.
 
 The full game design built on this toolkit is the *Long Erasure* GDD
 ([`docs/design/storyline-game-gdd.md`](design/storyline-game-gdd.md)): the
@@ -1810,7 +1813,7 @@ cell, and `#when` repeats for an ordered rule list:
 A real row from `long-erasure.csv` (record 2, quoted verbatim):
 
 ```csv
-le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,"The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
+le-i-open,The First Unwriting,A volume of space stops having happened and the ship's charts forget it with it.,"Log the erasure|le-i-log#cost=stores:1#says=You spend a store of paper and power writing down a volume that no longer exists. The log is exact, and the charts stay blank where it used to be.;Rally the survey crew|le-i-rally#extra=morale:1#says=You call the crew to the observation deck and name what you all just saw. They go back to their stations steadier than they left them.",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge","The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
 ```
 
 The `resources` column declares the keys a card's attributes may name

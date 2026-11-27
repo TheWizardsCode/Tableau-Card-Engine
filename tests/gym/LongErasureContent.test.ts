@@ -100,6 +100,26 @@ const MANIFEST = buildStorylineManifestFromCsv(
   LONG_ERASURE_CONTENT_ADAPTER,
 );
 
+/** The committed episode manifest (act membership, pacing and resource bounds). */
+const EPISODE_MANIFEST = JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
+  acts: {
+    order: number;
+    scenes: { beats: { cardId: string; clockCost: number }[] }[];
+  }[];
+  endings: string[];
+  resources: {
+    declared: string[];
+    bounds: Record<string, { min: number; max: number }>;
+  };
+};
+
+/**
+ * The content loaded through the run module: the only shape that carries an
+ * act and a clock cost now that both are manifest data (G10).
+ */
+const LOADED = longErasureContentFromCsv(CSV_TEXT, { episode: EPISODE_MANIFEST });
+const LOADED_BY_ID = new Map(LOADED.cards.map((card) => [card.id, card]));
+
 /** The compiled options of a card. */
 function optionsOf(id: string): StorylineOption<unknown>[] {
   const card = CARD_BY_ID.get(id);
@@ -144,9 +164,18 @@ function isBranchPoint(card: ContentCard): boolean {
   return distinctSuccessors(card.id).length >= 2;
 }
 
-/** The act a card declares. */
+/** The act a card belongs to, read from the episode manifest via the loader. */
 function actOf(card: ContentCard): string {
-  return (card.fields.act ?? '').trim();
+  const loaded = LOADED_BY_ID.get(card.id);
+  if (loaded === undefined) throw new Error(`card "${card.id}" was not loaded`);
+  return loaded.act;
+}
+
+/** The clock cost a card declares, read from the episode manifest. */
+function clockCostOf(card: ContentCard): number {
+  const loaded = LOADED_BY_ID.get(card.id);
+  if (loaded === undefined) throw new Error(`card "${card.id}" was not loaded`);
+  return loaded.clockCost;
 }
 
 /** Every authored card whose declared act is `act`. */
@@ -202,15 +231,21 @@ describe('The Long Erasure: authored content shape', () => {
     expect(MANIFEST.storylineIds).toEqual(['long-erasure']);
   });
 
-  it('declares the act of every card and a pressure-clock cost per beat', () => {
+  it('declares no `act` or `clockCost` column — both are manifest data (G10)', () => {
+    expect(parseCsv(CSV_TEXT).header).not.toContain('act');
+    expect(parseCsv(CSV_TEXT).header).not.toContain('clockCost');
+
+    // Act membership and pacing come from the episode manifest, and the
+    // values are the same ones the retired CSV cells carried: every authored
+    // beat costs clock, and an ending is terminal at zero.
     for (const card of CARDS) {
       const act = actOf(card);
       expect(
         [...ACTS, 'Ending'] as readonly string[],
-        `card "${card.id}" declares an unknown act`,
+        `card "${card.id}" resolves to an unknown act`,
       ).toContain(act);
 
-      const clockCost = Number((card.fields.clockCost ?? '').trim());
+      const clockCost = clockCostOf(card);
       expect(Number.isFinite(clockCost), `card "${card.id}" clockCost`).toBe(true);
 
       if (act === 'Ending') {
@@ -222,7 +257,7 @@ describe('The Long Erasure: authored content shape', () => {
 
     // The clock escalates: act III beats cost at least as much as act I beats.
     const maxClock = (act: string): number =>
-      Math.max(...cardsInAct(act).map((card) => Number(card.fields.clockCost)));
+      Math.max(...cardsInAct(act).map((card) => clockCostOf(card)));
     expect(maxClock('III')).toBeGreaterThanOrEqual(maxClock('I'));
     expect(maxClock('II')).toBeGreaterThanOrEqual(maxClock('I'));
   });
@@ -487,55 +522,68 @@ describe('The Long Erasure: IP guard', () => {
 });
 
 describe('Long Erasure content: resource bounds (GDD §2.8, G4)', () => {
-  /** The committed episode manifest, read as plain data. */
-  const episodeManifest = JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
-    resources: { declared: string[]; bounds: Record<string, { min: number; max: number }> };
-  };
+  /** The committed episode manifest's resource block. */
+  const episodeResources = EPISODE_MANIFEST.resources;
 
   it('reads every declared key’s bounds from the committed manifest', () => {
     const content = longErasureContentFromCsv(CSV_TEXT, {
-      bounds: episodeManifest.resources.bounds,
+      episode: EPISODE_MANIFEST,
+      bounds: episodeResources.bounds,
     });
 
     // The declared set and the bounded set are the same keys…
-    expect([...content.resources]).toEqual([...episodeManifest.resources.declared]);
+    expect([...content.resources]).toEqual([...episodeResources.declared]);
     // …and the ranges are the manifest's, never a hand-copied literal.
-    expect(content.bounds).toEqual(episodeManifest.resources.bounds);
+    expect(content.bounds).toEqual(episodeResources.bounds);
     expect(content.bounds.hull).toEqual({ min: 0, max: 5 });
     expect(content.bounds.charge).toEqual({ min: 0, max: 4 });
   });
 
-  it('declares no bounds when the content is loaded without a manifest', () => {
-    expect(longErasureContentFromCsv(CSV_TEXT).bounds).toEqual({});
+  it('declares no bounds when the content is loaded without a bounds block', () => {
+    expect(longErasureContentFromCsv(CSV_TEXT, { episode: EPISODE_MANIFEST }).bounds).toEqual(
+      {},
+    );
   });
 
   it('fails closed when the supplied bounds do not cover the declared keys', () => {
     expect(() =>
-      longErasureContentFromCsv(CSV_TEXT, { bounds: { hull: { min: 0, max: 5 } } }),
+      longErasureContentFromCsv(CSV_TEXT, {
+        episode: EPISODE_MANIFEST,
+        bounds: { hull: { min: 0, max: 5 } },
+      }),
     ).toThrowError(LongErasureError);
     expect(() =>
-      longErasureContentFromCsv(CSV_TEXT, { bounds: { hull: { min: 0, max: 5 } } }),
+      longErasureContentFromCsv(CSV_TEXT, {
+        episode: EPISODE_MANIFEST,
+        bounds: { hull: { min: 0, max: 5 } },
+      }),
     ).toThrowError(/missing-bounds-entry: morale/);
   });
 
   it('fails closed on an inverted range rather than normalising it', () => {
     const inverted = {
-      ...episodeManifest.resources.bounds,
+      ...episodeResources.bounds,
       stores: { min: 6, max: 0 },
     };
 
-    expect(() => longErasureContentFromCsv(CSV_TEXT, { bounds: inverted })).toThrowError(
-      /bounds-inverted: stores/,
-    );
+    expect(() =>
+      longErasureContentFromCsv(CSV_TEXT, {
+        episode: EPISODE_MANIFEST,
+        bounds: inverted,
+      }),
+    ).toThrowError(/bounds-inverted: stores/);
   });
 
   it('ignores a bounds entry for a key the content does not declare', () => {
     const extra = {
-      ...episodeManifest.resources.bounds,
+      ...episodeResources.bounds,
       shields: { min: 0, max: 3 },
     };
 
-    const content = longErasureContentFromCsv(CSV_TEXT, { bounds: extra });
+    const content = longErasureContentFromCsv(CSV_TEXT, {
+      episode: EPISODE_MANIFEST,
+      bounds: extra,
+    });
 
     expect(content.resources).not.toContain('shields');
     expect('shields' in content.bounds).toBe(false);

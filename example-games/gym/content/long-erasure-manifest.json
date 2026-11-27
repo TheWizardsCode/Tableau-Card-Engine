@@ -18,10 +18,7 @@
       "context": "You give the order to turn for home and the Ashlight comes about slowly, as though the hull has an opinion. The Unwriting does not pursue, which is worse, because it does not need to. Behind you the volume is still going out, edge first, and ahead of you is every berth you promised to come back for.",
       "epilogue": "The Ashlight reaches home berth with every certificate in order and no survey to show for it. The port authority thanks you for the quiet and asks you not to file the log until it has been reviewed. You wake some nights with the volume in your head exactly as it was, and then watch it go out edge first, taking the harbour with it. Home is still there in the morning. It is just not the home that was there when you left.",
       "impact": "",
-      "fields": {
-        "act": "Ending",
-        "clockCost": "0"
-      }
+      "fields": {}
     },
     {
       "id": "le-end-quiet",
@@ -35,10 +32,7 @@
       "context": "The Loom is unwritten and the room around you stops remembering. Its work stays done: the drowned homeland keeps its water, the berths stay erased, and the chart ends exactly where the chart ends. The Ashlight turns for home carrying a survey that agrees with itself and nothing else.",
       "epilogue": "The Loom is gone and its work stays done: the drowned homeland keeps its water and the erasures keep their silence. You file a survey that agrees with itself and nothing else, and the survey service accepts it without comment. Nobody ever raises the volume again, which is what winning looks like out here, a quiet chart, a full log, and a crew who will not talk about what they saw.",
       "impact": "",
-      "fields": {
-        "act": "Ending",
-        "clockCost": "0"
-      }
+      "fields": {}
     },
     {
       "id": "le-end-ram",
@@ -52,10 +46,7 @@
       "context": "You put the Ashlight's remaining hull into the core at full burn and the ship stops being a ship. The Loom comes apart around the impact, and every revision it held comes loose at once, filling the volume with versions of the world that cannot agree with one another.",
       "epilogue": "The Ashlight enters the core and stops being a ship, and the Loom fails around the impact. Somewhere in the wreckage there is a record with your hull number on it, and it will be the only salvage that matters in this volume for a hundred years. Nobody who reads it will know what you were refusing. The frame still turns, a little, in the shape the ship left in it.",
       "impact": "",
-      "fields": {
-        "act": "Ending",
-        "clockCost": "0"
-      }
+      "fields": {}
     },
     {
       "id": "le-end-reset",
@@ -77,10 +68,7 @@
       "context": "The Loom completes and the volume closes like a book being put away. The drowned homeland rises out of the record whole, streets, tide and names, and the Ashlight's survey is struck from every library that held it. You are the only thing left that remembers the room. If the story begins again it begins here, with a ship that has not yet learned why her charts are wrong.",
       "epilogue": "The timeline closes over the erasure like water over a stone, and the last thing to go is the sound of the Loom turning. The voyage survives only as a record that nobody will read, scored against an arc that no longer exists. Whatever the crew paid to reach the core, they paid it to a version of the world that has just been spared the knowing. The chart is whole. The survey never happened. You remember both.",
       "impact": "",
-      "fields": {
-        "act": "Ending",
-        "clockCost": "0"
-      }
+      "fields": {}
     },
     {
       "id": "le-i-log",
@@ -108,10 +96,7 @@
       "effect": "The log is a warning nobody has read and the Loom has already read it.",
       "context": "The log is finished, and it says what no survey manual covers: the volume ahead is being unwritten from its edges inward. Vane's Revision Loom reads every signal you broadcast, so a warning sent home also announces where the Ashlight is. The crew are waiting for the order, and the silence on the deep band has started to feel deliberate.",
       "impact": "",
-      "fields": {
-        "act": "I",
-        "clockCost": "1"
-      }
+      "fields": {}
     },
     {
       "id": "le-i-open",
@@ -139,10 +124,7 @@
       "effect": "A volume of space stops having happened and the ship's charts forget it with it.",
       "context": "The survey vessel Ashlight holds station at the edge of a volume that has stopped having happened, which the crew call the Unwriting. Your charts no longer agree with the stars ahead, and the mechanism behind it, the Revision Loom, is still turning past the last fix. Archivist Vane's voice arrives, polite and unhurried. Whatever is erased next, you must decide what the record is worth.",
       "impact": "",
-      "fields": {
-        "act": "I",
-        "clockCost": "1"
-      }
+      "fields": {}
     },
     {
       "id": "le-i-rally",
@@ -170,10 +152,7 @@
       "effect": "A crew member's home port never existed; they remember it anyway.",
       "context": "The crew are at the muster board, and a berth clerk from a station two sectors back cannot find their home port on any chart. It was not destroyed, it never was, and they remember the house, the street and the smell of the harbour. They are asking you which of those things is real. Half the crew are watching you instead of the board.",
       "impact": "",
-      "fields": {
-        "act": "I",
-        "clockCost": "1"
-      }
+      "fields": {}
     },
     {
       "id": "le-i-silent",
@@ -201,10 +180,7 @@
       "effect": "The survey continues and the crew stops asking about the berth that never was.",
       "context": "You chose silence, and the ship has settled into a working quiet. The chart is clean, the berth clerk has stopped asking, and the crew speak to one another in short, careful sentences. Ahead, the dead zone offers cover and the deeper volume offers answers, and the clock is not waiting for either.",
       "impact": "",
-      "fields": {
-        "act": "I",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-i-transmit",
@@ -232,10 +208,7 @@
       "effect": "The warning is answered by nobody who can still be answered.",
       "context": "Your transmission reaches three stations and each answers with static, a timestamp and no voice. One reply was relayed from a berth the crew now believe never existed. The Ashlight is close to the edge of the charted volume, where the Loom's carrier is strongest and the dark stops pretending to be empty.",
       "impact": "",
-      "fields": {
-        "act": "I",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-bargain",
@@ -263,10 +236,7 @@
       "effect": "The terms are a promise with a clause quietly removed.",
       "context": "Vane's terms arrive as a document: your ship survives, your crew survives, the Unwriting closes behind you, provided you stand down and let the weave finish. The second reading shows what the first one missed, the clause that defines who the weave excludes. The stores he promised are already aboard, and the crew are waiting to hear how you mean to honour a bargain you have not signed.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-derelict",
@@ -294,10 +264,7 @@
       "effect": "A hull with no crew and a full locker drifting since before the chart.",
       "context": "A hull drifts beside you that predates every chart in the library, unpowered, sealed, its locker still full. There is no name on the plate and no bodies inside, which is worse than finding either. Stripping it means cutting your own hull open to bridge the gap; leaving it means admitting you cannot afford to look.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-keep",
@@ -318,10 +285,7 @@
       "effect": "The bargain holds and the ship is spared something older is spent instead.",
       "context": "The bargain holds and the Ashlight is untouched, which is not the same as safe. Vane's weave is advancing through the volume behind you, spending something older than the crew's berths to pay for your survival. There is one way left into the story, and it is the thread he left you, and it is already warm on the hull.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "3"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-offer",
@@ -356,10 +320,7 @@
       "effect": "Vane offers the ship's survival for one more revision of the world.",
       "context": "Archivist Vane opens a channel from a room the Ashlight is not near and speaks as though you are already colleagues. He offers to strike the Unwriting from your hull and your crew's history, at the cost of one more revision somewhere you will never visit. Behind him the Revision Loom turns, and you can see what it is turning, and the crew are watching you decide.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-refuse",
@@ -387,10 +348,7 @@
       "effect": "The captain refuses Vane and the crew must choose what refusing costs.",
       "context": "Refusing Vane was the captain's decision and the crew did not get a vote. Half of them want to cut the channel and burn for home before the survey service calls it prudential; the other half want to finish what the Ashlight came for. Both halves are looking at you, and the deck has gone very quiet.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-sabotage",
@@ -419,10 +377,7 @@
       "effect": "A revision comes apart and the Loom's core is briefly unguarded.",
       "context": "The charge takes the Loom's frame apart in a slow bright way, and for a few minutes its core stands unguarded. Vane is shouting on a channel he has stopped caring who hears. You can break for the core before the weave closes over it, or follow the unravelling further in while it is still open, and the Ashlight has the fuel for exactly one of those.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "1"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-salvage",
@@ -450,10 +405,7 @@
       "effect": "The ally who guided you here asks only to keep their berth.",
       "context": "The salvage was guided by a free-hauler who has run this volume longer than the survey service has charted it, and they have come to collect on the favour. They ask for one berth in the locker before it is divided, which is a small thing, and the whole crew knows what a berth means out here now. The Loom's signal has been getting closer while you argue.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-ii-shelter",
@@ -481,10 +433,7 @@
       "effect": "Systems fail one at a time and the Loom's voice arrives on every band.",
       "context": "The dead zone is a bubble of old interference forty hours across, and the Ashlight is running dark inside it. Systems drop and come back one at a time, and the Loom's voice arrives on every band regardless, reciting coordinates in a patient voice. Two courses remain: ration what you have, or take what the drifting hull beside you is carrying.",
       "impact": "",
-      "fields": {
-        "act": "II",
-        "clockCost": "2"
-      }
+      "fields": {}
     },
     {
       "id": "le-iii-ahead",
@@ -512,10 +461,7 @@
       "effect": "The ship arrives before the revision closes and a charge is already spooling.",
       "context": "The Ashlight comes out of the tear ahead of the weave, close enough to the Loom that its frame fills the forward port. A charge is already spooling in the ship's own cells, and the core is a room away behind a door that is still remembering how to open. Set the charge properly, or spend the hull you have left and hit the core now.",
       "impact": "",
-      "fields": {
-        "act": "III",
-        "clockCost": "3"
-      }
+      "fields": {}
     },
     {
       "id": "le-iii-approach",
@@ -550,10 +496,7 @@
       "effect": "The Loom's core is a room that remembers every version of you.",
       "context": "The core is a room the size of a chapel, and it remembers every version of you that has ever walked in, including the ones that have not happened yet. Vane is not here; his work is. Three things can be done to it, and the Ashlight's clock, charge and hull decide which of them you can still afford.",
       "impact": "",
-      "fields": {
-        "act": "III",
-        "clockCost": "3"
-      }
+      "fields": {}
     }
   ],
   "edges": [

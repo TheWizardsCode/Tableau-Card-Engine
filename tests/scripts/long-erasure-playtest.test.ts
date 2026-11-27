@@ -62,6 +62,20 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 /** The authored content, loaded once through the module's own loader. */
 const CONTENT: LongErasureContent = longErasureContentFromCsv(
   readFileSync(join(REPO_ROOT, 'example-games/gym/content/long-erasure.csv'), 'utf-8'),
+  {
+    episode: JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, 'example-games/gym/content/long-erasure-episode.json'),
+        'utf-8',
+      ),
+    ) as {
+      acts: {
+        order: number;
+        scenes: { beats: { cardId: string; clockCost: number }[] }[];
+      }[];
+      endings: string[];
+    },
+  },
 );
 
 /** The cheapest complete route to the reset ending (the log's `reset-cheap`). */

@@ -7,9 +7,11 @@
  * CLI — so "the specification cannot drift from the tooling" is one green (or
  * red) signal:
  *
- * - **Completeness.** The GDD §2.4 rule table, the `EpisodeManifestIssueCode`
- *   union and the validator's `rules` list are the same set, so a rule can be
- *   neither silently dropped nor declared-but-never-run.
+ * - **Completeness.** The GDD §2.4 rule table and the
+ *   `EpisodeManifestIssueCode` union are the same set, so a rule code can be
+ *   neither silently dropped nor declared-but-never-run. A bound validation
+ *   runs every **durable** rule; the retired `clock-cost-mismatch` code stays
+ *   in the table/union as a documented no-op and is asserted to stay inactive.
  * - **Clean control.** The committed Appendix A manifest bound to the shipped
  *   `long-erasure.csv` reports `valid: true` with zero findings, directly and
  *   through the CLI (exit 0).
@@ -26,10 +28,12 @@
  *   table, so no rule can pass its own unit test while being unreachable from
  *   the command line.
  *
- * **Rule count.** The GDD §2.4 table carries **sixteen** codes, not the
- * fifteen the work item's acceptance criterion quotes: fifteen durable design
- * rules plus the migration-only `clock-cost-mismatch` that G10
- * (`CG-0MWR0BJXI007UINE`) retires with the legacy CSV column. The gate derives
+ * **Rule count.** The GDD §2.4 table carries **sixteen** codes: fifteen durable
+ * design rules plus the migration-only `clock-cost-mismatch` that G10
+ * (`CG-0MWR0BJXI007UINE`) retired with the legacy CSV column. A bound
+ * validation therefore runs the fifteen durable rules; the retired code stays
+ * in the union/table as a documented, permanently-green no-op and is
+ * deliberately excluded from the "every rule runs" assertion. The gate derives
  * the count from the GDD table instead of hard-coding either number, so the
  * two artefacts agree by construction rather than by a remembered constant.
  *
@@ -376,18 +380,28 @@ describe('the §2.4 rule table', () => {
 });
 
 describe('rule-table completeness', () => {
-  it('reports every §2.4 rule as run when content and declared resources are bound', () => {
+  /** The code G10 retired: declared in the table/union, never activated. */
+  const RETIRED_RULE = 'clock-cost-mismatch';
+
+  it('runs every durable §2.4 rule when content and declared resources are bound', () => {
     const result = validate(reference());
+    const durableRules = [...EPISODE_MANIFEST_ISSUE_CODES].filter(
+      (code) => code !== RETIRED_RULE,
+    );
     // A set, not a sequence: the result groups rules by activation family
-    // (structural, then content, resource, migration), not by table order.
-    expect([...result.rules].sort()).toEqual([...gddRuleTableCodes()].sort());
-    expect([...result.rules].sort()).toEqual([...EPISODE_MANIFEST_ISSUE_CODES].sort());
+    // (structural, then content, resource), not by table order.
+    expect([...result.rules].sort()).toEqual(durableRules.sort());
+    expect(result.rules).not.toContain(RETIRED_RULE);
   });
 
-  it('reports the same full rule set through the CLI', () => {
+  it('reports the same durable rule set through the CLI', () => {
     const { code, report } = runCliJson(['--manifest', REFERENCE_PATH]);
+    const durableRules = [...EPISODE_MANIFEST_ISSUE_CODES].filter(
+      (code) => code !== RETIRED_RULE,
+    );
     expect(code).toBe(0);
-    expect([...(report.rules as string[])].sort()).toEqual([...gddRuleTableCodes()].sort());
+    expect([...(report.rules as string[])].sort()).toEqual(durableRules.sort());
+    expect(report.rules as string[]).not.toContain(RETIRED_RULE);
   });
 
   it('never claims a rule ran without its activation input', () => {
@@ -431,12 +445,15 @@ describe('the drift pin — GDD fence, fixture and validator agree', () => {
     expect(`${gddManifestBlock()}\n`).toBe(readText(REFERENCE_PATH));
   });
 
-  it('validates the exact GDD fence document clean against the full rule table', () => {
+  it('validates the exact GDD fence document clean against the durable rule table', () => {
     // Not a copy or a re-serialisation: the bytes the specification shows.
     const fromFence = JSON.parse(gddManifestBlock()) as unknown;
     const result = validate(fromFence);
     expect(result.findings).toEqual([]);
-    expect([...result.rules].sort()).toEqual([...EPISODE_MANIFEST_ISSUE_CODES].sort());
+    const durableRules = [...EPISODE_MANIFEST_ISSUE_CODES].filter(
+      (code) => code !== 'clock-cost-mismatch',
+    );
+    expect([...result.rules].sort()).toEqual(durableRules.sort());
     // And the fixture is that same document (pinned above), so a manifest
     // edit in any one of the three places turns this gate red.
     expect(fromFence).toEqual(reference());
@@ -458,7 +475,8 @@ function multiDefectManifest(): Record<string, unknown> {
   const acts = manifest.acts as MutableAct[];
   // `numeric-invalid` (act-order-invalid) — no cascade.
   acts[0].order = 0;
-  // `numeric-invalid` (clock-cost-invalid) + `clock-cost-mismatch` — no cascade.
+  // `numeric-invalid` (clock-cost-invalid) — no cascade. G10 retired the
+  // legacy CSV column, so the migration rule is silent.
   acts[0].scenes[0].beats[1].clockCost = -1;
   // `objective-invalid` (statement-too-long) — no cascade.
   acts[0].scenes[1].objective.statement = 'x'.repeat(91);
@@ -509,17 +527,15 @@ describe('determinism of the formatters', () => {
     expect(first.stderr).toBe('');
   });
 
-  it('sorts findings by path, then code, on a same-path double finding', () => {
-    // `semantics-numeric-clock-cost.json` reports two codes at one path; the
-    // order is the sorter's, not the rule execution order.
+  it('sorts findings by path, then code, across a multi-finding fixture', () => {
+    // `identity-duplicate-beat.json` reports three findings across paths; the
+    // order the CLI emits is the sorter's, not the rule execution order.
     const { report } = runCliJson([
       '--manifest',
-      join(FIXTURE_DIR, 'semantics-numeric-clock-cost.json'),
+      join(FIXTURE_DIR, 'identity-duplicate-beat.json'),
     ]);
-    expect(reportFindingKeys(report).map((key) => key.code)).toEqual([
-      'clock-cost-mismatch',
-      'numeric-invalid',
-    ]);
+    const keys = reportFindingKeys(report).map((key) => `${key.path}\u0000${key.code}`);
+    expect(keys).toEqual([...keys].sort());
   });
 });
 
@@ -532,7 +548,6 @@ describe('determinism under array-order permutation', () => {
     // invariance assertion cannot pass vacuously.
     const originalKeys = original.findings.map(structuralKey).sort();
     expect(originalKeys).toEqual([
-      'clock-cost-mismatch||acts[].scenes[].beats[].clockCost',
       'numeric-invalid|act-order-invalid|acts[].order',
       'numeric-invalid|clock-cost-invalid|acts[].scenes[].beats[].clockCost',
       'objective-invalid|statement-too-long|acts[].scenes[].objective.statement',
@@ -644,7 +659,7 @@ describe('corruption sweep — content overrides through the CLI', () => {
 describe('corruption sweep — the corpus covers the whole rule table', () => {
   const metadata = expectedCodes();
 
-  it('exercises every §2.4 code from at least one CLI case', () => {
+  it('exercises every durable §2.4 code from at least one CLI case', () => {
     const covered = new Set<EpisodeManifestIssueCode>();
     for (const entry of metadata.corpus) {
       for (const finding of entry.findings) covered.add(finding.code as EpisodeManifestIssueCode);
@@ -652,7 +667,15 @@ describe('corruption sweep — the corpus covers the whole rule table', () => {
     for (const entry of metadata.contentOverrides) {
       for (const finding of entry.findings) covered.add(finding.code as EpisodeManifestIssueCode);
     }
-    expect([...covered].sort()).toEqual([...EPISODE_MANIFEST_ISSUE_CODES].sort());
+    // `clock-cost-mismatch` is the retired no-op (G10): its code stays declared
+    // but no CLI case can reach it, so it is the one documented exception.
+    const retired = new Set<EpisodeManifestIssueCode>(['clock-cost-mismatch']);
+    expect([...covered].sort()).toEqual(
+      EPISODE_MANIFEST_ISSUE_CODES.filter((code) => !retired.has(code)).sort(),
+    );
+    expect(EPISODE_MANIFEST_ISSUE_CODES.filter((code) => !covered.has(code))).toEqual([
+      ...retired,
+    ]);
   });
 
   it('uses only codes the §2.4 table declares', () => {

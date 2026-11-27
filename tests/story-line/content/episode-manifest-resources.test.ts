@@ -314,11 +314,12 @@ describe('rule activation — the declared-resource binding is what turns the ru
     expect(result.findings).toEqual([]);
   });
 
-  it('appends the resource and migration rules after the implemented and content rules', () => {
-    expect(validate(reference()).rules.slice(-3)).toEqual([
+  it('appends the resource rule after the implemented and content rules', () => {
+    // `clock-cost-mismatch` is retired (G10), so nothing follows the resource
+    // rule in the run list.
+    expect(validate(reference()).rules.slice(-2)).toEqual([
       'ending-successor',
       'resource-set-mismatch',
-      'clock-cost-mismatch',
     ]);
   });
 });

@@ -63,6 +63,15 @@ import {
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTENT_PATH = path.join(REPO_ROOT, 'example-games/gym/content/long-erasure.csv');
+/**
+ * The episode manifest's act/pacing beat sheet.
+ *
+ * Act membership and pacing are manifest data (G10 retired the CSV columns),
+ * so the harness reads the same authoritative file the scene does. An alternate
+ * `--content` file must therefore be authored against this beat sheet; a card
+ * the manifest does not assign is a loud `invalid-content` error.
+ */
+const EPISODE_PATH = path.join(REPO_ROOT, 'example-games/gym/content/long-erasure-episode.json');
 
 /** The option label of the state-gated (goodwill 3) branch. */
 const GATED_OPTION = 'Sabotage the Loom';
@@ -930,7 +939,9 @@ function main(): void {
   const { seeds, json, content: contentPath, routes: routeSpecs, timings } = parseArgs(
     process.argv.slice(2),
   );
-  const content = longErasureContentFromCsv(readFileSync(contentPath, 'utf8'));
+  const content = longErasureContentFromCsv(readFileSync(contentPath, 'utf8'), {
+    episode: JSON.parse(readFileSync(EPISODE_PATH, 'utf8')),
+  });
   const shape = contentShape(content);
   const space = enumeratePlayableRoutes(content);
 

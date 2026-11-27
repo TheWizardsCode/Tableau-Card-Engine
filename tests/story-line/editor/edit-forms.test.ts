@@ -656,8 +656,8 @@ describe('the committed Gym content is never mutated', () => {
 
 describe('authored prose fields (context / epilogue)', () => {
   const PROSE_CSV = [
-    'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue',
-    'le-x-open,The Opening,Nothing happens.,,q,Q,"hull",I,1,"A ship at anchor; nothing moves.","The anchor holds."',
+    'id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue',
+    'le-x-open,The Opening,Nothing happens.,,q,Q,"hull","A ship at anchor; nothing moves.","The anchor holds."',
     '',
   ].join('\n');
 

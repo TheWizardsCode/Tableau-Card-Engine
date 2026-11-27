@@ -204,6 +204,7 @@ export function longErasureSceneContent(): LongErasureContent {
   if (contentOverride !== null) return contentOverride;
   if (cachedContent === null) {
     cachedContent = longErasureContentFromCsv(longErasureCsv, {
+      episode: LONG_ERASURE_EPISODE_MANIFEST,
       bounds: LONG_ERASURE_EPISODE_MANIFEST.resources.bounds,
     });
   }

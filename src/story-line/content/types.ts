@@ -36,18 +36,22 @@
  */
 
 /**
- * The legacy per-card `clockCost` column the Long Erasure spike still carries.
+ * The legacy per-card `clockCost` column name, retained as a **retired**
+ * constant (G10, `CG-0MWR0BJXI007UINE`).
  *
- * **Migration-only.** A per-card clock cost is beat-sheet data written in the
- * wrong place (GDD §2.1): pacing belongs to `beat.clockCost` in the episode
- * manifest, and the column retires with that move (`CG-0MWR0BJXI007UINE`, G10).
- * Until then exactly one reader consults it — the manifest validator's
- * `clock-cost-mismatch` rule — and never as a beat's authoritative cost.
+ * A per-card clock cost was beat-sheet data written in the wrong place (GDD
+ * §2.1): pacing belongs to `beat.clockCost` in the episode manifest. The Long
+ * Erasure adapter no longer declares the column, so the manifest validator's
+ * `clock-cost-mismatch` rule is a **permanently-green no-op** — it resolves the
+ * column from an adapter's declaration and has nothing left to compare. The
+ * name survives only so the retired rule keeps its documented vocabulary and a
+ * future reintroduction would be caught against a named constant rather than a
+ * string literal.
  *
- * It is a **game column**, not a {@link ContentFieldMapping} field: an adapter
- * that declares it lists it in {@link ContentAdapter.columns}, and the rule
- * reads the raw cell from {@link ContentCard.fields}. Removing it from that
- * declaration (G10) therefore switches the check off with no code change.
+ * It was a **game column**, not a {@link ContentFieldMapping} field: an adapter
+ * that declared it listed it in {@link ContentAdapter.columns}, and the rule
+ * read the raw cell from {@link ContentCard.fields}. Retiring the declaration is
+ * the whole change; there is deliberately no general legacy-column mechanism.
  */
 export const LEGACY_CLOCK_COST_COLUMN = 'clockCost' as const;
 
@@ -90,6 +94,10 @@ export interface ContentCard {
   /**
    * Every column that is not part of the adapter's story-line field mapping,
    * keyed by CSV column name, with the raw cell text (untrimmed).
+   *
+   * Beat-sheet data (`act` / `clockCost`) is deliberately absent from this
+   * shape: it lives in the episode manifest, not in a CSV game column (G10,
+   * `CG-0MWR0BJXI007UINE`).
    */
   readonly fields: Readonly<Record<string, string>>;
   /**

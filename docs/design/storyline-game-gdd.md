@@ -362,11 +362,14 @@ beat-sheet data written in the wrong place, and v1 retires them:
 | `act` | act membership is dramaturgy, and a per-row label cannot be validated against a structure | `scene.id` under `act.scenes` |
 | `clockCost` | pacing belongs to the scene that owns the budget; the spike's value is a per-card override with no scene to spend against | `beat.clockCost` |
 
-Until the beat-sheet layer lands, the spike keeps those columns and they are the
-`GymLongErasureGame` rule implementation's input. The manifest validator must
-reject a manifest whose beat clock cost disagrees with the legacy column while
-both exist (`clock-cost-mismatch`); the build epic removes the column once the
-beat sheet is the only reader.
+Those two columns **have now retired** (G10, `CG-0MWR0BJXI007UINE`): the
+spike content file no longer carries `act` or `clockCost`, and
+`GymLongErasureGame` resolves both from the episode manifest's
+`acts[].scenes[].beats[]` and `beat.clockCost`. The migration check
+(`clock-cost-mismatch`) is retained as a documented, permanently-green no-op:
+its code stays in the §2.4 union, but no adapter declares the legacy column, so
+it never runs. The build epic removed the column once the beat sheet became the
+only reader.
 
 **Three deliberate non-duplications.** The beat sheet must never grow: (a) a
 second condition language — it reuses `@story-line`'s `Condition` shape
@@ -783,7 +786,7 @@ list this document is written against:
 | `loss-not-irreversible` | every loss rule's `field` is in `resources.irreversible` |
 | `numeric-invalid` | `budget.clock ≥ 1`, `clockCost ≥ 0`, `amount ≥ 1` |
 | `resource-set-mismatch` | `resources.declared` equals the content file's declared set, and the block's `start` / `bounds` entries agree with `declared` (one finite start value per declared key, one well-ordered range per key, the start inside its own range) |
-| `clock-cost-mismatch` | *(migration only)* `beat.clockCost` agrees with the legacy CSV `clockCost` cell until the column is retired |
+| `clock-cost-mismatch` | *(migration only, retired by G10)* `beat.clockCost` was checked against the legacy CSV `clockCost` cell while both existed; with the column gone the rule is a documented, permanently-green no-op |
 | `ending-successor` | an ending card's successors, if any, resolve to assigned beats (the reset loop) or are absent |
 
 The beat sheet needs a **third** check the content guard cannot perform, because
@@ -1133,7 +1136,7 @@ and each one is a trade the objective fights. They validate through
 **Act I — stores against the record.**
 
 ```csv
-gxr-i-record,The Record or the Crew,The log spends a store; the crew costs nothing.,"Log the erasure|gxr-ii-locker#cost=stores:1#says=You write the volume down and spend a store of paper and power doing it. The record is exact and the hold is one lighter.;Rally the crew|gxr-ii-locker#extra=morale:1#says=You gather the crew on the observation deck instead. Nobody writes anything down, and the watch ends steadier.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",I,1,"Act I trade: the scene objective reads stores, and the story's record costs exactly that store. Keeping the objective and keeping the record are the same currency.",
+gxr-i-record,The Record or the Crew,The log spends a store; the crew costs nothing.,"Log the erasure|gxr-ii-locker#cost=stores:1#says=You write the volume down and spend a store of paper and power doing it. The record is exact and the hold is one lighter.;Rally the crew|gxr-ii-locker#extra=morale:1#says=You gather the crew on the observation deck instead. Nobody writes anything down, and the watch ends steadier.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge","Act I trade: the scene objective reads stores, and the story's record costs exactly that store. Keeping the objective and keeping the record are the same currency.",
 ```
 
 Read it as arithmetic: the scene objective is `stores >= 3` and the starting hold
@@ -1145,7 +1148,7 @@ later". Neither option is a no-op, and neither is a clear win.
 **Act II — hull against stores.**
 
 ```csv
-gxr-ii-locker,The Locker,The locker is full and the hull is not.,"Strip the locker|gxr-iii-core#cost=hull:1#extra=stores:2#says=You cut the locker open and take the stores aboard, and the sound the hull makes doing it stays with the crew.;Leave it sealed|gxr-iii-core#says=You log the position and hold your course. The locker stays full behind you and the hull stays whole.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",II,2,"Act II trade: stores are bought with the one key the scene objective is measuring, and the objective reads hull.",
+gxr-ii-locker,The Locker,The locker is full and the hull is not.,"Strip the locker|gxr-iii-core#cost=hull:1#extra=stores:2#says=You cut the locker open and take the stores aboard, and the sound the hull makes doing it stays with the crew.;Leave it sealed|gxr-iii-core#says=You log the position and hold your course. The locker stays full behind you and the hull stays whole.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge","Act II trade: stores are bought with the one key the scene objective is measuring, and the objective reads hull.",
 ```
 
 The scene objective is `hull >= 5`, and stripping the locker is the only way to
@@ -1157,7 +1160,7 @@ either door leaves the scene.
 **Act III — three currencies and one free door.**
 
 ```csv
-gxr-iii-core,The Core Door,Three doors and only some of them are affordable.,"Unwrite the Loom|gxr-end-quiet#cost=charge:2#says=You empty the core's charge into the Loom and the mechanism stops remembering.;Break for the core|gxr-end-quiet,gxr-end-ram#when=charge>=2>gxr-end-ram#says=You drive for the core while the tear is still open, and the hull pays for the approach.;Finish the weave|gxr-end-reset#says=You let the weave finish and the timeline closes over the room.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge",III,3,"Act III trade: the quiet ending spends charge (recoverable), the ram spends hull (irreversible), and the reset spends nothing. The #when rule reads charge before the door is offered.",
+gxr-iii-core,The Core Door,Three doors and only some of them are affordable.,"Unwrite the Loom|gxr-end-quiet#cost=charge:2#says=You empty the core's charge into the Loom and the mechanism stops remembering.;Break for the core|gxr-end-quiet,gxr-end-ram#when=charge>=2>gxr-end-ram#says=You drive for the core while the tear is still open, and the hull pays for the approach.;Finish the weave|gxr-end-reset#says=You let the weave finish and the timeline closes over the room.",gdd-resource-trades,The GDD Resource Trades,"hull,morale,stores,goodwill,charge","Act III trade: the quiet ending spends charge (recoverable), the ram spends hull (irreversible), and the reset spends nothing. The #when rule reads charge before the door is offered.",
 ```
 
 Here the objective (`morale >= 4`) is read *before* the doors, so the player
@@ -1317,12 +1320,15 @@ adapter names its own.
 | `trigger` | game column | What causes the beat in the game's own rules. | `Incident` |
 | `cost`, `coinDelta`, `reputationDelta` | game column | The spike/Gym adapter's legacy incident columns. A GDD-game adapter declares its own game columns; these are examples, not a requirement. | `0` |
 
-**The two retired columns.** `act` and `clockCost` are beat-sheet data written in
-the wrong place ([§2.1](#21-composition-contract-who-owns-what)): act membership
-is `scene.id` under `act.scenes`, and pacing is `beat.clockCost` in the manifest.
-They stay in the spike file only while the spike's own rule module reads them;
-a writer on the GDD game never authors either, and the manifest validator must
-reject a disagreeing pair while both exist (engine gap [G10](#g10)).
+**The two retired columns.** `act` and `clockCost` were beat-sheet data written
+in the wrong place ([§2.1](#21-composition-contract-who-owns-what)): act
+membership is `scene.id` under `act.scenes`, and pacing is `beat.clockCost` in
+the manifest. They **have retired** (both G10 and the build epic are delivered):
+the spike file no longer declares them, act/clock values resolve from the
+episode manifest, and the authoring path refuses a `--field act=…` /
+`--field clockCost=…` write as an `unknown content column`. A writer on the GDD
+game never authors either, and the manifest validator's migration check is now
+a documented no-op rather than a live agreement check.
 
 **"Enforced" means a hard error; "GDD rule" is a reviewer's check.** The
 validator refuses a row on the enforced cells and the option attributes; the
@@ -1573,7 +1579,7 @@ CLI — is closed by the same work item and listed after the table.
 | 2 | **`update-card` replaces the whole `options` cell**, so one new option means retyping the rest | **Resolved** — `add-option` appends one encoded entry to the existing cell and leaves every existing option byte-for-byte alone. `update-card --options` still replaces the cell, deliberately, for a wholesale rewrite. | add one branch: `npm run storylines:author -- add-option --id gx-reef --label "Run before the gale" --target gx-gale --attr cost=coins:1` | `CG-0MWQYDC7D003G4ON` (delivered) |
 | 3 | **Every row repeats the full declared resource set** in `resources` | **Resolved** — a leading `#resources: hull,morale,stores,goodwill,charge` line before the header declares the set once per file. A blank `resources` cell inherits it; a non-blank cell overrides it (mixed-resource files stay expressible). The declaration is validated per card exactly as before, so `unknown-resource-key` still fires. | declare the set once at the top of the file (`#resources: …`) and leave the column blank on every row | `CG-0MWQYDC7D003G4ON` (delivered) |
 | 4 | **No positional insert** — a new card is appended, so reading order drifts from narrative order | **Resolved** — `add-card --after <card-id>` inserts the new row directly after that card's row; omitting `--after` appends exactly as before. Neither form can silently re-point a story-line's entry card: an edit that would move it is refused, naming both the old and the would-be entry and pointing at `add-linked-card --link-from`. | insert where the beat belongs: `npm run storylines:author -- add-card --id le-ii-toll --name "The Toll House" --after le-i-ford` | `CG-0MWQYDC7D003G4ON` (delivered) |
-| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`); the legacy columns themselves retire into the manifest ([§2.1](#21-composition-contract-who-owns-what), engine gap [G10](#g10)) | nothing: authoring an `act`/`clockCost` column the adapter does not declare fails loudly | [G10](#g10) — filed (`CG-0MWR0BJXI007UINE`) |
+| 5 | **Act and clock are generic `--field` writes**, and a typo'd field name was a silent no-op | **Resolved** — an unknown column is a hard error naming the file's columns (`unknown content column "acts" (file columns: …)`), and the legacy columns themselves have retired into the manifest ([§2.1](#21-composition-contract-who-owns-what), [G10](#g10) delivered) | nothing: authoring an `act`/`clockCost` field now fails loudly because the adapter declares neither | [G10](#g10) — **Delivered** (`CG-0MWR0BJXI007UINE`) |
 
 **Prose (found while writing this section): resolved.** `storylines:author` now
 authors prose directly: `--context <text>` and `--epilogue <text>` on `add-card`
@@ -2907,7 +2913,7 @@ invisible.
 | [G7](#g7) | Surfaced affordability: compile an unaffordable option with its shortfall instead of deleting it | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat) option gating, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3, [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), [§3.6](#36-named-presentation-gaps) B4 | **delivered (engine)** — `optionAffordability` returns the requirement object (every unmet key, `available` through `readResource`), `isOptionAffordable` is its boolean projection, the opt-in `'surface'` policy keeps condition-passing options with their computed `affordability` in both omission seams (registry compile + episode-runner beat entry), and resolution refuses an unaffordable surfaced option with a structured shortfall (`src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/episode-runner.ts`) | small — `isOptionAffordable` + the compiled-option shape in `src/story-line/compile.ts` | feature | **Delivered** — `CG-0MWR0BI3S008K9Y6` (the disabled-option **visual** remains the presentation surface's work, [§3.6](#36-named-presentation-gaps) B4) |
 | [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | **delivered** — `ResourceHud` (`src/ui/ResourceHud.ts`, exported from `@ui`) renders one labelled item per caller-declared key in declaration order, prints `value / max` for bounded keys, prints the `full` / `empty` / `irreversible` markers with secondary colour cues and updates through `setResources(bag)` (one pop tween, at most one SFX, instant and silent under reduced motion); the declaration is plain data, so `src/ui` still does not import `@story-line` | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | **Delivered** — `CG-0MWR0BIPV0074WLM` (`src/ui/ResourceHud.ts`; Gym adoption `CG-0MWZ9WDWS004NJ8Y`) |
 | [G9](#g9) | Act/scene transition presentation: scene-exit banner and a sequenced act transition with a reduced-motion path | [§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.6](#36-named-presentation-gaps) B5 | `src/ui/sceneTransition.ts` animates the camera only; no banner surface, no outcome→route sequence and no rendered scene boundary | small–medium — `src/ui/sceneTransition.ts` + `src/ui/narration-reveal.ts` | feature | Filed — `CG-0MWR0BJBU005TDTT` |
-| [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | `src/story-line/content/adapters.ts` still declares both as Gym columns and as `editableColumns`; the spike reads `clockCost` from the CSV | small — the adapter column declaration + `missing-column` diagnostic | chore | Filed — `CG-0MWR0BJXI007UINE` |
+| [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | **delivered** — `src/story-line/content/adapters.ts` declares neither column; `GymLongErasureGame` resolves act and pacing from `long-erasure-episode.json`, and the generated graph manifest carries no `fields.act` / `fields.clockCost` | small — the adapter column declaration + `missing-column` diagnostic | chore | **Delivered** — `CG-0MWR0BJXI007UINE` |
 | [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`6` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | only `HelpPanel` / `SettingsPanel` toggle keys and `getEndTurnKeybind()` are bound; no choice-list navigator or focus helper is exported from `src/ui/index.ts` | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | Filed — `CG-0MWR0BKIT0084ZID` |
 | [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | `SettingsStore` persists tooltips and the end-turn keybind, `ReducedMotion` persists reduced motion; no verbosity key exists, and `extraToggles` is game-local | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Filed — `CG-0MWR0BL4Q000OYG6` |
 | [G13](#g13) | Deterministic replay adapter + fixture for this game | [§3.5.4](#354-replay), [§3.6](#36-named-presentation-gaps) B9, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | the engine seam is present (`scripts/replay.ts` + `scripts/adapters/ReplayAdapter.ts`); no adapter or fixture for this game exists | small — the Golf replay adapter as the reference implementation | task | **Deferred to the build epic** (game-owned deliverable, not engine work) |
@@ -3252,20 +3258,25 @@ rule: act membership is `scene.id` under `act.scenes`, pacing is
 retire, a writer on the GDD game can still author beat-sheet data in the wrong
 place.
 
-**Why the engine cannot do it at this commit.** `src/story-line/content/adapters.ts`
-declares `act` and `clockCost` as Gym game columns **and** lists both in
-`editableColumns`, with defaults. `example-games/gym/GymLongErasureGame.ts` reads
-`clockCost` from the CSV for its pressure clock. The migration check
-(`clock-cost-mismatch`) is part of the manifest validator (G2), which does not
-exist yet.
+**Why the engine cannot do it at this commit.** *(Historical — delivered by
+G10.)* `src/story-line/content/adapters.ts` declared `act` and `clockCost` as
+Gym game columns **and** listed both in `editableColumns`, with defaults.
+`example-games/gym/GymLongErasureGame.ts` read `clockCost` from the CSV for its
+pressure clock. The migration check (`clock-cost-mismatch`) is part of the
+manifest validator (G2), delivered after this gap was filed.
 
 **Nearest precedent and effort band.** **Small**: the adapter's column
 declaration and the `missing-column` diagnostic in
 `src/story-line/content/validate.ts`. A content-format change with a migration,
 not new machinery.
 
-**Disposition.** **Filed** — `CG-0MWR0BJXI007UINE` (`chore`, low, effort `S`).
-Blocked by the GDD epic and by G2.
+**Disposition.** **Delivered** — `CG-0MWR0BJXI007UINE` (`chore`, low, effort `S`).
+The adapter no longer declares either column; `long-erasure.csv` and every
+fixture are migrated; `GymLongErasureGame` resolves act membership and pacing
+from `long-erasure-episode.json` (a card absent from the beat sheet is a loud
+`invalid-content` error); the generated graph artefacts carry no
+`fields.act` / `fields.clockCost`; and `clock-cost-mismatch` remains in the
+§2.4 union as a documented, permanently-green no-op.
 
 #### <a id="g11"></a>G11 — Keyboard choice navigation and overlay focus order
 
@@ -3371,7 +3382,7 @@ this backlog reaches.
 |---|---|---|---|
 | Beat-sheet / objective layer | **Confirmed — the build epic's core.** Not one gap but three that ship together: the runtime layer, the manifest contract that describes it and the guard that proves it. | [G1](#g1), [G2](#g2), [G3](#g3) | `src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/content/manifest.ts`, `src/story-line/content/guard.ts` |
 | Arbitrary-resource generalisation follow-through | **Mostly landed; the follow-through is real but split.** The declared set, declared-key deltas, `unknown-resource-key` and the irreversibility guarantee shipped (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, structured affordability and compound conditions. | [G4](#g4), [G5](#g5) (delivered), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `Condition` is single-clause; the irreversible subset is enforced by the projection and validate.ts |
-| CSV extension follow-through | **No single missing capability; the remaining work is split two ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped, and the authoring ergonomics landed ([G14](#g14), delivered). Remaining: retire the legacy columns and validate the manifest/CSV agreement. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `CG-0MWQYDC7D003G4ON` delivered the authoring CLI ergonomics |
+| CSV extension follow-through | **No single missing capability; the remaining work split two ways and both have now landed.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped; the authoring ergonomics landed ([G14](#g14), delivered); the legacy columns retired and the manifest/CSV agreement was validated ([G10](#g10), [G2](#g2), both delivered). | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` declares neither `act` nor `clockCost`; `example-games/gym/GymLongErasureGame.ts` resolves both from the episode manifest |
 | Resource HUD | **Delivered.** The declared set, its bounds and its loss-bearing subset now render through the shared `ResourceHud`; the zone itself was layout data and remains so. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/ResourceHud.ts`, `example-games/gym/scenes/GymLongErasureScene.ts` |
 | Act/scene transition presentation | **Confirmed, but narrower than first stated.** A camera transition ships (`runSceneTransition`); the banner surface, the outcome→route sequence and any rendered scene boundary do not. | [G9](#g9) | `src/ui/sceneTransition.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json` (no `sceneBanner` zone) |
 
@@ -3407,7 +3418,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G7 | `CG-0MWR0BI3S008K9Y6` | feature | medium | S | GDD epic | **Delivered** — surfaced affordability: `optionAffordability` requirement object + opt-in `'surface'` policy in both omission seams + structured resolution refusal |
 | G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | **Delivered** — `ResourceHud` (declared resource set, bounds display, printed `full` / `empty` / `irreversible` markers, animated/SFX value updates with a reduced-motion snap) + Gym adoption `CG-0MWZ9WDWS004NJ8Y` |
 | G9 | `CG-0MWR0BJBU005TDTT` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
-| G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | blocked, scheduled past the GDD close |
+| G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | **Delivered** — the adapter declares neither retired column; `long-erasure.csv` + fixtures migrated; act/pacing resolve from `long-erasure-episode.json`; `clock-cost-mismatch` retained as a documented no-op |
 | G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | blocked, scheduled past the GDD close |
 | G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
 | G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
@@ -3673,7 +3684,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Surfaced affordability (an unaffordable door is shown, not deleted) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) T5 | [G7](#g7) | small | `CG-0MWR0BI3S008K9Y6` |
 | Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` (delivered) |
 | Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
-| Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` |
+| Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` (delivered) |
 | Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` |
 | Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` |
 | Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` (delivered) |

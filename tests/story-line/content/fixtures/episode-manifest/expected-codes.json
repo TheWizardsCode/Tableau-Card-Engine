@@ -13,10 +13,13 @@
     "cannot become unreachable, or newly reachable, unnoticed.",
     "",
     "`contentOverrides` covers the rule families whose defect cannot be expressed",
-    "as a manifest-only mutation (the failing input lives in the content file),",
-    "plus the migration-only rule's committed drift CSV. Both mutations are",
-    "applied to the shipped rows exactly as written and written to a temp file,",
-    "so the sweep still goes through the CLI's real --content path."
+    "as a manifest-only mutation (the failing input lives in the content file).",
+    "Both mutations are applied to the shipped rows exactly as written and written",
+    "to a temp file, so the sweep still goes through the CLI's real --content path.",
+    "",
+    "G10 (CG-0MWR0BJXI007UINE) retired the legacy `clockCost` CSV column, so the",
+    "migration-only `clock-cost-mismatch` rule never runs and no corpus entry",
+    "expects it. The retired code stays in the §2.4 union by design."
   ],
   "manifest": "example-games/gym/content/long-erasure-episode.json",
   "content": "example-games/gym/content/long-erasure.csv",
@@ -165,7 +168,6 @@
     {
       "file": "semantics-numeric-clock-cost.json",
       "findings": [
-        { "code": "clock-cost-mismatch", "path": "acts[0].scenes[0].beats[0].clockCost" },
         {
           "code": "numeric-invalid",
           "path": "acts[0].scenes[0].beats[0].clockCost",

@@ -54,6 +54,20 @@ const CONTENT: LongErasureContent = longErasureContentFromCsv(
     join(REPO_ROOT, 'example-games/gym/content/long-erasure.csv'),
     'utf-8',
   ),
+  {
+    episode: JSON.parse(
+      readFileSync(
+        join(REPO_ROOT, 'example-games/gym/content/long-erasure-episode.json'),
+        'utf-8',
+      ),
+    ) as {
+      acts: {
+        order: number;
+        scenes: { beats: { cardId: string; clockCost: number }[] }[];
+      }[];
+      endings: string[];
+    },
+  },
 );
 
 /** The cheapest full route to the reset ending (17 clock — exactly the default). */

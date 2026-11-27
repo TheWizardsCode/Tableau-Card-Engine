@@ -15,7 +15,7 @@
  */
 
 import { DEFAULT_ARTEFACT_PATHS, type ArtefactPaths } from './artefact-paths';
-import { LEGACY_CLOCK_COST_COLUMN, type ContentAdapter } from './types';
+import type { ContentAdapter } from './types';
 
 /** Relative path of the default (Gym) story-line content file. */
 export const DEFAULT_CONTENT_PATH = 'example-games/gym/content/storylines.csv';
@@ -89,17 +89,17 @@ export const GYM_CONTENT_ADAPTER: ContentAdapter = {
  *
  * Its own content file and storyline (`long-erasure`) keep the shipped Gym demo
  * rows untouched, so the committed options-parity goldens stay green. The
- * column set is the generic story-line shape plus the two narrative columns the
- * Phaser-free run module reads:
+ * column set is the generic story-line shape plus the two optional prose
+ * columns the narrative panel and closing screen read:
  *
- * - `act` — the act the card belongs to (`I`, `II`, `III` or `Ending`);
- * - {@link LEGACY_CLOCK_COST_COLUMN} (`clockCost`) — pressure-clock beats
- *   consumed when the card is drawn, the migration-only column G10 retires in
- *   favour of `beat.clockCost` (the manifest validator checks the two agree
- *   while both exist);
- * - `context` / `epilogue` — the optional authored prose the narrative panel and
- *   the closing screen read. The columns are part of the file's schema and may
- *   be blank: a blank cell reads as "no prose authored" (`null`).
+ * - `context` / `epilogue` — the optional authored prose. The columns are part
+ *   of the file's schema and may be blank: a blank cell reads as "no prose
+ *   authored" (`null`).
+ *
+ * Act membership and pacing are **not** columns here (G10,
+ * `CG-0MWR0BJXI007UINE`): the episode manifest owns act membership
+ * (`act.scenes[].beats[]`) and pacing (`beat.clockCost`), so the content file
+ * cannot be a second, drift-prone authoring home for beat-sheet data.
  *
  * Mechanics ride on the **option** attributes (`#cost` / `#extra` / `#when`),
  * so no bespoke resource column exists: the declared set is the mapped
@@ -121,8 +121,6 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     'storylineId',
     'storylineTitle',
     'resources',
-    'act',
-    LEGACY_CLOCK_COST_COLUMN,
     'context',
     'epilogue',
   ],
@@ -137,15 +135,13 @@ export const LONG_ERASURE_CONTENT_ADAPTER: ContentAdapter = {
     context: 'context',
     epilogue: 'epilogue',
   },
-  editableColumns: ['act', LEGACY_CLOCK_COST_COLUMN],
+  editableColumns: [],
   irreversibleResources: ['hull'],
   newCardDefaults: {
     options: '',
     storylineId: 'long-erasure',
     storylineTitle: 'The Long Erasure',
     resources: 'hull,morale,stores,goodwill,charge',
-    act: 'I',
-    [LEGACY_CLOCK_COST_COLUMN]: '1',
     context: '',
     epilogue: '',
   },

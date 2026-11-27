@@ -101,6 +101,17 @@ describe('shipped adapters', () => {
     );
   });
 
+  it('declares no retired beat-sheet columns (G10)', () => {
+    // Act membership and pacing belong to the episode manifest, so the Long
+    // Erasure adapter must not offer them as authored CSV columns.
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).not.toContain('act');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.columns).not.toContain('clockCost');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.editableColumns).not.toContain('act');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.editableColumns).not.toContain('clockCost');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.newCardDefaults).not.toHaveProperty('act');
+    expect(LONG_ERASURE_CONTENT_ADAPTER.newCardDefaults).not.toHaveProperty('clockCost');
+  });
+
   it('describes the Gym impact from its game columns', () => {
     const [start] = cardsFromCsv(parseCsv(readText(GYM_CONTENT_PATH)), GYM_CONTENT_ADAPTER);
     expect(GYM_CONTENT_ADAPTER.describeImpact?.(start)).toBe('−50 coins');

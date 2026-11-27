@@ -71,25 +71,32 @@ function readRepoFile(relativePath: string): string {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf-8');
 }
 
-/** The authored content, loaded once through the module's own loader. */
-const CONTENT: LongErasureContent = longErasureContentFromCsv(
-  readRepoFile(CONTENT_PATH),
-);
-
 /** Repository-relative path of the committed episode manifest. */
 const EPISODE_MANIFEST_PATH = 'example-games/gym/content/long-erasure-episode.json';
 
+/** The committed episode manifest (act membership, pacing and resource bounds). */
+const EPISODE_MANIFEST = JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
+  acts: {
+    order: number;
+    scenes: { beats: { cardId: string; clockCost: number }[] }[];
+  }[];
+  endings: string[];
+  resources: { bounds: unknown };
+};
+
+/** The authored content, loaded once through the module's own loader. */
+const CONTENT: LongErasureContent = longErasureContentFromCsv(
+  readRepoFile(CONTENT_PATH),
+  { episode: EPISODE_MANIFEST },
+);
+
 /** The committed manifest's raw `resources.bounds` block. */
-const MANIFEST_BOUNDS = (
-  JSON.parse(readRepoFile(EPISODE_MANIFEST_PATH)) as {
-    resources: { bounds: unknown };
-  }
-).resources.bounds;
+const MANIFEST_BOUNDS = EPISODE_MANIFEST.resources.bounds;
 
 /** The authored content bounded by the committed manifest (the scene's path). */
 const BOUNDED_CONTENT: LongErasureContent = longErasureContentFromCsv(
   readRepoFile(CONTENT_PATH),
-  { bounds: MANIFEST_BOUNDS },
+  { episode: EPISODE_MANIFEST, bounds: MANIFEST_BOUNDS },
 );
 
 /** Options passed to {@link play}. */
@@ -257,17 +264,32 @@ describe('The Long Erasure: content loading', () => {
       'le-i-log,The Missing Berth',
     );
     expect(duplicate).not.toBe(csv);
-    expect(caughtError(() => longErasureContentFromCsv(duplicate))).toMatchObject({
+    expect(
+      caughtError(() => longErasureContentFromCsv(duplicate, { episode: EPISODE_MANIFEST })),
+    ).toMatchObject({
       code: 'invalid-content',
     });
 
-    const badAct = csv.replace(',I,1', ',IV,1');
-    expect(badAct).not.toBe(csv);
-    expect(caughtError(() => longErasureContentFromCsv(badAct))).toMatchObject({
+    // A card the episode manifest does not assign is loud: the content file no
+    // longer carries `act` / `clockCost`, so there is no value to infer.
+    const unassigned = csv.replace('le-i-rally,The Missing Berth', 'le-x-rally,The Missing Berth');
+    expect(unassigned).not.toBe(csv);
+    expect(
+      caughtError(() =>
+        longErasureContentFromCsv(unassigned, { episode: EPISODE_MANIFEST }),
+      ),
+    ).toMatchObject({
       code: 'invalid-content',
     });
+    expect(
+      caughtError(() =>
+        longErasureContentFromCsv(unassigned, { episode: EPISODE_MANIFEST }),
+      )?.message,
+    ).toContain('not assigned to the episode manifest');
 
-    expect(caughtError(() => longErasureContentFromCsv(''))).toMatchObject({
+    expect(
+      caughtError(() => longErasureContentFromCsv('', { episode: EPISODE_MANIFEST })),
+    ).toMatchObject({
       code: 'invalid-content',
     });
   });
@@ -305,6 +327,7 @@ describe('The Long Erasure: bounded resources (GDD §2.8, G4)', () => {
     // A morale floor above zero makes a legal (affordable) cost clamp: the
     // option pays 1 of the 2 below the floor, and the rest is reported.
     const bounded = longErasureContentFromCsv(readRepoFile(CONTENT_PATH), {
+      episode: EPISODE_MANIFEST,
       bounds: { ...(MANIFEST_BOUNDS as Record<string, unknown>), morale: { min: 2, max: 8 } },
     });
     const patched: LongErasureContent = {
@@ -714,6 +737,37 @@ describe('The Long Erasure: purity of the transition surface', () => {
  * come back.
  */
 describe('The Long Erasure: narrative view model (prose contract)', () => {
+  /**
+   * The prose fixture's episode beat sheet.
+   *
+   * The fixture uses its own `le-p-*` ids, so it carries its own minimal
+   * manifest slice: act membership and pacing are manifest data now, never CSV
+   * columns.
+   */
+  const PROSE_EPISODE = {
+    acts: [
+      { order: 1, scenes: [{ beats: [{ cardId: 'le-p-open', clockCost: 1 }] }] },
+      {
+        order: 2,
+        scenes: [
+          {
+            beats: [
+              { cardId: 'le-p-log', clockCost: 1 },
+              { cardId: 'le-p-rally', clockCost: 1 },
+            ],
+          },
+        ],
+      },
+    ],
+    endings: ['le-p-end'],
+  };
+
+  /** The no-prose fixture's minimal beat sheet. */
+  const BARE_EPISODE = {
+    acts: [{ order: 1, scenes: [{ beats: [{ cardId: 'le-b-open', clockCost: 1 }] }] }],
+    endings: ['le-b-end'],
+  };
+
   /** Reads a compiled option's authored outcome prose, or `null`. */
   function saysOf(option: unknown): string | null {
     return (option as { says?: string | null }).says ?? null;
@@ -723,6 +777,7 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
   function proseContent(): LongErasureContent {
     return longErasureContentFromCsv(
       readRepoFile('tests/fixtures/story-line/prose/long-erasure-prose.csv'),
+      { episode: PROSE_EPISODE },
     );
   }
 
@@ -730,6 +785,7 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
   function bareContent(): LongErasureContent {
     return longErasureContentFromCsv(
       readRepoFile('tests/fixtures/story-line/prose/long-erasure-bare.csv'),
+      { episode: BARE_EPISODE },
     );
   }
 
@@ -812,13 +868,23 @@ describe('The Long Erasure: narrative view model (prose contract)', () => {
     // shared helper; the untruncated copy survives on the same journal entry.
     const longOutcome = `${'word '.repeat(60).trim()}`;
     const csv = [
-      'id,name,effect,options,storylineId,storylineTitle,resources,act,clockCost,context,epilogue',
-      `le-x-open,Open,An opening.,"Wait|le-x-end#says=${longOutcome}",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",I,1,,`,
-      'le-x-end,End,It ends.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",Ending,1,,A closing line.',
+      'id,name,effect,options,storylineId,storylineTitle,resources,context,epilogue',
+      `le-x-open,Open,An opening.,"Wait|le-x-end#says=${longOutcome}",long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",,`,
+      'le-x-end,End,It ends.,,long-erasure,The Long Erasure,"hull,morale,stores,goodwill,charge",,A closing line.',
     ].join('\n');
 
     const finished = chooseOption(
-      createLongErasureRun(1, longErasureContentFromCsv(csv)),
+      createLongErasureRun(
+        1,
+        longErasureContentFromCsv(csv, {
+          episode: {
+            acts: [
+              { order: 1, scenes: [{ beats: [{ cardId: 'le-x-open', clockCost: 1 }] }] },
+            ],
+            endings: ['le-x-end'],
+          },
+        }),
+      ),
       'Wait',
     );
     const row = runJournal(finished)[0];

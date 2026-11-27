@@ -147,7 +147,7 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
     expect(result.manifestId).toBe('long-erasure');
   });
 
-  it('reports the manifest-only rules, the card-resolution rules, the resource rule and the migration rule', () => {
+  it('reports the manifest-only rules, the card-resolution rules and the resource rule', () => {
     expect(validate(reference()).rules).toEqual([
       'duplicate-act',
       'duplicate-scene',
@@ -162,10 +162,10 @@ describe('clean control — the committed Appendix A manifest bound to long-eras
       ...CARD_RULES,
       // The resource rule runs because `validate()` binds a declared set.
       'resource-set-mismatch',
-      // The migration rule runs because the adapter still declares the legacy
-      // `clockCost` column (G10 retires it).
-      'clock-cost-mismatch',
+      // `clock-cost-mismatch` is retired (G10): the adapter no longer declares
+      // the legacy column, so the migration rule never runs.
     ]);
+    expect(validate(reference()).rules).not.toContain('clock-cost-mismatch');
   });
 
   it('counts the same traversal as the manifest-only validation', () => {

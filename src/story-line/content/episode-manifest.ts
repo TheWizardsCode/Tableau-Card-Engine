@@ -251,8 +251,10 @@ export interface LossRule {
  * Declared in full here — including the families later children implement — so
  * a new rule family adds a predicate, never a new code, and a caller can key
  * its own handling off a closed set. `clock-cost-mismatch` is the
- * migration-only rule: it compares a beat's `clockCost` with the legacy CSV
- * cell and is retired by G10 (CG-0MWR0BJXI007UINE) along with that column.
+ * migration-only rule: it compared a beat's `clockCost` with the legacy CSV
+ * cell and is now a **permanently-green no-op** because G10
+ * (`CG-0MWR0BJXI007UINE`) retired that column. The code stays declared so the
+ * §2.4 table and this union stay the same closed set; it simply never runs.
  */
 export const EPISODE_MANIFEST_ISSUE_CODES = [
   'duplicate-act',
@@ -828,11 +830,13 @@ const RESOURCE_RULES: readonly EpisodeManifestRule[] = ['resource-set-mismatch']
 
 /**
  * The migration-only rules, which need both the bound content and a legacy
- * column the adapter still declares.
+ * column an adapter still declares.
  *
- * They are reported as run only while that column exists: once G10
- * (`CG-0MWR0BJXI007UINE`) retires it the list is empty, so the check disappears
- * with the data instead of leaving a rule that silently passes.
+ * They are reported as run only while that column exists. G10
+ * (`CG-0MWR0BJXI007UINE`) retired the only declaration, so the list is empty in
+ * practice and the check disappears with the data instead of leaving a rule
+ * that silently passes. The constant is kept so a reintroduced column would
+ * reactivate the same documented rule rather than needing new machinery.
  */
 const MIGRATION_RULES: readonly EpisodeManifestRule[] = ['clock-cost-mismatch'];
 
@@ -1334,9 +1338,11 @@ interface ContentResolutionIndex {
  * The column is a **game column**, not a story-line field mapping: it is read
  * from {@link ContentCard.fields} (the raw row) and never through a mapped
  * `ContentCard` member. The name comes from the adapter's declared columns
- * rather than a literal here, so G10's removal (`CG-0MWR0BJXI007UINE`) is a
- * data change: once no adapter declares the column, `clock-cost-mismatch` is a
- * silent no-op.
+ * rather than a literal here. G10 (`CG-0MWR0BJXI007UINE`) removed the only
+ * declaration, so this now always returns `undefined` for every shipped
+ * adapter and `clock-cost-mismatch` is a permanently-green no-op — keep the
+ * predicate (it is the retirement's documented residue), do not extend it into
+ * a general legacy-column mechanism.
  */
 function legacyClockCostColumn(adapter: ContentAdapter): string | undefined {
   const mapped: readonly string[] = Object.values(adapter.fields).filter(
@@ -1596,18 +1602,26 @@ function endingSuccessorFindings(
 }
 
 /**
- * `clock-cost-mismatch` *(migration only)*: the manifest and the legacy column agree.
+ * `clock-cost-mismatch` *(migration only, retired)*: the manifest and the legacy
+ * column agreed.
  *
- * While the spike's per-card `clockCost` column still exists, a beat's
- * authoritative `clockCost` in the manifest must equal the legacy CSV cell for
- * the same `cardId`, so the interim period cannot silently desynchronise. The
- * rule is deliberately narrow: it fires on **any** difference (a one-tick drift
- * is the committed fixture), reports one finding per mismatched beat at the
- * manifest field, and is silent when the adapter no longer declares the column
- * (G10) or a cell carries no value to compare.
+ * G10 (`CG-0MWR0BJXI007UINE`) retired the only adapter declaration of the
+ * legacy per-card `clockCost` CSV column, so {@link legacyClockCostColumn}
+ * returns `undefined` for every shipped adapter and this rule never runs. It is
+ * kept as a documented no-op rather than deleted: the code remains part of the
+ * §2.4 rule table, and the predicate is the retirement's audit trail — a
+ * reintroduced column would reactivate the same one-tick-agreement check
+ * without new machinery. It is deliberately **not** a general legacy-column
+ * mechanism.
  *
- * The cell is read from the raw row ({@link ContentCard.fields}); it is never a
- * beat's authoritative cost and never a story-line field mapping.
+ * While it did run, the rule was narrow: a beat's authoritative `clockCost` in
+ * the manifest had to equal the legacy CSV cell for the same `cardId`; it
+ * reported one finding per mismatched beat at the manifest field and was silent
+ * when the adapter no longer declared the column or a cell carried no value to
+ * compare.
+ *
+ * The cell was read from the raw row ({@link ContentCard.fields}); it was never
+ * a beat's authoritative cost and never a story-line field mapping.
  */
 function clockCostMismatchFindings(
   traversal: EpisodeManifestTraversal,
@@ -1663,8 +1677,9 @@ function clockCostMismatchFindings(
  * substituted for it here.
  *
  * The migration-only `clock-cost-mismatch` rule needs both: content bound and
- * the adapter still declaring the legacy `clockCost` column. Retiring the
- * column (G10) removes it from the rule list with no code change.
+ * an adapter still declaring the legacy `clockCost` column. G10
+ * (`CG-0MWR0BJXI007UINE`) retired the only declaration, so the rule is now a
+ * permanently-green no-op and never appears in `rules`.
  *
  * @param manifest          The (possibly unvalidated) manifest document.
  * @param contentCards      Bound content cards — the input the card-resolution

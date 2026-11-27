@@ -244,6 +244,7 @@ function readRepoFile(relativePath: string): string {
 /** The real authored content, loaded through the game's own loader. */
 const CONTENT: LongErasureContent = longErasureContentFromCsv(
   readRepoFile(CONTENT_PATH),
+  { episode: JSON.parse(readRepoFile(MANIFEST_PATH)) },
 );
 
 /**
