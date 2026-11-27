@@ -316,7 +316,7 @@ export class GymLongErasureScene extends GymSceneBase {
       },
       {
         heading: 'Controls',
-        body: 'Click an option label to take it. The act, clock, resources, beat, narrative and journal panels update on every choice, and a feedback line names what you just did. [ more… ] pages over-long prose (first pointer input also skips the reveal). [ Begin a new survey ] starts the same deterministic run again from the first beat. The help panel (this slide-out) documents the rules and the IP statement.',
+        body: 'Click an option label to take it. The act, clock, resources, beat, narrative and journal panels update on every choice, and a feedback line names what you just did. The status bar’s resource row is the shared ResourceHud: every declared key’s label, current value and maximum (for example Morale 5 / 8), a printed full or empty marker at a declared edge, and the word irreversible beside hull — the one key that is losses only — so the economy reads without relying on colour. [ more\u2026 ] pages over-long prose (first pointer input also skips the reveal). [ Begin a new survey ] starts the same deterministic run again from the first beat. The help panel (this slide-out) documents the rules and the IP statement.',
       },
       {
         heading: 'Original setting — no third-party IP',

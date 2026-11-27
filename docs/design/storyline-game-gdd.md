@@ -1225,7 +1225,7 @@ the nearest precedent and the filed work item.
 | 4 | **Condition expressiveness** — conjunction ("hull ≥ 5 **and** stores ≥ 3"), "at maximum", or a range | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`); the beat sheet adds only `{budget: "exhausted"}`. Any compound objective must be authored as data the runner cannot evaluate, or as two scenes. | [G6](#g6) — deferred to the build epic |
 | 5 | **The scene clock inside the resource guard** — prove no scene exit strands the player | **Delivered** — `enumerateSceneSpace(manifest, cards, options)` (`src/story-line/content/scene-guard.ts`) walks the scene/beat/close/routing transitions the runner performs, delegates outcome and route precedence to the runtime's pure helpers, and asserts `no-success-on-exhausted-close` and `refusal-reaches-ending` under the route guard's `maxDepth` / `maxStates` bounds (fail-closed on truncation). The clock is still not a declared resource, which is why the check lives in the manifest-bound guard rather than in `src/story-line/content/guard.ts`. | [G3](#g3) — **Delivered** by `CG-0MWR0BG9H007AFNU` (`npm run storylines:guard -- --manifest <file>`; [reference](../core-engine/story-line.md#scene-space-guard)) |
 | 6 | **Irreversibility as an engine guarantee** — refuse any grant to an irreversible key | **Delivered** — the concept is threaded through `@story-line`: the resource projection carries an `irreversible` subset (derived from the manifest by `createEpisodeResourceProjection`), `validateStorylineOptions(…, { irreversible })` reports a positive `#extra` on one as `irreversible-grant`, and the resolution guard refuses the grant while a `#cost` on the key still pays. The manifest's `resources.irreversible` is authoritative; the adapter's `irreversibleResources` is audited for drift. | [G5](#g5) — **Delivered** by `CG-0MWR0BHH9002OQUZ` |
-| 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | No SLL zone or component renders the declared keys or marks the loss-bearing subset; the presentation contract is owned by `CG-0MWPY2CHF003AHE1` and the surface does not exist (`src/ui/screen-layout.ts`). | [G8](#g8) — filed (`CG-0MWR0BIPV0074WLM`); the act-boundary half is [G9](#g9) |
+| 7 | **The resource HUD and the act-boundary presentation** — where the trade is *seen* | **Resource HUD delivered** — `ResourceHud` (`src/ui/ResourceHud.ts`, exported from the `@ui` barrel) renders one labelled item per caller-declared key in declaration order, prints `value / max` for a bounded key, prints the edge markers `full` / `empty` and the word `irreversible` for the loss-bearing subset (each with a secondary colour cue, never colour alone), and updates through `setResources(bag)` with one pop tween and at most one SFX — instant and silent under reduced motion. The declaration is plain data (`declaredKeys`, `resources`, `bounds`, `irreversible`, `labels`), so `src/ui` still does not import `@story-line`. | [G8](#g8) — **Delivered** by `CG-0MWR0BIPV0074WLM` (`src/ui/ResourceHud.ts`; Gym adoption `CG-0MWZ9WDWS004NJ8Y`); the act-boundary half remains [G9](#g9) |
 
 #### 2.8.7 How the economy is verified
 
@@ -2143,7 +2143,7 @@ A **zone** is a named normalised rectangle (a surface's reserved area); an
 
 | Surface | Zone | Anchors (`zone.anchor`) | Data rendered | Engine status | Gym reference |
 |---|---|---|---|---|---|
-| Resource HUD | `statusBar` | `statusBar.act`, `statusBar.clock`, `statusBar.nextBeatCost`, `statusBar.resources`, `statusBar.losses` | act title; `clockRemaining / budget.clock`; the next beat's cost; `storyline.engine.getResources` over the declared keys; the summed irreversible deltas | **Shipped** in the spike layout; `nextBeatCost` and `losses` are new anchors — layout data, no engine change | `GymLongErasureScene` |
+| Resource HUD | `statusBar` | `statusBar.act`, `statusBar.clock`, `statusBar.nextBeatCost`, `statusBar.resources`, `statusBar.losses` | act title; `clockRemaining / budget.clock`; the next beat's cost; the declared keys through `ResourceHud` (`src/ui/ResourceHud.ts`) fed from `getResources` plus the manifest's `bounds` / `irreversible`; the summed irreversible deltas | **Delivered** — the resource row renders through `ResourceHud`; `nextBeatCost` and `losses` are anchors — layout data, no engine change | `GymLongErasureScene` |
 | Act/scene banner | `sceneBanner` | `sceneBanner.actTitle`, `sceneBanner.sceneTitle`, `sceneBanner.outcome`, `sceneBanner.route` | `act.title`, `scene.title`; at a scene close, the `scene-exit` record's outcome word and the opened door ([§2.3](#23-how-a-scene-outcome-selects-the-next-beat)) | **New game zone**; `screen-layout-schema.ts` accepts any zone name. The *data* needs the beat-sheet layer (gap B1); the *transition motion* needs gap B5 | `GymHudComponentsScene` (panel chrome) |
 | Objective panel | `objectivePanel` | `objectivePanel.statement`, `objectivePanel.status` | `objective.statement`; pending / met / unmet, evaluated once at scene close | **New game zone**; the data needs gap B1. Keep the statement within 90 characters ([§2.2.5](#225-objective)) | `GymHudComponentsScene` (panel chrome) |
 | Beat narrative | `narrative` | `narrative.beat`, `narrative.title`, `narrative.effect`, `narrative.context`, `narrative.contextMore` | the compiled card: id, title, effect line, authored `context`; prose longer than the panel budget is **paged** by `paginateProse()`, never clipped | **Shipped** in the spike layout | `GymLongErasureScene` |
@@ -2340,7 +2340,7 @@ nothing requires hover.
 | Resource affordability | dimmed/red | printed shortfall: `2 charge needed` |
 | Objective status | green / amber / red | word: `met` / `at risk` / `unmet` |
 | Scene outcome | green / amber / red | the outcome word: `success` / `partial` / `failure` on the banner |
-| Irreversible key | red marker | the word `irreversible` beside the key, and `losses only` in its tooltip |
+| Irreversible key | red marker | the word `irreversible` printed beside the key (`ResourceHud`), and `losses only` in its tooltip |
 | Loss ledger line | red | a signed line: `−1 hull — <statement>` |
 | Selected option | tint/lift | a `[ selected ]` prefix and the raised card position |
 | Act progress | colour band | `Act 1 of 3` in `statusBar.act` |
@@ -2905,7 +2905,7 @@ invisible.
 | [G5](#g5) | Irreversible-resource policy: never grant a declared irreversible key | [§2.8](#28-resource-model-and-economy) `hull`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 6, [§2.10](#210-tension-pacing-failure-and-reset-ending-scoring) | **delivered** — the projection carries the irreversible subset, `validateStorylineOptions` reports `irreversible-grant` and the resolution guard refuses the grant while a cost still pays (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/resolve.ts`) | small — the `unknown-resource-key` rule in `src/story-line/content/validate.ts` | task | **Delivered** — `CG-0MWR0BHH9002OQUZ` (`src/story-line/resolve.ts`) |
 | [G6](#g6) | Compound / range conditions ("`hull ≥ 5` **and** `stores ≥ 3`", "at maximum") | [§2.2.5](#225-objective) `Objective.check`, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 4 | `Condition` is a single `{field, op, value}` (`src/story-line/types.ts`) evaluated once (`evaluateCondition`, `src/story-line/resolve.ts`) | small — `Condition` + `evaluateCondition` | task | **Deferred to the build epic** (v1 uses one-clause objectives; two clauses are two scenes) |
 | [G7](#g7) | Surfaced affordability: compile an unaffordable option with its shortfall instead of deleting it | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat) option gating, [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 3, [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate), [§3.6](#36-named-presentation-gaps) B4 | **delivered (engine)** — `optionAffordability` returns the requirement object (every unmet key, `available` through `readResource`), `isOptionAffordable` is its boolean projection, the opt-in `'surface'` policy keeps condition-passing options with their computed `affordability` in both omission seams (registry compile + episode-runner beat entry), and resolution refuses an unaffordable surfaced option with a structured shortfall (`src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/episode-runner.ts`) | small — `isOptionAffordable` + the compiled-option shape in `src/story-line/compile.ts` | feature | **Delivered** — `CG-0MWR0BI3S008K9Y6` (the disabled-option **visual** remains the presentation surface's work, [§3.6](#36-named-presentation-gaps) B4) |
-| [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | `src/ui/index.ts` exports card/hand/pile components and `TokenPileView`, but no component renders a declared resource bag; the spike draws its two-key economy as bespoke text | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | Filed — `CG-0MWR0BIPV0074WLM` |
+| [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | **delivered** — `ResourceHud` (`src/ui/ResourceHud.ts`, exported from `@ui`) renders one labelled item per caller-declared key in declaration order, prints `value / max` for bounded keys, prints the `full` / `empty` / `irreversible` markers with secondary colour cues and updates through `setResources(bag)` (one pop tween, at most one SFX, instant and silent under reduced motion); the declaration is plain data, so `src/ui` still does not import `@story-line` | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | **Delivered** — `CG-0MWR0BIPV0074WLM` (`src/ui/ResourceHud.ts`; Gym adoption `CG-0MWZ9WDWS004NJ8Y`) |
 | [G9](#g9) | Act/scene transition presentation: scene-exit banner and a sequenced act transition with a reduced-motion path | [§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.6](#36-named-presentation-gaps) B5 | `src/ui/sceneTransition.ts` animates the camera only; no banner surface, no outcome→route sequence and no rendered scene boundary | small–medium — `src/ui/sceneTransition.ts` + `src/ui/narration-reveal.ts` | feature | Filed — `CG-0MWR0BJBU005TDTT` |
 | [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | `src/story-line/content/adapters.ts` still declares both as Gym columns and as `editableColumns`; the spike reads `clockCost` from the CSV | small — the adapter column declaration + `missing-column` diagnostic | chore | Filed — `CG-0MWR0BJXI007UINE` |
 | [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`6` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | only `HelpPanel` / `SettingsPanel` toggle keys and `getEndTurnKeybind()` are bound; no choice-list navigator or focus helper is exported from `src/ui/index.ts` | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | Filed — `CG-0MWR0BKIT0084ZID` |
@@ -3187,8 +3187,34 @@ seam exists (`StorylineResourceProjection.getResources`), the presenter does not
 is a reusable component with labels, bounds display, a colour-independent
 loss marker and a reduced-motion update path.
 
-**Disposition.** **Filed** — `CG-0MWR0BIPV0074WLM` (`feature`, medium, effort
-`M`). Blocked by the GDD epic.
+**Delivered.** `ResourceHud` (`src/ui/ResourceHud.ts`, exported from the `@ui`
+barrel) renders **one labelled item per caller-declared key, in declaration
+order**, reading each value from the caller's resource bag. The declaration is
+plain data — `declaredKeys`, `resources`, `bounds`, `irreversible` and `labels`
+— so `src/ui` still does not import `@story-line`: the bag comes from
+`StorylineResourceProjection.getResources`, the bounds from the manifest's
+`readManifestBounds`, and the loss-bearing subset from the projection's
+`irreversible`. A bounded key prints `value / max` (for example `Morale 5 / 8`);
+a key at a declared edge prints `full` or `empty`; and a key in the irreversible
+subset prints the word `irreversible`. Each printed marker also carries a
+secondary colour cue, so colour is never the only channel
+([§3.4.3](#343-colour-independent-signalling)); an irreversible cue outlives a
+transient edge state. `setResources(bag)` updates only the texts that changed
+(no re-flow), plays one short pop tween and **at most one** `COMMON_SFX_KEYS`
+SFX per update through an injected `SoundManager`, snaps instantly and silently
+under reduced motion (the caller-resolved `getEffectiveReducedMotion()` flag,
+also settable at runtime through `setReducedMotion`), and is a silent no-op
+without a manager. `destroy()` is idempotent. The Gym's `GymLongErasureScene`
+adopts it at the SLL-resolved `statusBar.resources` anchor, feeding every
+declaration from the committed episode manifest and the live run's values, so
+the five-key economy renders without bespoke scene text. The component is
+documented in [the developer guide](../DEVELOPER.md#resource-hud-resourcehud)
+and covered by `tests/ui/resourceHud.test.ts` plus the scene's browser suite.
+
+**Disposition.** **Delivered** — epic `CG-0MWR0BIPV0074WLM` (`feature`,
+medium, effort `M`): the component landed in `CG-0MWZ9W5SF0094QHM` /
+`CG-0MWZ9W8VG008LUZS` / `CG-0MWZ9W9F5001ZPF2` and the Gym adoption in
+`CG-0MWZ9WDWS004NJ8Y`.
 
 #### <a id="g9"></a>G9 — Act/scene transition presentation
 
@@ -3346,7 +3372,7 @@ this backlog reaches.
 | Beat-sheet / objective layer | **Confirmed — the build epic's core.** Not one gap but three that ship together: the runtime layer, the manifest contract that describes it and the guard that proves it. | [G1](#g1), [G2](#g2), [G3](#g3) | `src/story-line/compile.ts`, `src/story-line/resolve.ts`, `src/story-line/content/manifest.ts`, `src/story-line/content/guard.ts` |
 | Arbitrary-resource generalisation follow-through | **Mostly landed; the follow-through is real but split.** The declared set, declared-key deltas, `unknown-resource-key` and the irreversibility guarantee shipped (`src/story-line/resources.ts`, `src/story-line/validate.ts`, `src/story-line/content/validate.ts`). What did **not** ship: bounds/clamping, structured affordability and compound conditions. | [G4](#g4), [G5](#g5) (delivered), [G6](#g6) (and [G7](#g7) for affordability) | `applyResourceDelta` is unbounded; `Condition` is single-clause; the irreversible subset is enforced by the projection and validate.ts |
 | CSV extension follow-through | **No single missing capability; the remaining work is split two ways.** The CSV vocabulary (`#cost` / `#extra` / `#when` / `#says`, `resources`, prose columns), the validator, the guard and the editor shipped, and the authoring ergonomics landed ([G14](#g14), delivered). Remaining: retire the legacy columns and validate the manifest/CSV agreement. | [G10](#g10), [G2](#g2), [G14](#g14) | `src/story-line/content/adapters.ts` still declares `act` / `clockCost`; `CG-0MWQYDC7D003G4ON` delivered the authoring CLI ergonomics |
-| Resource HUD | **Confirmed.** No component renders a declared resource bag; the spike draws its two-key economy by hand. The zone itself is layout data and is not the gap. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/index.ts` (no resource component), `src/ui/TokenPileView.ts` (nearest precedent) |
+| Resource HUD | **Delivered.** The declared set, its bounds and its loss-bearing subset now render through the shared `ResourceHud`; the zone itself was layout data and remains so. | [G8](#g8) (with [G7](#g7) for the affordability presentation) | `src/ui/ResourceHud.ts`, `example-games/gym/scenes/GymLongErasureScene.ts` |
 | Act/scene transition presentation | **Confirmed, but narrower than first stated.** A camera transition ships (`runSceneTransition`); the banner surface, the outcome→route sequence and any rendered scene boundary do not. | [G9](#g9) | `src/ui/sceneTransition.ts`, `example-games/gym/layouts/gym-long-erasure.layout.json` (no `sceneBanner` zone) |
 
 ### 6.5 What is deliberately not a gap
@@ -3379,7 +3405,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G5 | `CG-0MWR0BHH9002OQUZ` | task | medium | S | GDD epic | **Delivered** — `irreversible` projection + `irreversible-grant` diagnostic + runtime guard |
 | G6 | — | task | — | — | — | **Deferred** — one-clause objectives are the v1 model |
 | G7 | `CG-0MWR0BI3S008K9Y6` | feature | medium | S | GDD epic | **Delivered** — surfaced affordability: `optionAffordability` requirement object + opt-in `'surface'` policy in both omission seams + structured resolution refusal |
-| G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
+| G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | **Delivered** — `ResourceHud` (declared resource set, bounds display, printed `full` / `empty` / `irreversible` markers, animated/SFX value updates with a reduced-motion snap) + Gym adoption `CG-0MWZ9WDWS004NJ8Y` |
 | G9 | `CG-0MWR0BJBU005TDTT` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
 | G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | blocked, scheduled past the GDD close |
 | G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | blocked, scheduled past the GDD close |
@@ -3407,7 +3433,7 @@ was delivered *by G1* — G5 has since been delivered by its own item):
 - **G9** act/scene transition presentation (`CG-0MWR0BJBU005TDTT`).
 - **G13** replay adapter — deferred to the game repo.
 - **G7** surfaced affordability (`CG-0MWR0BI3S008K9Y6`) and **G8** resource HUD
-  (`CG-0MWR0BIPV0074WLM`).
+  (`CG-0MWR0BIPV0074WLM`, since delivered).
 - **Transcript event emission** (§3.5.3's eight-event table) and
   `TranscriptStore` wiring — a follow-up child.
 - **Migrating `GymLongErasureGame.ts`** onto the runner.
@@ -3645,7 +3671,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Resource bounds and spill/clamp reporting | [§2.8](#28-resource-model-and-economy) | [G4](#g4) | small–medium | `CG-0MWR0BGVG004UE7X` |
 | Irreversible-resource policy (`hull` is never granted) | [§2.8.2](#282-per-key-contract), [§2.10.2](#2102-irreversible-loss-hull-as-the-dial) | [G5](#g5) | small | `CG-0MWR0BHH9002OQUZ` (delivered) |
 | Surfaced affordability (an unaffordable door is shown, not deleted) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§2.10.1](#2101-the-clock-a-visible-per-scene-budget) T5 | [G7](#g7) | small | `CG-0MWR0BI3S008K9Y6` |
-| Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` |
+| Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` (delivered) |
 | Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
 | Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` |
 | Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` |

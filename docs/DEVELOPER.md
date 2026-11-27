@@ -5315,6 +5315,114 @@ Tests advance a fake clock (unit) or the real Phaser clock via `scene.time.preUp
 
 **Guards.** In non-DOM environments (`document`/`window` undefined) the manager stays inert; when the canvas bounding rect cannot be read it hides, and when viewport dimensions are unavailable it falls back to the legacy unclamped placement. `pointer-events: none`, the maximum `z-index` and reduced-motion behaviour are preserved. A tooltip larger than the viewport or canvas cannot fit — it is pinned to the margin and partial visibility is accepted.
 
+### Resource HUD (`ResourceHud`)
+
+`ResourceHud` (`src/ui/ResourceHud.ts`, exported from the `@ui` barrel) renders a
+**game-declared resource set** as one labelled item per declared key, in
+declaration order. It is the shared presenter for a resource bag such as the
+story-line economy: the caller supplies the keys, labels, bounds and the
+loss-bearing subset, and the component owns label casing, ordering, bound
+display and the printed markers. No resource key, label, order or value is
+hard-coded in the component, and it is a **read-only view** — it never mutates a
+resource and never spends one.
+
+#### Plain-data contract
+
+`src/ui` must not import `@story-line` (the same rule as `TokenPileView` and
+`HintBar`), so every declaration arrives as plain data:
+
+| Option | Required | Meaning |
+|---|---|---|
+| `x`, `y` | yes | The SLL-resolved anchor point (`anchorPoint()`), never a literal coordinate |
+| `declaredKeys` | yes | The resource keys, in the order they must render (trimmed, blank/duplicate keys dropped) |
+| `resources` | yes | The current resource bag (`projection.getResources(state)` or any `Record<string, number>`); an absent or non-finite value reads as `0` |
+| `align` | no | `'left'` (default), `'centre'` or `'right'` — which edge of the block sits on the anchor point |
+| `bounds` | no | Inclusive per-key `{ min, max }` (for example the manifest's `readManifestBounds` output). A bounded key prints `value / max` |
+| `irreversible` | no | The declared never-restored / loss-bearing keys (for example the projection's `irreversible` subset) |
+| `labels` | no | Display-label overrides. A key with no override prints as authored, capitalised at most (`hull` → `Hull`) |
+| `reducedMotion` | no | The caller-resolved `getEffectiveReducedMotion()` flag |
+| `soundManager` | no | Optional audio sink (structural: anything with `play(key)`); a missing manager is a silent no-op |
+| `sfx` | no | The `COMMON_SFX_KEYS` key played at most once per animated update |
+| `onChange` | no | Called once with the new declared-key snapshot after a real value change |
+| `style` | no | Font size, font family, base/state/irreversible colours and `itemGap` overrides |
+
+#### Rendering and printed markers
+
+Each item prints `Label value` — or `Label value / max` when the key is
+bounded — followed by its printed state markers. The printed word is the
+**primary** channel and every marker also carries a secondary colour cue, so no
+state is signalled by colour alone (GDD §3.4.3):
+
+| Condition | Printed marker | Secondary cue |
+|---|---|---|
+| Value at or beyond the declared maximum | `full` | `style.fullColor` (green) |
+| Value at or below the declared minimum | `empty` | `style.emptyColor` (amber) |
+| Key in the `irreversible` subset | `irreversible` | `style.irreversibleColor` (red; wins over an edge-state cue) |
+
+The marker words live in `RESOURCE_HUD_MARKERS` (`full`, `empty`,
+`irreversible`) so the component, its callers and its tests name the same text.
+A key with no usable bounds entry (or a non-finite `max`) is treated as
+unbounded: the HUD never invents a range, and it prints a supplied value exactly
+as given — including a value that a projection already spilled or clamped.
+
+`align` positions the block around the SLL anchor: `left` grows right from it,
+`centre` centres on it, and `right` ends at it (the Gym's `statusBar.resources`
+anchor is right-aligned). Alignment uses the items' measured rendered width, so
+it follows the real text bounds rather than a per-character estimate.
+
+#### Updating values
+
+`setResources(bag)` is the only way values change. It rewrites the text of the
+items that actually changed and leaves positions alone, so the row never
+re-flows:
+
+- **Animated path (default):** the changed texts pop once (scale `1.15` → `1`,
+  240 ms) and **at most one** SFX plays for the whole update, however many keys
+  moved. A previous in-flight pop is stopped first, and an update that changes
+  nothing is a no-op (no tween, no SFX, no `onChange`).
+- **Reduced motion:** the new values snap with no tween and **no** SFX; the
+  printed channel is always kept. `setReducedMotion(boolean)` follows the
+  settings toggle at runtime and stops any in-flight pop.
+- **No `soundManager` or no `sfx`:** silently no audio.
+- **After `destroy()`:** a safe no-op (idempotent teardown of every item, the
+  container and tracked tweens).
+
+#### Usage
+
+```typescript
+import { ResourceHud, getEffectiveReducedMotion } from '@ui';
+
+const anchor = anchorPoint(layout, 'statusBar', 'resources');
+const hud = new ResourceHud(this, {
+  x: anchor.x,
+  y: anchor.y,
+  align: 'right',
+  declaredKeys: projection.resources,
+  resources: projection.getResources(state),
+  labels: { hull: 'Hull', morale: 'Morale' },
+  bounds: readManifestBounds(manifest),
+  irreversible: projection.irreversible,
+  reducedMotion: getEffectiveReducedMotion(),
+  // soundManager + sfx are optional; omitting them keeps the update silent.
+});
+
+// After a choice that changes the economy:
+hud.setResources(projection.getResources(state));
+```
+
+`getItems()`, `getResources()` and `gameObject` expose the rendered items, the
+current declared-key snapshot and the Phaser container for tests and layout.
+The module also exports the pure helpers it builds on — `formatResourceLabel`,
+`readResourceValue`, `readResourceBounds`, `formatResourceAmount` and
+`resolveResourceState` — so a caller can render the same strings elsewhere
+(for example a closing-screen summary) without duplicating the rules.
+
+`ResourceHud` is Phaser-bearing and is **not** part of the node-safe `@ui`
+manifest (`src/ui/node-safe-modules.ts`); the `check:ui-node-surface` prebuild
+gate must stay green. The Gym's `GymLongErasureScene` is the reference adoption:
+it reads every declaration from the committed episode manifest and pushes the
+live run's values through `setResources` on each render.
+
 ### UI Component Base Class (`UIComponentBase`)
 
 `UIComponentBase` (`src/ui/UIComponentBase.ts`) provides the shared lifecycle contract for reusable UI widgets. `HelpButton`, `SettingsButton`, and `Slider` extend it, and new components should too — it removes the repeated `destroyed` flag, idempotency guard, and manual listener bookkeeping that previously had to be re-implemented (and could leak listeners when a component was destroyed mid-interaction).
