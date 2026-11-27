@@ -587,6 +587,17 @@ export type { HighlightZoneConfig, HighlightStyle } from './HighlightManager';
 export { HintBar } from './HintBar';
 export type { HintBarOptions } from './HintBar';
 
+// ResourceHud – declared resource-set HUD (one labelled item per declared key)
+export { ResourceHud, formatResourceLabel, readResourceValue } from './ResourceHud';
+export type {
+  ResourceHudAlign,
+  ResourceHudBounds,
+  ResourceHudItem,
+  ResourceHudOptions,
+  ResourceHudSoundPlayer,
+  ResourceHudStyle,
+} from './ResourceHud';
+
 // Layout ownership / visibility controller
 // Re-exported from core-engine for convenience: SLL consumers can import
 // ownership helpers directly from the UI barrel without reaching into
