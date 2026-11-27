@@ -35,13 +35,24 @@
  *   (and why this module is a candidate for the node-safe manifest once the
  *   Phaser rendering layer is adjacent — that decision belongs to the
  *   exports/node-safety slice, not here).
- * - **Audio and colour belong to the presentation layer.** The planner carries
- *   no SFX key and no tint: the outcome is carried by its printed word
- *   (`success` / `partial` / `failure`), and the SFX resolver is a separate
- *   pure function in this module's sibling slice.
+ * - **Audio is one shared key per stage, and never blocks text.**
+ *   {@link resolveSceneExitSfxKey} is a separate pure function that returns a
+ *   `COMMON_SFX_KEYS` value — `ROUND_END` when the act closes, `TURN_CHANGE`
+ *   when a scene closes inside an act — or `null` to silence it. A game-scoped
+ *   or unknown string never leaks through: it falls back to the stage default.
+ *   {@link playSceneExitSfx} plays that key best-effort, so a missing,
+ *   unplayable or throwing backend cannot abort the presentation; the textual
+ *   channel (the plan) is unconditional. The planner itself carries no SFX key
+ *   and no tint: the outcome is carried by its printed word
+ *   (`success` / `partial` / `failure`).
  *
  * @module ui/scene-exit-presentation
  */
+
+import {
+  COMMON_SFX_KEYS,
+  type CommonSfxKey,
+} from '../core-engine/SoundManager';
 
 // ── Pacing constants ────────────────────────────────────────
 
@@ -53,6 +64,24 @@ export const SCENE_EXIT_AUTO_ADVANCE_MS = 3000;
 
 /** Separator used between fields merged into one line of text. */
 export const SCENE_EXIT_TEXT_SEPARATOR = ' — ';
+
+/**
+ * Shared SFX played when an **act** closes (the round is over).
+ *
+ * A `COMMON_SFX_KEYS` value, never a game-scoped literal: the key ships in
+ * `public/assets/audio/default/` so every distribution can play it.
+ */
+export const SCENE_EXIT_ACT_CLOSED_SFX: CommonSfxKey =
+  COMMON_SFX_KEYS.ROUND_END;
+
+/**
+ * Shared SFX played when a **scene** closes inside an act.
+ *
+ * The closer, smaller beat of the pair: the act is still running, only the
+ * scene boundary moved.
+ */
+export const SCENE_EXIT_SCENE_CLOSED_SFX: CommonSfxKey =
+  COMMON_SFX_KEYS.TURN_CHANGE;
 
 // ── Plan shapes ─────────────────────────────────────────────
 
@@ -240,4 +269,108 @@ export function planSceneExitPresentation(
     stepMs,
     autoAdvanceMs,
   };
+}
+
+// ── SFX selection (pure, Phaser-free) ──────────────────────
+
+/**
+ * SFX selection accepted by a scene exit: a shared {@link CommonSfxKey},
+ * `null` to silence it, or `undefined` for the stage default.
+ */
+export type SceneExitSfxSelection = CommonSfxKey | null | undefined;
+
+/** Options accepted by {@link resolveSceneExitSfxKey}. */
+export interface SceneExitSfxOptions {
+  /**
+   * `true` when the **act** itself closes (the round is over); `false` or
+   * omitted when a scene closes inside a running act. Only a strict `true`
+   * selects the act-close key.
+   */
+  readonly actClosed?: boolean;
+  /**
+   * `true` to silence the presentation entirely (an explicit mute or the
+   * reduced-motion contract). Mute wins over any `sfx` override.
+   */
+  readonly mute?: boolean;
+  /**
+   * Optional override: a shared {@link CommonSfxKey}, `null` to silence, or
+   * `undefined` for the stage default. Any other string (e.g. a game-scoped
+   * literal) falls back to the stage default — an unknown key is never played.
+   */
+  readonly sfx?: SceneExitSfxSelection | string;
+}
+
+const COMMON_SFX_VALUES: ReadonlySet<string> = new Set<string>(
+  Object.values(COMMON_SFX_KEYS),
+);
+
+/**
+ * Resolve the single SFX key a scene exit should play.
+ *
+ * Pure and Phaser-free, so the mapping is assertable in a Node unit test:
+ *
+ * - `mute: true` → `null` (silence wins over everything);
+ * - `sfx: null` → `null` (the caller asked for a silent presentation);
+ * - `sfx` is a shared `COMMON_SFX_KEYS` value → that value;
+ * - `actClosed: true` → {@link SCENE_EXIT_ACT_CLOSED_SFX} (`ROUND_END`);
+ * - otherwise (including an unknown/game-scoped `sfx` string) →
+ *   {@link SCENE_EXIT_SCENE_CLOSED_SFX} (`TURN_CHANGE`).
+ *
+ * Exactly **one** key is ever returned — never a stack of keys — and it is
+ * always a shared key or `null`.
+ *
+ * @param options - The stage (`actClosed`) plus optional `mute`/`sfx` overrides.
+ * @returns The shared SFX key to play, or `null` to stay silent.
+ */
+export function resolveSceneExitSfxKey(
+  options?: SceneExitSfxOptions | null,
+): CommonSfxKey | null {
+  if (options?.mute === true) return null;
+
+  const sfx = options?.sfx;
+  if (sfx === null) return null;
+  if (typeof sfx === 'string' && COMMON_SFX_VALUES.has(sfx)) {
+    return sfx as CommonSfxKey;
+  }
+
+  return options?.actClosed === true
+    ? SCENE_EXIT_ACT_CLOSED_SFX
+    : SCENE_EXIT_SCENE_CLOSED_SFX;
+}
+
+/**
+ * Minimal sound surface a scene-exit presentation plays through.
+ *
+ * Satisfied by the engine's `SoundManager` (`play(key): void`) as well as by a
+ * lighter backend that reports whether it handled the key.
+ */
+export interface SceneExitSoundPlayer {
+  play(key: string): boolean | void;
+}
+
+/**
+ * Play a resolved scene-exit SFX, best-effort and total.
+ *
+ * Audio is a **secondary** channel: it may be missing (no manager), unplayable
+ * (no registered/loaded key, or a backend returning `false`) or throw. None of
+ * those outcomes may abort the presentation, so every failure is swallowed and
+ * reported as `false` — the caller always proceeds with the textual steps.
+ *
+ * @param soundManager - The injected backend (typically the scene's
+ *   `SoundManager`), or `null`/`undefined` when audio is unavailable.
+ * @param key - A key from {@link resolveSceneExitSfxKey}; `null` means silent.
+ * @returns `true` when the backend accepted playback, `false` when there was
+ *   nothing to play, no usable backend, the backend declined, or it threw.
+ */
+export function playSceneExitSfx(
+  soundManager: SceneExitSoundPlayer | null | undefined,
+  key: CommonSfxKey | null | undefined,
+): boolean {
+  if (key === null || key === undefined) return false;
+  if (!soundManager || typeof soundManager.play !== 'function') return false;
+  try {
+    return soundManager.play(key) !== false;
+  } catch {
+    return false;
+  }
 }

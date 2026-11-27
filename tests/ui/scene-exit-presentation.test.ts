@@ -1,22 +1,33 @@
 /**
- * Unit tests for the scene-exit presentation planner
- * (`src/ui/scene-exit-presentation.ts`, CG-0MWZCKY1W008JV83).
+ * Unit tests for the scene-exit presentation planner and SFX resolver
+ * (`src/ui/scene-exit-presentation.ts`; planner CG-0MWZCKY1W008JV83, SFX
+ * resolver CG-0MWZCLIBF000SU2U).
  *
- * Everything here runs in a plain Node environment: the planner is pure and
- * Phaser-free, so the step order, the reduced-motion collapse, the default
- * dwell times and the input validation are all asserted without a scene, a
- * timer or a browser. The rendered presentation is covered separately by the
- * browser suite.
+ * Everything here runs in a plain Node environment: both the planner and the
+ * SFX resolver are pure and Phaser-free, so the step order, the reduced-motion
+ * collapse, the default dwell times, the SFX mapping and the total (never
+ * throwing) playback wrapper are asserted without a scene, a timer or a
+ * browser. The rendered presentation is covered separately by the browser
+ * suite.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  COMMON_SFX_KEYS,
+  type CommonSfxKey,
+} from '../../src/core-engine/SoundManager';
+import {
+  SCENE_EXIT_ACT_CLOSED_SFX,
   SCENE_EXIT_AUTO_ADVANCE_MS,
+  SCENE_EXIT_SCENE_CLOSED_SFX,
   SCENE_EXIT_STEP_MS,
   SCENE_EXIT_TEXT_SEPARATOR,
+  playSceneExitSfx,
   planSceneExitPresentation,
+  resolveSceneExitSfxKey,
   type SceneExitPlan,
   type SceneExitPlanOptions,
+  type SceneExitSoundPlayer,
   type SceneExitStepKey,
 } from '../../src/ui/scene-exit-presentation';
 
@@ -280,5 +291,200 @@ describe('planSceneExitPresentation', () => {
         'mutated',
       );
     });
+  });
+});
+
+describe('resolveSceneExitSfxKey', () => {
+  const sharedKeys: readonly string[] = Object.values(COMMON_SFX_KEYS);
+
+  it('plays ROUND_END when the act closes (AC1)', () => {
+    const key = resolveSceneExitSfxKey({ actClosed: true });
+
+    expect(key).toBe(COMMON_SFX_KEYS.ROUND_END);
+    expect(key).toBe(SCENE_EXIT_ACT_CLOSED_SFX);
+    expect(key).toBe('sfx-round-end');
+  });
+
+  it('plays TURN_CHANGE for a scene close within an act (AC2)', () => {
+    expect(resolveSceneExitSfxKey({ actClosed: false })).toBe(
+      COMMON_SFX_KEYS.TURN_CHANGE,
+    );
+    expect(resolveSceneExitSfxKey({})).toBe(COMMON_SFX_KEYS.TURN_CHANGE);
+    expect(resolveSceneExitSfxKey()).toBe(COMMON_SFX_KEYS.TURN_CHANGE);
+    expect(resolveSceneExitSfxKey(null)).toBe(COMMON_SFX_KEYS.TURN_CHANGE);
+    expect(SCENE_EXIT_SCENE_CLOSED_SFX).toBe('sfx-turn-change');
+  });
+
+  it('selects the act key only for a strict `true`, so odd values stay on the scene key', () => {
+    for (const actClosed of [undefined, false, 0, 1, 'true', {}]) {
+      expect(
+        resolveSceneExitSfxKey({
+          actClosed: actClosed as unknown as boolean,
+        }),
+      ).toBe(COMMON_SFX_KEYS.TURN_CHANGE);
+    }
+  });
+
+  it('returns null when muted, whichever stage is closing (AC3)', () => {
+    expect(resolveSceneExitSfxKey({ actClosed: true, mute: true })).toBeNull();
+    expect(resolveSceneExitSfxKey({ actClosed: false, mute: true })).toBeNull();
+    expect(resolveSceneExitSfxKey({ mute: true })).toBeNull();
+  });
+
+  it('lets mute win over an explicit shared-key override', () => {
+    expect(
+      resolveSceneExitSfxKey({
+        actClosed: true,
+        mute: true,
+        sfx: COMMON_SFX_KEYS.SCORE_REVEAL,
+      }),
+    ).toBeNull();
+  });
+
+  it('treats an explicit `sfx: null` as a request for silence', () => {
+    expect(resolveSceneExitSfxKey({ actClosed: true, sfx: null })).toBeNull();
+    expect(resolveSceneExitSfxKey({ sfx: null })).toBeNull();
+  });
+
+  it('honours an explicit shared-key override', () => {
+    expect(
+      resolveSceneExitSfxKey({
+        actClosed: true,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+      }),
+    ).toBe(COMMON_SFX_KEYS.UI_CLICK);
+    expect(resolveSceneExitSfxKey({ sfx: SCENE_EXIT_ACT_CLOSED_SFX })).toBe(
+      COMMON_SFX_KEYS.ROUND_END,
+    );
+  });
+
+  it.each(['sfx-game-scoped-bell', 'sfx-act-close', '', 'ROUND_END'])(
+    'falls back to the stage key for the unknown/game-scoped string %j (AC4)',
+    (sfx) => {
+      expect(resolveSceneExitSfxKey({ actClosed: true, sfx })).toBe(
+        COMMON_SFX_KEYS.ROUND_END,
+      );
+      expect(resolveSceneExitSfxKey({ actClosed: false, sfx })).toBe(
+        COMMON_SFX_KEYS.TURN_CHANGE,
+      );
+    },
+  );
+
+  it('never returns more than one key, and always a shared key or null', () => {
+    const selections = [
+      resolveSceneExitSfxKey({ actClosed: true }),
+      resolveSceneExitSfxKey({ actClosed: false }),
+      resolveSceneExitSfxKey({ sfx: COMMON_SFX_KEYS.CARD_SWAP }),
+      resolveSceneExitSfxKey({ sfx: 'sfx-game-scoped-bell' }),
+      resolveSceneExitSfxKey({ mute: true }),
+      resolveSceneExitSfxKey({ sfx: null }),
+    ];
+
+    for (const key of selections) {
+      expect(key === null || sharedKeys.includes(key)).toBe(true);
+      expect(Array.isArray(key)).toBe(false);
+    }
+  });
+
+  it('is deterministic and does not mutate the caller’s (frozen) options', () => {
+    const options = Object.freeze({
+      actClosed: true,
+      sfx: 'sfx-game-scoped-bell',
+    });
+    const snapshot = { ...options };
+
+    expect(resolveSceneExitSfxKey(options)).toBe(
+      resolveSceneExitSfxKey(options),
+    );
+    expect(options).toEqual(snapshot);
+  });
+});
+
+describe('playSceneExitSfx', () => {
+  function fakePlayer(result?: boolean | void) {
+    const play = vi.fn((_key: string) => result);
+    return { player: { play } as SceneExitSoundPlayer, play };
+  }
+
+  it('plays the resolved key through the injected backend', () => {
+    const { player, play } = fakePlayer();
+    const key = resolveSceneExitSfxKey({ actClosed: true }) as CommonSfxKey;
+
+    expect(playSceneExitSfx(player, key)).toBe(true);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(play).toHaveBeenCalledWith(COMMON_SFX_KEYS.ROUND_END);
+  });
+
+  it('is a no-op for a silent key, so a muted exit never plays anything', () => {
+    const { player, play } = fakePlayer();
+
+    expect(playSceneExitSfx(player, null)).toBe(false);
+    expect(playSceneExitSfx(player, undefined)).toBe(false);
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it('never throws without a backend (AC5)', () => {
+    const key = resolveSceneExitSfxKey({ actClosed: true });
+
+    expect(() => playSceneExitSfx(null, key)).not.toThrow();
+    expect(() => playSceneExitSfx(undefined, key)).not.toThrow();
+    expect(playSceneExitSfx(null, key)).toBe(false);
+    expect(playSceneExitSfx(undefined, key)).toBe(false);
+  });
+
+  it('treats a backend without a usable play method as unavailable', () => {
+    const bare = {} as SceneExitSoundPlayer;
+
+    expect(playSceneExitSfx(bare, COMMON_SFX_KEYS.ROUND_END)).toBe(false);
+    expect(
+      playSceneExitSfx(
+        { play: 42 } as unknown as SceneExitSoundPlayer,
+        COMMON_SFX_KEYS.ROUND_END,
+      ),
+    ).toBe(false);
+  });
+
+  it('reports an unplayable key (backend returns false) without throwing', () => {
+    const { player } = fakePlayer(false);
+
+    expect(playSceneExitSfx(player, COMMON_SFX_KEYS.TURN_CHANGE)).toBe(false);
+  });
+
+  it.each([true, undefined])(
+    'treats a %s result as accepted playback',
+    (result) => {
+      const { player } = fakePlayer(result as boolean | undefined);
+
+      expect(playSceneExitSfx(player, COMMON_SFX_KEYS.TURN_CHANGE)).toBe(true);
+    },
+  );
+
+  it('swallows a throwing backend so the presentation is never blocked (AC5)', () => {
+    const throwing: SceneExitSoundPlayer = {
+      play: () => {
+        throw new Error('missing audio key');
+      },
+    };
+    const key = resolveSceneExitSfxKey({ actClosed: true });
+
+    expect(() => playSceneExitSfx(throwing, key)).not.toThrow();
+    expect(playSceneExitSfx(throwing, key)).toBe(false);
+  });
+
+  it('leaves the textual channel unconditional when audio fails', () => {
+    const throwing: SceneExitSoundPlayer = {
+      play: () => {
+        throw new Error('backend exploded');
+      },
+    };
+    const plan = planSceneExitPresentation(baseOptions);
+
+    playSceneExitSfx(throwing, resolveSceneExitSfxKey({ actClosed: true }));
+
+    expect(plan.steps.map((step) => step.text)).toEqual([
+      `Act I${SCENE_EXIT_TEXT_SEPARATOR}The Arrival`,
+      'success',
+      'The road south',
+    ]);
   });
 });
