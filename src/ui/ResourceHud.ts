@@ -26,8 +26,31 @@
  * channel (GDD §3.4.3).
  *
  * The options object is the stable public contract: `reducedMotion`,
- * `soundManager`, `sfx` and `onChange` are declared here so callers can adopt
- * the component once, and are consumed by the follow-on update-path slice.
+ * `soundManager`, `sfx` and `onChange` all drive the update path.
+ *
+ * ## Updating values
+ *
+ * `setResources(bag)` pushes a new resource bag after a choice and is the only
+ * way values change. It diffs the declared keys against the rendered values and
+ * updates **only the text content of the items that actually changed** — the
+ * item objects keep their position, so the row is never re-flowed into a new
+ * layout. The printed marker words and colour cues are re-resolved, so a value
+ * that reaches a bound (or is printed as a caller-supplied spilled/clamped
+ * figure) reads correctly afterwards.
+ *
+ * - **Animated path (default):** the changed value texts get one short pop
+ *   tween (scale `1.15` → `1`), the previous in-flight pop is stopped first,
+ *   and **at most one** SFX is played per update through the injected
+ *   `soundManager` (a `COMMON_SFX_KEYS` key was supplied by the caller).
+ * - **Reduced motion:** the new values snap with no tween and **no** SFX
+ *   (GDD §3.4.1); the printed channel is never suppressed.
+ * - **No `soundManager` / no `sfx`:** a silent no-op on the audio seam.
+ * - **`onChange`:** called once with the new declared-key snapshot after a
+ *   real change (either path), and not at all when nothing changed.
+ * - **After `destroy()`:** a safe no-op — no text write, tween, SFX or callback.
+ *
+ * `setReducedMotion()` lets a caller follow the settings-panel toggle at
+ * runtime; a switch to reduced motion stops an in-flight pop and snaps.
  *
  * `src/ui` is Phaser-bearing and must not import `@story-line`: the resource
  * bag, declared keys, labels and bounds all arrive as plain data (for example
@@ -154,13 +177,19 @@ export interface ResourceHudOptions {
    * entry prints as authored, capitalised at most (no invented pluralisation).
    */
   labels?: Readonly<Record<string, string>>;
-  /** Caller-resolved reduced-motion flag. Consumed by the update path. */
+  /**
+   * Caller-resolved reduced-motion flag — pass
+   * `getEffectiveReducedMotion()` from `@ui`. An instant, silent update path.
+   */
   reducedMotion?: boolean;
-  /** Optional audio sink for value updates. Consumed by the update path. */
+  /** Optional audio sink for value updates. A missing manager is a silent no-op. */
   soundManager?: ResourceHudSoundPlayer;
-  /** SFX key to play on a value update. Consumed by the update path. */
+  /**
+   * SFX key played once per animated value update — a `COMMON_SFX_KEYS` key.
+   * Omitted, no sound is played (and reduced motion never plays one).
+   */
   sfx?: string;
-  /** Called after the HUD's values change. Consumed by the update path. */
+  /** Called once with the new bag after a `setResources` update changes a value. */
   onChange?: (resources: Readonly<Record<string, number>>) => void;
   /** Optional style overrides. */
   style?: ResourceHudStyle;
@@ -207,6 +236,12 @@ const RESOURCE_HUD_STYLE_DEFAULTS: Required<ResourceHudStyle> = {
  * during construction, so rendered alignment uses the true bounds.
  */
 const FALLBACK_CHAR_WIDTH = 8;
+
+/** Duration, in milliseconds, of the value-change pop tween. */
+const UPDATE_TWEEN_DURATION_MS = 240;
+
+/** Scale a changed value text pops from before settling back to `1`. */
+const UPDATE_TWEEN_POP_SCALE = 1.15;
 
 /**
  * Formats a declared resource key as a display label: capitalises the first
@@ -344,6 +379,10 @@ export class ResourceHud extends UIComponentBase {
   private readonly declaredKeys: readonly string[];
   private readonly container: Phaser.GameObjects.Container;
   private readonly items: ResourceHudItem[];
+  /** In-flight value-change tweens, stopped on a new update and on destroy. */
+  private readonly tweens = new Set<Phaser.Tweens.Tween>();
+  /** The resolved reduced-motion flag driving the update path. */
+  private reducedMotionFlag: boolean;
 
   /**
    * @param scene   The Phaser scene that owns the HUD.
@@ -357,6 +396,7 @@ export class ResourceHud extends UIComponentBase {
 
     this.declaredKeys = normaliseDeclaredKeys(options.declaredKeys);
     this.items = this.buildItems(this.declaredKeys);
+    this.reducedMotionFlag = options.reducedMotion ?? false;
 
     this.container = this.scene.add.container(0, 0);
     if (this.items.length > 0) {
@@ -382,19 +422,87 @@ export class ResourceHud extends UIComponentBase {
    * The current values of the declared keys, in declaration order.
    *
    * An absent key reads as `0`; keys outside the declaration are not
-   * projected.
+   * projected. Reflects the most recent {@link setResources} update.
    */
   getResources(): Readonly<Record<string, number>> {
     const snapshot: Record<string, number> = {};
-    for (const key of this.declaredKeys) {
-      snapshot[key] = readResourceValue(this.options.resources, key);
+    for (const item of this.items) {
+      snapshot[item.key] = item.value;
     }
     return snapshot;
+  }
+
+  /** Whether the HUD currently takes the instant, silent update path. */
+  get reducedMotion(): boolean {
+    return this.reducedMotionFlag;
+  }
+
+  /**
+   * Follow the settings-panel reduced-motion toggle at runtime.
+   *
+   * Switching it on stops any in-flight value pop and snaps the texts back to
+   * their resting scale, so the next update is instant and silent.
+   *
+   * @param reducedMotion The newly resolved reduced-motion flag.
+   */
+  setReducedMotion(reducedMotion: boolean): void {
+    this.reducedMotionFlag = reducedMotion;
+    if (reducedMotion) this.stopTweens();
+  }
+
+  /**
+   * Push a new resource bag and render the values that changed.
+   *
+   * Only the text content of changed items is rewritten — item positions are
+   * left untouched, so the row never re-flows. The changed texts pop once on
+   * the animated path (with at most one SFX), snap instantly and silently
+   * under reduced motion, and the new bag is reported through `onChange`. An
+   * update that changes nothing is a no-op; so is any update after
+   * {@link destroy}.
+   *
+   * @param resources The new resource bag, keyed by declared resource key.
+   */
+  setResources(resources: Readonly<Record<string, number>>): void {
+    if (this.destroyed) return;
+
+    const changedTexts: Phaser.GameObjects.Text[] = [];
+    let changed = false;
+
+    this.items.forEach((item, index) => {
+      const value = readResourceValue(resources, item.key);
+      if (value === item.value) return;
+      changed = true;
+
+      const bounds = readResourceBounds(this.options.bounds, item.key);
+      const state = resolveResourceState(value, bounds);
+      const irreversible = this.isIrreversible(item.key);
+      const color = this.resolveColor(state, irreversible);
+      item.text.setText(
+        this.buildContent(item.label, value, bounds, state, irreversible),
+      );
+      item.text.setColor(color);
+      this.items[index] = { ...item, value, state, color };
+      changedTexts.push(item.text);
+    });
+
+    if (!changed) return;
+
+    // A fresh update always starts from a settled row: the previous pop (if
+    // any) is stopped and every text returns to its resting scale.
+    this.stopTweens();
+
+    if (!this.reducedMotionFlag) {
+      this.animateValueChange(changedTexts);
+      this.playUpdateSfx();
+    }
+
+    this.options.onChange?.(this.getResources());
   }
 
   // ── Lifecycle ──────────────────────────────────────────────
 
   protected destroyContent(): void {
+    this.stopTweens();
     for (const item of this.items) {
       try {
         item.text.destroy();
@@ -406,6 +514,66 @@ export class ResourceHud extends UIComponentBase {
       this.container.destroy();
     } catch {
       // Non-fatal — Phaser may throw if the object was already destroyed.
+    }
+  }
+
+  // ── Update helpers ─────────────────────────────────────────
+
+  /**
+   * Starts the single value-change pop tween and tracks it for teardown.
+   *
+   * All changed texts are targets of one tween so an update costs one tween
+   * and one SFX regardless of how many keys moved.
+   */
+  private animateValueChange(texts: readonly Phaser.GameObjects.Text[]): void {
+    if (texts.length === 0) return;
+    const tweens = this.scene.tweens;
+    if (!tweens || typeof tweens.add !== 'function') return;
+
+    for (const text of texts) text.setScale(UPDATE_TWEEN_POP_SCALE);
+
+    const tween = tweens.add({
+      targets: texts as Phaser.GameObjects.Text[],
+      scaleX: 1,
+      scaleY: 1,
+      duration: UPDATE_TWEEN_DURATION_MS,
+      ease: 'Quad.easeOut',
+      onComplete: () => this.tweens.delete(tween),
+      onStop: () => this.tweens.delete(tween),
+    });
+    if (tween) this.tweens.add(tween);
+  }
+
+  /**
+   * Plays at most one SFX for this update — only when the caller supplied both
+   * a `soundManager` and a `COMMON_SFX_KEYS` key, and never under reduced
+   * motion (the callers of this helper gate that).
+   */
+  private playUpdateSfx(): void {
+    const { soundManager, sfx } = this.options;
+    if (!soundManager || !sfx) return;
+    soundManager.play(sfx);
+  }
+
+  /**
+   * Stops and forgets every tracked pop tween, returning the texts to their
+   * resting scale. Safe to call when no tween is in flight.
+   */
+  private stopTweens(): void {
+    for (const tween of this.tweens) {
+      try {
+        tween.stop();
+      } catch {
+        // Non-fatal — the tween may already have completed or been destroyed.
+      }
+    }
+    this.tweens.clear();
+    for (const item of this.items) {
+      try {
+        item.text.setScale(1);
+      } catch {
+        // Non-fatal — Phaser may throw if the object was already destroyed.
+      }
     }
   }
 

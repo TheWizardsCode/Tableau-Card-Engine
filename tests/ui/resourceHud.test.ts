@@ -12,12 +12,19 @@
  * key in the caller's irreversible subset prints the word `irreversible` —
  * each with a secondary colour cue, never colour alone (GDD §3.4.3).
  *
+ * Finally it specifies the value-update path: `setResources(bag)` animates only
+ * the changed value texts (never re-flowing the layout), plays at most one
+ * `COMMON_SFX_KEYS` SFX through the injected `SoundManager`, reports the new
+ * bag through `onChange`, snaps instantly and silently under reduced motion,
+ * and is a safe no-op after `destroy()`.
+ *
  * Uses a minimal Phaser stub, matching `HintBar.test.ts`, so the component is
  * exercised headlessly in Node.js.
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 
+import { COMMON_SFX_KEYS } from '../../src/core-engine/SoundManager';
 import { FONT_FAMILY } from '../../src/ui/constants';
 import { uiNodeSafeModules } from '../../src/ui/node-safe-modules';
 import {
@@ -41,11 +48,33 @@ interface MockText {
   style: Record<string, unknown>;
   originX: number;
   originY: number;
+  scaleX: number;
+  scaleY: number;
   destroyed: boolean;
   setOrigin: (x: number, y?: number) => MockText;
   setText: (text: string) => MockText;
+  setColor: (color: string) => MockText;
+  setScale: (x: number, y?: number) => MockText;
   setDepth: (depth: number) => MockText;
   destroy: () => void;
+}
+
+interface MockTween {
+  config: Record<string, any>;
+  stopped: boolean;
+  stop: () => void;
+}
+
+interface MockTweens {
+  configs: Record<string, any>[];
+  created: MockTween[];
+  add: (config: Record<string, any>) => MockTween;
+}
+
+/** Records every `play(key)` call, so an SFX assertion reads the seam not internals. */
+interface MockSoundManager {
+  played: string[];
+  play: (key: string) => void;
 }
 
 interface MockContainer {
@@ -74,6 +103,8 @@ function makeText(
     style,
     originX: 0,
     originY: 0,
+    scaleX: 1,
+    scaleY: 1,
     destroyed: false,
     setOrigin(ox: number, oy?: number) {
       mock.originX = ox;
@@ -82,6 +113,15 @@ function makeText(
     },
     setText(next: string) {
       mock.text = next;
+      return mock;
+    },
+    setColor(color: string) {
+      mock.style = { ...mock.style, color };
+      return mock;
+    },
+    setScale(sx: number, sy?: number) {
+      mock.scaleX = sx;
+      mock.scaleY = sy ?? sx;
       return mock;
     },
     setDepth() {
@@ -97,6 +137,8 @@ function makeText(
 class MockScene {
   readonly texts: MockText[] = [];
   readonly containers: MockContainer[] = [];
+
+  readonly tweens: MockTweens = makeTweens();
 
   add = {
     text: (x: number, y: number, text: string, style: Record<string, unknown>) => {
@@ -134,6 +176,38 @@ class MockScene {
 
 function makeHud(scene: MockScene, options: ResourceHudOptions): ResourceHud {
   return new ResourceHud(scene as any, options);
+}
+
+function makeTweens(): MockTweens {
+  const configs: Record<string, any>[] = [];
+  const created: MockTween[] = [];
+  return {
+    configs,
+    created,
+    add(config: Record<string, any>) {
+      const tween: MockTween = {
+        config,
+        stopped: false,
+        stop() {
+          tween.stopped = true;
+          if (typeof config.onStop === 'function') config.onStop();
+        },
+      };
+      configs.push(config);
+      created.push(tween);
+      return tween;
+    },
+  };
+}
+
+function makeSoundManager(): MockSoundManager {
+  const played: string[] = [];
+  return {
+    played,
+    play(key: string) {
+      played.push(key);
+    },
+  };
 }
 
 const DEFAULT_ITEM_GAP = 18;
@@ -690,6 +764,295 @@ describe('ResourceHud', () => {
     });
   });
 
+  // ── Value updates ─────────────────────────────────────────
+
+  describe('value updates', () => {
+    it('updates each declared key from the new bag in place', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 3, morale: 6, supply: 4 });
+
+      expect(hud.getItems().map((item) => item.value)).toEqual([3, 6, 4]);
+      expect(hud.getItems().map((item) => item.text.text)).toEqual([
+        'Hull 3',
+        'Morale 6',
+        'Supply 4',
+      ]);
+      expect(hud.getResources()).toEqual({ hull: 3, morale: 6, supply: 4 });
+    });
+
+    it('reuses the existing text objects and container (no re-render)', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      const texts = hud.getItems().map((item) => item.text);
+
+      hud.setResources({ hull: 3, morale: 6, supply: 4 });
+
+      expect(scene.texts).toHaveLength(3);
+      expect(scene.containers).toHaveLength(1);
+      expect(hud.getItems().map((item) => item.text)).toEqual(texts);
+    });
+
+    it('never re-flows the layout', () => {
+      const hud = makeHud(scene, { ...BASE_OPTIONS, align: 'right' });
+      const xs = hud.getItems().map((item) => item.text.x);
+      const containerX = scene.containers[0].x;
+
+      hud.setResources({ hull: 1, morale: 2, supply: 3 });
+
+      expect(hud.getItems().map((item) => item.text.x)).toEqual(xs);
+      expect(scene.containers[0].x).toBe(containerX);
+    });
+
+    it('reads an absent or non-finite key as zero on update', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 2, morale: Number.NaN });
+
+      expect(hud.getItems().map((item) => item.value)).toEqual([2, 0, 0]);
+    });
+
+    it('animates only the changed value texts with one tween', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 7, morale: 5, supply: 3 });
+
+      expect(scene.tweens.configs).toHaveLength(1);
+      const [config] = scene.tweens.configs;
+      expect(config.targets).toEqual([hud.getItems()[0].text]);
+      expect(config.scaleX).toBe(1);
+      expect(config.scaleY).toBe(1);
+      expect(config.duration).toBeGreaterThan(0);
+    });
+
+    it('plays exactly one COMMON_SFX_KEYS SFX on an animated update', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.TURN_CHANGE,
+      });
+
+      hud.setResources({ hull: 1, morale: 5, supply: 3 });
+
+      expect(sound.played).toEqual([COMMON_SFX_KEYS.TURN_CHANGE]);
+    });
+
+    it('plays at most one SFX however many values change', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+      });
+
+      hud.setResources({ hull: 1, morale: 1, supply: 1 });
+
+      expect(sound.played).toHaveLength(1);
+    });
+
+    it('is a silent no-op when no SoundManager is supplied', () => {
+      const hud = makeHud(scene, { ...BASE_OPTIONS, sfx: COMMON_SFX_KEYS.UI_CLICK });
+
+      expect(() =>
+        hud.setResources({ hull: 1, morale: 1, supply: 1 }),
+      ).not.toThrow();
+      expect(scene.tweens.configs).toHaveLength(1);
+    });
+
+    it('plays no SFX when no key is supplied', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, { ...BASE_OPTIONS, soundManager: sound });
+
+      hud.setResources({ hull: 1, morale: 1, supply: 1 });
+
+      expect(sound.played).toEqual([]);
+    });
+
+    it('does nothing and makes no sound when no value changed', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+      });
+
+      hud.setResources({ ...BASE_OPTIONS.resources });
+
+      expect(scene.tweens.configs).toHaveLength(0);
+      expect(sound.played).toEqual([]);
+    });
+
+    it('reports the new bag through onChange', () => {
+      const seen: Record<string, number>[] = [];
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        onChange: (bag) => seen.push({ ...bag }),
+      });
+
+      hud.setResources({ hull: 1, morale: 2, supply: 3 });
+
+      expect(seen).toEqual([{ hull: 1, morale: 2, supply: 3 }]);
+    });
+
+    it('does not report an unchanged bag through onChange', () => {
+      const seen: Record<string, number>[] = [];
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        onChange: (bag) => seen.push({ ...bag }),
+      });
+
+      hud.setResources({ ...BASE_OPTIONS.resources });
+
+      expect(seen).toEqual([]);
+    });
+
+    it('re-resolves the printed state marker and colour cue on update', () => {
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        declaredKeys: ['hull', 'morale'],
+        resources: { hull: 1, morale: 4 },
+        bounds: HULL_BOUNDS,
+        style: MARKER_STYLE,
+      });
+
+      hud.setResources({ hull: 5, morale: 4 });
+
+      const [hull, morale] = hud.getItems();
+      expect(hull.text.text).toBe(
+        `Hull 5 / 5 ${RESOURCE_HUD_MARKERS.full}`,
+      );
+      expect(hull.state).toBe('full');
+      expect(hull.color).toBe(MARKER_STYLE.fullColor);
+      expect(hull.text.style.color).toBe(MARKER_STYLE.fullColor);
+      expect(morale.text.text).toBe('Morale 4 / 8');
+      expect(morale.state).toBeUndefined();
+      expect(morale.color).toBe(MARKER_STYLE.color);
+    });
+
+    it('prints a spilled value exactly as supplied', () => {
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        declaredKeys: ['hull'],
+        resources: { hull: 2 },
+        bounds: HULL_BOUNDS,
+      });
+
+      hud.setResources({ hull: 9 });
+
+      expect(hud.getItems()[0].text.text).toBe(
+        `Hull 9 / 5 ${RESOURCE_HUD_MARKERS.full}`,
+      );
+      expect(hud.getItems()[0].value).toBe(9);
+    });
+
+    it('prints a value clamped to the floor exactly as supplied', () => {
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        declaredKeys: ['morale'],
+        resources: { morale: 4 },
+        bounds: HULL_BOUNDS,
+      });
+
+      hud.setResources({ morale: 0 });
+
+      expect(hud.getItems()[0].text.text).toBe(
+        `Morale 0 / 8 ${RESOURCE_HUD_MARKERS.empty}`,
+      );
+    });
+
+    it('keeps the irreversible marker and cue across an update', () => {
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        declaredKeys: ['hull'],
+        resources: { hull: 2 },
+        bounds: HULL_BOUNDS,
+        irreversible: ['hull'],
+        style: MARKER_STYLE,
+      });
+
+      hud.setResources({ hull: 4 });
+
+      expect(hud.getItems()[0].text.text).toBe(
+        `Hull 4 / 5 ${RESOURCE_HUD_MARKERS.irreversible}`,
+      );
+      expect(hud.getItems()[0].color).toBe(MARKER_STYLE.irreversibleColor);
+    });
+
+    it('stops the in-flight tween before starting the next update', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 1, morale: 5, supply: 3 });
+      const firstTween = scene.tweens.created[0];
+
+      hud.setResources({ hull: 2, morale: 5, supply: 3 });
+
+      expect(firstTween.stopped).toBe(true);
+      expect(scene.tweens.configs).toHaveLength(2);
+    });
+  });
+
+  // ── Reduced motion ────────────────────────────────────────
+
+  describe('reduced motion', () => {
+    it('snaps to the new value with no tween and no SFX', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        reducedMotion: true,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+      });
+
+      hud.setResources({ hull: 9, morale: 0, supply: 3 });
+
+      expect(scene.tweens.configs).toHaveLength(0);
+      expect(sound.played).toEqual([]);
+      expect(hud.getItems().map((item) => item.text.text)).toEqual([
+        'Hull 9',
+        'Morale 0',
+        'Supply 3',
+      ]);
+    });
+
+    it('reports the change through onChange under reduced motion', () => {
+      const seen: Record<string, number>[] = [];
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        reducedMotion: true,
+        onChange: (bag) => seen.push({ ...bag }),
+      });
+
+      hud.setResources({ hull: 1, morale: 2, supply: 3 });
+
+      expect(seen).toEqual([{ hull: 1, morale: 2, supply: 3 }]);
+    });
+
+    it('stops an in-flight tween and snaps when motion is turned off', () => {
+      const sound = makeSoundManager();
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+      });
+      hud.setResources({ hull: 1, morale: 5, supply: 3 });
+      const animatedTween = scene.tweens.created[0];
+      expect(hud.getItems()[0].text.scaleX).not.toBe(1);
+
+      hud.setReducedMotion(true);
+      hud.setResources({ hull: 2, morale: 5, supply: 3 });
+
+      expect(animatedTween.stopped).toBe(true);
+      expect(scene.tweens.configs).toHaveLength(1);
+      expect(sound.played).toHaveLength(1);
+      expect(hud.getItems()[0].text.scaleX).toBe(1);
+    });
+
+    it('exposes the resolved reduced-motion flag', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      expect(hud.reducedMotion).toBe(false);
+
+      hud.setReducedMotion(true);
+
+      expect(hud.reducedMotion).toBe(true);
+    });
+  });
+
   // ── Lifecycle ─────────────────────────────────────────────
 
   describe('destroy', () => {
@@ -709,6 +1072,47 @@ describe('ResourceHud', () => {
         hud.destroy();
         hud.destroy();
       }).not.toThrow();
+    });
+
+    it('stops every tracked tween', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 1, morale: 5, supply: 3 });
+      const tween = scene.tweens.created[0];
+
+      hud.destroy();
+
+      expect(tween.stopped).toBe(true);
+    });
+
+    it('is safe to call destroy() repeatedly while a tween is tracked', () => {
+      const hud = makeHud(scene, BASE_OPTIONS);
+      hud.setResources({ hull: 1, morale: 5, supply: 3 });
+
+      expect(() => {
+        hud.destroy();
+        hud.destroy();
+      }).not.toThrow();
+    });
+
+    it('makes a post-destroy setResources a safe no-op', () => {
+      const sound = makeSoundManager();
+      const seen: Record<string, number>[] = [];
+      const hud = makeHud(scene, {
+        ...BASE_OPTIONS,
+        soundManager: sound,
+        sfx: COMMON_SFX_KEYS.UI_CLICK,
+        onChange: (bag) => seen.push({ ...bag }),
+      });
+      const before = hud.getItems().map((item) => item.text.text);
+      hud.destroy();
+
+      expect(() =>
+        hud.setResources({ hull: 1, morale: 1, supply: 1 }),
+      ).not.toThrow();
+      expect(hud.getItems().map((item) => item.text.text)).toEqual(before);
+      expect(scene.tweens.configs).toHaveLength(0);
+      expect(sound.played).toEqual([]);
+      expect(seen).toEqual([]);
     });
   });
 
