@@ -16,7 +16,10 @@
  *  4. the outcome word is printed in every outcome state (colour is only a
  *     secondary cue);
  *  5. reduced motion presents everything synchronously with no timer and no
- *     SFX;
+ *     SFX, from **either** source (CG-0MWZCOFVH002WEY6): the explicit
+ *     `reducedMotion` flag, or the effective preference
+ *     (`getEffectiveReducedMotion()` — the SettingsStore toggle, then the CSS
+ *     `prefers-reduced-motion: reduce` fallback);
  *  6. `destroy()` is idempotent and leaves no text object behind.
  *
  * @module tests/ui/scene-exit-presentation.browser.test.ts
@@ -66,6 +69,9 @@ const LAYOUT: ScreenLayoutDocument = {
     },
   },
 };
+
+/** Storage key the SettingsStore persists the reduced-motion toggle under. */
+const REDUCED_MOTION_STORAGE_KEY = 'tce-ui-reduced-motion';
 
 const FIELDS = {
   actTitle: 'Act I',
@@ -420,6 +426,93 @@ describe('presentSceneExit browser behaviour', () => {
     }
 
     // Reduced motion: no timer, no SFX (the accessibility contract).
+    expect(scheduler.calls).toHaveLength(0);
+    expect(soundManager.play).not.toHaveBeenCalled();
+  });
+
+  it('honours the settings preference: all four fields instantly, no timer or SFX', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const soundManager = { play: vi.fn(() => true) };
+    const onComplete = vi.fn();
+
+    // No explicit `reducedMotion` option: the effective preference decides.
+    // The SettingsStore toggle (localStorage) is the person's own choice, so
+    // it takes priority over the CSS media-query fallback.
+    localStorage.setItem(REDUCED_MOTION_STORAGE_KEY, 'true');
+    try {
+      handle = presentSceneExit(scene, {
+        ...FIELDS,
+        resolveAnchor,
+        scheduler,
+        soundManager,
+        onComplete,
+      });
+
+      const plan = handle.plan;
+      expect(plan.instant).toBe(true);
+      expect(plan.steps).toHaveLength(1);
+      expect(plan.totalMs).toBe(0);
+
+      // Synchronous: the promise is settled before the caller resumes.
+      expect(handle.done).toBe(true);
+      await handle.promise;
+      expect(onComplete).toHaveBeenCalledTimes(1);
+
+      // All four fields are present and visible in the one instant step.
+      for (const value of Object.values(FIELDS)) {
+        const text = textFor(scene, value);
+        expect(text, `missing instant text for ${value}`).toBeDefined();
+        expect(text!.visible).toBe(true);
+      }
+
+      // No timer and no SFX: the preference suppresses motion *and* audio.
+      expect(scheduler.calls).toHaveLength(0);
+      expect(soundManager.play).not.toHaveBeenCalled();
+    } finally {
+      localStorage.removeItem(REDUCED_MOTION_STORAGE_KEY);
+    }
+  });
+
+  it('falls back to prefers-reduced-motion when no setting is stored', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const soundManager = { play: vi.fn(() => true) };
+
+    // Storage carries no explicit preference, so the CSS media query decides.
+    localStorage.removeItem(REDUCED_MOTION_STORAGE_KEY);
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      media: query,
+      matches: true,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      // No explicit `reducedMotion` option: only the platform preference can
+      // collapse the plan.
+      handle = presentSceneExit(scene, {
+        ...FIELDS,
+        resolveAnchor,
+        scheduler,
+        soundManager,
+      });
+    } finally {
+      // The instant path is synchronous, so the platform stub is no longer
+      // needed once presentSceneExit has returned.
+      window.matchMedia = realMatchMedia;
+    }
+
+    expect(handle.plan.instant).toBe(true);
+    expect(handle.done).toBe(true);
+    await handle.promise;
+
+    for (const value of Object.values(FIELDS)) {
+      const text = textFor(scene, value);
+      expect(text, `missing instant text for ${value}`).toBeDefined();
+      expect(text!.visible).toBe(true);
+    }
+
     expect(scheduler.calls).toHaveLength(0);
     expect(soundManager.play).not.toHaveBeenCalled();
   });
