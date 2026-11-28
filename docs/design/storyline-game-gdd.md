@@ -2367,10 +2367,10 @@ reviewed as art, not asserted by a unit test.
 | Open/close Help | `?` (engine default `toggleKey`) | tap the help button | **Available** (`HelpPanel`) |
 | Open/close Settings | Escape (engine default `toggleKey`) | tap the settings button | **Available** (`SettingsPanel`) |
 | Skip a narration reveal | any key | tap | **Available** (`revealNarration` `skipOnInput`, default on) |
-| Page the narrative or journal | Gap B7 (the page control is pointer-driven at this commit) | tap the page control | **Partly available** — `paginateProse()` is available; keyboard activation is B7 |
-| Select a choice | `1`–`6`, or arrows + Enter | tap the option row | **Gap B7** — no shared choice-navigation helper exists |
-| Traverse/activate overlay buttons | Tab / Enter / Space | tap | **Gap B7** — overlay focus order is not implemented |
-| Close a modal | Escape | close button | **Partly available** — the dialog exposes `close()`; the game binds Escape |
+| Page the narrative or journal | Tab to the page control, then Enter/Space | tap the page control | **Available** — `paginateProse()` + `attachOverlayFocus()` (page controls are focusable overlay items) |
+| Select a choice | `1`–`9`, or arrows + Enter/Space | tap the option row | **Available** — `attachChoiceNavigation()` (digits, arrow wrap, Enter/Space activation) |
+| Traverse/activate overlay buttons | Tab / Shift+Tab, then Enter/Space | tap | **Available** — `attachOverlayFocus()` (list-order traversal with wrap) |
+| Close a modal | Escape (topmost managed overlay only) | close button | **Available** — `attachOverlayFocus()` closes only the topmost managed overlay; `OverlayDialogHandle.close()` remains the close path |
 | End-turn shortcut | `getEndTurnKeybind()` | n/a | **Not applicable** — the loop has no end-turn action; choices advance the beat |
 
 **Touch rules.** Every interactive element is a Phaser `Text`/container with
@@ -2492,7 +2492,7 @@ No gap is described as though it already works.
 | B1 Beat-sheet / objective layer | the banner, objective, clock, ledger and restart data all read from it | no scene, objective or budget concept exists (`src/story-line/compile.ts`; the spike's act/clock live in `example-games/gym/GymLongErasureGame.ts`) | large (the build epic's core) | epic | [G1](#g1) — filed (`CG-0MWR0BAT30015DPQ`) |
 | B4 Affordability presentation | showing an unaffordable option with its shortfall instead of removing it | **engine half delivered** — the requirement object ships (`optionAffordability`, `OptionAffordability` on `StorylineOption.affordability`, opt-in `'surface'` policy) and resolution refuses it; the disabled-option visual and shortfall wording remain the presentation surface's work ([§3.6](#36-named-presentation-gaps)) | small | task | [G7](#g7) — **engine delivered** by `CG-0MWR0BI3S008K9Y6`; presentation remains |
 | B5 Act/scene transition presentation | the `sceneBanner` and act transition motion | the camera transition ships (`runSceneTransition` in `src/ui/sceneTransition.ts`); no banner surface or outcome→route sequence exists, and the spike has no scene boundary (`example-games/gym/layouts/gym-long-erasure.layout.json`) | small–medium | feature | [G9](#g9) — filed (`CG-0MWR0BJBU005TDTT`) |
-| B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | only the panels' own toggle keys are bound (`?` for Help, Escape for Settings — `src/ui/HelpPanel.ts`, `src/ui/SettingsPanel.ts`, `src/ui/SettingsStore.ts`); no choice-list or overlay-focus helper exists | small | task | [G11](#g11) — filed (`CG-0MWR0BKIT0084ZID`) |
+| B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | **engine delivered** — `attachChoiceNavigation()` and `attachOverlayFocus()` ship in `src/ui/keyboard-navigation.ts`, with a stack-aware Escape that closes only the topmost modal; the panels keep their own toggle keys (`?` for Help, Escape for Settings) | small | task | [G11](#g11) — **engine delivered** by `CG-0MWR0BKIT0084ZID` |
 | B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | `SettingsStore` has tooltips and reduced motion but no verbosity key; `SettingsPanel.extraToggles` gives a game-local toggle without shared persistence | extra-small | task | [G12](#g12) — filed (`CG-0MWR0BL4Q000OYG6`) |
 | B9 Deterministic replay adapter | the replay guarantees in [§3.5.4](#354-replay) | the replay tool is engine code but a game's adapter is a build-epic deliverable; no adapter exists for this game | small | task | [G13](#g13) — deferred to the build epic |
 
@@ -2537,10 +2537,14 @@ The contract is pinned by one unit suite and four review checks.
 - **No automated contrast audit.** The WCAG targets in
   [§3.4.3](#343-colour-independent-signalling) are a review gate; no engine
   checker measures the rendered palette.
-- **The keyboard path is untestable until B7 lands.** Only the engine's own
-  panel toggles and the narration skip can be exercised at this commit; choice
-  navigation
-  and overlay focus are explicitly a gap, not an assumed capability.
+- **The keyboard path is engine-tested but not human-playtested.**
+  `attachChoiceNavigation` and `attachOverlayFocus` ship with headless unit
+  coverage (digits, arrow wrap, focus traversal, topmost-only Escape, inertness
+  while a modal is open, teardown) and a browser test that drives the real
+  `scene.input.keyboard` and asserts the rendered focus state on a parented
+  overlay ([§6](#6-engine-gap-backlog) G11, `CG-0MWR0BKIT0084ZID`). Whether the
+  focus cue reads well for a keyboard-only player is still the human playtest
+  above, not an assumption of this section.
 - **No touch browser test for the journal paging.** `paginateProse()` is unit
   tested and the spike renders it, but the full game's overlay does not exist yet;
   the touch assertion is a review check until the build epic supplies the scene.
@@ -2914,7 +2918,7 @@ invisible.
 | [G8](#g8) | Resource HUD: render a game-declared resource set, its bounds and its loss-bearing subset | [§2.8.6](#286-what-the-engine-cannot-express-at-this-commit-named-gaps) item 7, [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | **delivered** — `ResourceHud` (`src/ui/ResourceHud.ts`, exported from `@ui`) renders one labelled item per caller-declared key in declaration order, prints `value / max` for bounded keys, prints the `full` / `empty` / `irreversible` markers with secondary colour cues and updates through `setResources(bag)` (one pop tween, at most one SFX, instant and silent under reduced motion); the declaration is plain data, so `src/ui` still does not import `@story-line` | medium — `src/ui/TokenPileView.ts` + `src/ui/HintBar.ts` | feature | **Delivered** — `CG-0MWR0BIPV0074WLM` (`src/ui/ResourceHud.ts`; Gym adoption `CG-0MWZ9WDWS004NJ8Y`) |
 | [G9](#g9) | Act/scene transition presentation: scene-exit banner and a sequenced act transition with a reduced-motion path | [§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.6](#36-named-presentation-gaps) B5 | `src/ui/sceneTransition.ts` animates the camera only; no banner surface, no outcome→route sequence and no rendered scene boundary | small–medium — `src/ui/sceneTransition.ts` + `src/ui/narration-reveal.ts` | feature | Filed — `CG-0MWR0BJBU005TDTT` |
 | [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | **delivered** — `src/story-line/content/adapters.ts` declares neither column; `GymLongErasureGame` resolves act and pacing from `long-erasure-episode.json`, and the generated graph manifest carries no `fields.act` / `fields.clockCost` | small — the adapter column declaration + `missing-column` diagnostic | chore | **Delivered** — `CG-0MWR0BJXI007UINE` |
-| [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`6` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | only `HelpPanel` / `SettingsPanel` toggle keys and `getEndTurnKeybind()` are bound; no choice-list navigator or focus helper is exported from `src/ui/index.ts` | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | Filed — `CG-0MWR0BKIT0084ZID` |
+| [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`9` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | **delivered (engine)** — `attachChoiceNavigation()` (in-range digits, arrow wrap, Enter/Space activation, inert while a managed overlay is open) and `attachOverlayFocus()` (list-order Tab/Shift+Tab traversal, Enter/Space activation, stack-aware Escape, visible focus contract) ship in `src/ui/keyboard-navigation.ts` with a headless seam and a node-safe manifest entry; `HelpPanel` / `SettingsPanel` keep their own toggle keys | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | **Delivered** — `CG-0MWR0BKIT0084ZID` |
 | [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | `SettingsStore` persists tooltips and the end-turn keybind, `ReducedMotion` persists reduced motion; no verbosity key exists, and `extraToggles` is game-local | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Filed — `CG-0MWR0BL4Q000OYG6` |
 | [G13](#g13) | Deterministic replay adapter + fixture for this game | [§3.5.4](#354-replay), [§3.6](#36-named-presentation-gaps) B9, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | the engine seam is present (`scripts/replay.ts` + `scripts/adapters/ReplayAdapter.ts`); no adapter or fixture for this game exists | small — the Golf replay adapter as the reference implementation | task | **Deferred to the build epic** (game-owned deliverable, not engine work) |
 | [G14](#g14) | CSV authoring ergonomics for writers (the spike's five frictions) | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | delivered: `add-option`, `add-linked-card`, `add-card --after`, `--context` / `--epilogue` and the per-file `#resources:` declaration close all five frictions on the CLI | small — `src/story-line/content/author.ts` + `src/story-line/content/mutate.ts` | chore | **Delivered** — `CG-0MWQYDC7D003G4ON` |
@@ -3281,7 +3285,7 @@ from `long-erasure-episode.json` (a card absent from the beat sheet is a loud
 #### <a id="g11"></a>G11 — Keyboard choice navigation and overlay focus order
 
 **What it unlocks.** The keyboard path of
-[§3.4.4](#344-keyboard-and-touch-input-paths): choose an option with `1`–`6` or
+[§3.4.4](#344-keyboard-and-touch-input-paths): choose an option with `1`–`9` or
 arrows + Enter, traverse focus in an open overlay, activate with Enter/Space and
 close only the topmost modal with Escape
 ([§3.2](#32-overlay-behaviour)). Without it the accessibility contract's keyboard
@@ -3297,10 +3301,32 @@ focus-trap or focus-order helper is exported from `src/ui/index.ts`.
 **Nearest precedent and effort band.** **Small**: the keydown listener lifecycle
 in `src/ui/HelpPanel.ts` (register, and `off` on destroy) and
 `src/ui/OverlayManager.ts` (one live modal, ordered open/close). One navigator
-helper plus focus handling on the existing overlay primitives.
+module plus focus handling over the existing overlay primitives — no overlay
+primitive signature changed.
 
-**Disposition.** **Filed** — `CG-0MWR0BKIT0084ZID` (`task`, low, effort `S`).
-Blocked by the GDD epic.
+**Delivered.** `src/ui/keyboard-navigation.ts` exports two additive helpers from
+the `@ui` barrel — `attachChoiceNavigation()` and `attachOverlayFocus()` — each
+returning an idempotent disposer and tearing down on scene `shutdown`:
+
+- `attachChoiceNavigation(scene, { count, onChoose, onHighlight?, keys?, keyboard?, lifecycle?, isBlocked? })`
+  maps in-range `1`–`9` to option indices, moves the highlight with all four
+  arrows (wrapping both ends), activates with Enter/Space, and is inert while a
+  managed overlay is open or `isBlocked()` returns `true`.
+- `attachOverlayFocus(scene, focusables, { onEscape, onFocusChange?, keyboard?, lifecycle? })`
+  traverses the supplied `OverlayFocusable[]` in list order (Tab / Shift+Tab,
+  wrapping), activates with Enter/Space, reports focus through `onFocusChange`
+  and `setFocusVisual`, and calls `onEscape` only for the **topmost** managed
+  overlay — with no frame attached it does not observe Escape at all, so
+  `SettingsPanel`'s default Escape toggle keeps working (GDD §3.2 rule 3).
+
+`HelpPanel` (`toggleKey`, default `FORWARD_SLASH` = `?`) and `SettingsPanel`
+(`toggleKey`, default `Escape`) keep their own lifecycle and are unmodified;
+the new Escape handler is stack-aware rather than a competing global listener.
+
+**Disposition.** **Delivered** — `CG-0MWR0BKIT0084ZID` (`task`, low, effort `S`),
+with headless unit coverage (digits, out-of-range, arrow wrap, activation,
+focus traversal/wrap, topmost-only Escape, modal inertness, disposer/shutdown
+teardown) and a browser test against the real `scene.input.keyboard`.
 
 #### <a id="g12"></a>G12 — Shared verbosity preference
 
@@ -3419,7 +3445,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G8 | `CG-0MWR0BIPV0074WLM` | feature | medium | M | GDD epic | **Delivered** — `ResourceHud` (declared resource set, bounds display, printed `full` / `empty` / `irreversible` markers, animated/SFX value updates with a reduced-motion snap) + Gym adoption `CG-0MWZ9WDWS004NJ8Y` |
 | G9 | `CG-0MWR0BJBU005TDTT` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
 | G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | **Delivered** — the adapter declares neither retired column; `long-erasure.csv` + fixtures migrated; act/pacing resolve from `long-erasure-episode.json`; `clock-cost-mismatch` retained as a documented no-op |
-| G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | blocked, scheduled past the GDD close |
+| G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | **Delivered** — shared keyboard helpers in `src/ui/keyboard-navigation.ts` (`attachChoiceNavigation`, `attachOverlayFocus`) with unit + browser coverage |
 | G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
 | G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
 | G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | **Delivered** — authoring CLI ergonomics |
@@ -3685,7 +3711,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Resource HUD for the declared five-key bag | [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.4.3](#343-colour-independent-signalling) | [G8](#g8) | medium | `CG-0MWR0BIPV0074WLM` (delivered) |
 | Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
 | Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` (delivered) |
-| Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` |
+| Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` (delivered) |
 | Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` |
 | Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` (delivered) |
 

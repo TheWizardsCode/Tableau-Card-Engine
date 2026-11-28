@@ -4329,6 +4329,76 @@ render consistently above gameplay content across all example games.
 | Illegal-move reason toast    | 1900   | Transient rejection explanation            |
 | Game-state overlays          | 2000   | Win, loss, game-over, round-end overlays   |
 
+### Keyboard Navigation (Choice Lists and Overlay Focus)
+
+The shared keyboard contract for story-line and other choice-driven games lives
+in [`src/ui/keyboard-navigation.ts`](../src/ui/keyboard-navigation.ts)
+(`CG-0MWR0BKIT0084ZID`; GDD G11 / gap B7). Two additive helpers replace the
+per-scene `keydown` listeners games used to hand-roll:
+
+| Helper | Contract |
+|--------|----------|
+| `attachChoiceNavigation(scene, { count, onChoose, onHighlight?, keys?, keyboard?, lifecycle?, isBlocked? })` | `1`–`9` select an in-range option (highlight **and** choose); ArrowUp/ArrowLeft and ArrowDown/ArrowRight move the highlight with wrap; Enter/Space activate the highlight. Inert while a managed overlay is open, while `isBlocked()` returns `true`, and after disposal. |
+| `attachOverlayFocus(scene, focusables, { onEscape, onFocusChange?, keyboard?, lifecycle? })` | Tab/Shift+Tab traverse the supplied `OverlayFocusable[]` in list order with wrap; Enter/Space call the focused item's `onActivate()`; Escape calls `onEscape()` **only** for the topmost managed overlay. Attaching focuses index `0` and calls `setFocusVisual(true)`. |
+
+Both helpers return an **idempotent disposer** and also tear down on the scene's
+`shutdown` event. They own the key wiring and focus bookkeeping; the game owns
+the artwork.
+
+```ts
+import {
+  attachChoiceNavigation,
+  attachOverlayFocus,
+} from '@ui/keyboard-navigation';
+
+// A choice list: digits and arrows drive the same highlight.
+const disposeChoices = attachChoiceNavigation(scene, {
+  count: options.length,
+  onHighlight: (index) => highlightRow(index),
+  onChoose: (index) => resolveChoice(index),
+});
+
+// An open modal: Tab walks the controls, Enter activates, Escape closes it.
+const buttons = [continueButton, saveButton, quitButton];
+const disposeFocus = attachOverlayFocus(
+  scene,
+  buttons.map((button) => ({
+    onActivate: () => button.activate(),
+    setFocusVisual: (focused) => button.setFocused(focused),
+  })),
+  {
+    onEscape: () => dialog.close(),
+    onFocusChange: (index) => renderFocus(index),
+  },
+);
+
+// Later, when the overlay closes: one teardown path, no leaked listeners.
+disposeFocus();
+```
+
+**Focus order and the Escape stack.** Overlay frames form a shared stack: the
+most recently attached frame is topmost and alone handles keys, so a lower modal
+never steals Tab, activation or Escape. Attaching an overlay frame makes
+`attachChoiceNavigation` inert (`isManagedOverlayOpen()`), and with no frame
+attached the helpers do **not** observe Escape at all — `SettingsPanel`'s
+default `Escape` toggle keeps working (GDD §3.2 rule 3).
+
+**Visible focus is mandatory.** `setFocusVisual(focused)` is called `true` on the
+newly focused item and `false` on the item losing focus (including on disposal),
+and `onFocusChange(index)` reports the index so a game can render its own cue.
+Nothing animates, so reduced motion is a no-op and the keyboard path is
+identical under it.
+
+**Headless-testable by construction.** Keyboard and scene lifecycle access go
+through injectable `{ on, off }` seams (`KeyboardSeam`, `LifecycleSeam`) that
+default to `scene.input.keyboard` and `scene.events` — the same pattern as
+`revealNarration()`. A null scene or a scene with no keyboard plugin never
+throws. The module uses Phaser as a **type-only** import and is listed in the
+node-safe manifest (`src/ui/node-safe-modules.ts`), so downstream game unit
+suites can import `@ui/keyboard-navigation` under plain Node. The pure reducers
+`resolveChoiceKeyAction()`, `resolveOverlayKeyAction()` and `wrapIndex()` expose
+the wrap/range rules without a scene.
+
 ### Full Component Reference
 
 For comprehensive documentation covering all shared HUD components

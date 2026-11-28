@@ -157,6 +157,30 @@ export {
   DEFAULT_PROSE_PAGE_CHARS,
 } from './prose-pagination';
 export type { ProsePagination } from './prose-pagination';
+
+// Shared keyboard navigation for choice lists and modal overlay focus
+// (CG-0MWR0BKIT0084ZID; GDD G11 / gap B7). See docs/DEVELOPER.md →
+// Keyboard navigation helpers.
+export {
+  attachChoiceNavigation,
+  attachOverlayFocus,
+  isManagedOverlayOpen,
+  managedOverlayDepth,
+  resolveChoiceKeyAction,
+  resolveOverlayKeyAction,
+  wrapIndex,
+} from './keyboard-navigation';
+export type {
+  ChoiceKeyAction,
+  ChoiceKeyGroups,
+  ChoiceNavigationOptions,
+  KeyboardSeam,
+  LifecycleSeam,
+  OverlayFocusable,
+  OverlayFocusOptions,
+  OverlayKeyAction,
+  OverlayKeyModifiers,
+} from './keyboard-navigation';
 export { runSceneTransition } from './sceneTransition';
 export type { SceneTransitionOptions, SceneTransitionMode, SceneTransitionType } from './sceneTransition';
 

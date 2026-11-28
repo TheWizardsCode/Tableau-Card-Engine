@@ -59,6 +59,8 @@ export const uiNodeSafeModules = [
   'narration-reveal',
   // Word-boundary prose pagination for a fixed display budget; pure string work.
   'prose-pagination',
+  // Shared keyboard choice/overlay-focus navigation; injected seams, type-only Phaser.
+  'keyboard-navigation',
 ] as const;
 
 /** Union of the `src/ui` module basenames promised by {@link uiNodeSafeModules}. */
