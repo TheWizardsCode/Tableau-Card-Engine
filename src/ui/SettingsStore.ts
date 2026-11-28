@@ -6,6 +6,7 @@ const STORAGE_KEY_END_TURN_KEYBIND = 'tce-endturn-keybind';
 const STORAGE_KEY_TOOLTIPS = 'tce-show-tooltips';
 const STORAGE_KEY_CARD_DESIGN = 'tce-card-design';
 const STORAGE_KEY_EVENT_LOG_PALETTE = 'tce-ui-event-log-palette';
+const STORAGE_KEY_VERBOSITY = 'tce-verbosity';
 
 // ── Card Design system ─────────────────────────────────
 
@@ -216,6 +217,63 @@ export function setTooltips(enabled: boolean, storage?: StorageLike | null): voi
 
   try {
     backend.setItem(STORAGE_KEY_TOOLTIPS, enabled ? 'true' : 'false');
+  } catch {
+    // ignore storage failures
+  }
+}
+
+// ── Verbosity preference ───────────────────────────────
+
+/**
+ * Reading-comfort verbosity levels shared across narration-bearing games.
+ *
+ * `'full'` renders the complete narration and auxiliary feedback; `'concise'`
+ * trims auxiliary chrome (never authored prose). What each level suppresses is
+ * game-owned behaviour — the engine only stores, exposes and renders the
+ * preference.
+ */
+export type Verbosity = 'full' | 'concise';
+
+/** The default verbosity when nothing is stored (GDD §3.4.2). */
+export const VERBOSITY_DEFAULT: Verbosity = 'full';
+
+/**
+ * Read the persisted verbosity preference.
+ *
+ * Returns {@link VERBOSITY_DEFAULT} (`'full'`) when nothing is stored,
+ * storage is unavailable, or the stored value is not one of the known
+ * verbosity levels — mirroring {@link getCardDesign}'s validated-key read.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access (returns the default).
+ */
+export function getVerbosity(storage?: StorageLike | null): Verbosity {
+  const backend = resolveStorage(storage);
+  if (!backend) return VERBOSITY_DEFAULT;
+
+  try {
+    const raw = backend.getItem(STORAGE_KEY_VERBOSITY);
+    if (raw === 'full' || raw === 'concise') return raw;
+    return VERBOSITY_DEFAULT;
+  } catch {
+    return VERBOSITY_DEFAULT;
+  }
+}
+
+/**
+ * Persist the verbosity preference.
+ *
+ * @param storage Optional storage backend. When omitted (undefined), falls
+ *   back to `globalThis.localStorage`. Pass `null` to explicitly disable
+ *   storage access (no-op).
+ */
+export function setVerbosity(value: Verbosity, storage?: StorageLike | null): void {
+  const backend = resolveStorage(storage);
+  if (!backend) return;
+
+  try {
+    backend.setItem(STORAGE_KEY_VERBOSITY, value);
   } catch {
     // ignore storage failures
   }

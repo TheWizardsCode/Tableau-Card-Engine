@@ -11,7 +11,7 @@ import Phaser from 'phaser';
 import type { SoundManager } from '../core-engine/SoundManager';
 import { ListenerRegistry } from '../core-engine/ListenerRegistry';
 import { SettingsButton } from './SettingsButton';
-import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns } from './SettingsStore';
+import { getReducedMotion, setReducedMotion, getEndTurnKeybind, setEndTurnKeybind, getTooltips, setTooltips, getCardDesign, setCardDesign, getAvailableCardDesigns, getVerbosity, setVerbosity, type Verbosity } from './SettingsStore';
 import { createVersionLabel } from './versionDisplay';
 import { createAlphaBadge } from './AlphaBadge';
 import type { AlphaBadgeResult } from './AlphaBadge';
@@ -108,6 +108,15 @@ export interface SettingsPanelConfig {
    * hide the toggle.
    */
   hasTooltips?: boolean;
+
+  /**
+   * Whether the current game supports a Full/Concise verbosity preference.
+   * When true, a two-option "Full" / "Concise" selector is rendered in the
+   * Display section. Default `false` (opt-in), so a game with no narration
+   * never shows a no-op control. The preference is persisted by
+   * {@link setVerbosity} and shared across games.
+   */
+  hasVerbosity?: boolean;
 
   /**
    * Optional AI skill rating slider configuration.
@@ -223,6 +232,7 @@ export class SettingsPanel {
     buttonPosition: SettingsPanelConfig['buttonPosition'];
     debugTools?: DebugToolsEntry[];
     hasTooltips: boolean;
+    hasVerbosity: boolean;
     skillRating?: SkillRatingConfig;
     extraToggles: readonly ExtraToggleConfig[];
   };
@@ -288,6 +298,11 @@ export class SettingsPanel {
   private cardDesignLabel!: Phaser.GameObjects.Text;
   private cardDesignTextObjects: Phaser.GameObjects.Text[] = [];
   private _cardDesignKey: string;
+
+  // Verbosity selector (only created when hasVerbosity config is true)
+  private verbosityLabel!: Phaser.GameObjects.Text;
+  private verbosityTextObjects: Phaser.GameObjects.Text[] = [];
+  private _verbosity: Verbosity;
 
   // Scrollable content sub-container
   private _scrollContent: Phaser.GameObjects.Container;
@@ -367,6 +382,7 @@ export class SettingsPanel {
       buttonPosition: config.buttonPosition,
       debugTools: config.debugTools,
       hasTooltips: config.hasTooltips ?? true,
+      hasVerbosity: config.hasVerbosity ?? false,
       skillRating: config.skillRating,
       extraToggles: config.extraToggles ?? [],
     };
@@ -378,6 +394,7 @@ export class SettingsPanel {
     this._reducedMotion = this.loadReducedMotionPreference();
     this._showTooltips = this.loadTooltipPreference();
     this._cardDesignKey = this.loadCardDesignPreference();
+    this._verbosity = this.loadVerbosityPreference();
 
     // Pull optional difficulty names from config
     if (config.difficultyNames && config.difficultyNames.length > 0) {
@@ -797,8 +814,52 @@ export class SettingsPanel {
     designTip.setDepth(DEPTH_PANEL_CONTENT);
     this._scrollContent.add(designTip);
 
+    // ── Verbosity selector (opt-in) ───────────────────────
+    // Reading-comfort preference shared across narration-bearing games. Two
+    // selectable text options (Card Design precedent) so the visible labels
+    // match the 'full' / 'concise' values.
+    let endTurnY = cardDesignY + 46;
+    if (this.config.hasVerbosity) {
+      const verbosityY = cardDesignY + 46;
+
+      this.verbosityLabel = scene.add.text(PADDING, verbosityY, 'Verbosity', LABEL_STYLE);
+      this.verbosityLabel.setOrigin(0, 0.5);
+      this.verbosityLabel.setDepth(DEPTH_PANEL_CONTENT);
+      this._scrollContent.add(this.verbosityLabel);
+
+      const verbosityOptions: ReadonlyArray<{ key: Verbosity; label: string }> = [
+        { key: 'full', label: 'Full' },
+        { key: 'concise', label: 'Concise' },
+      ];
+      const verbosityStartX = PADDING + 120;
+      const verbosityGap = 8;
+      this.verbosityTextObjects = [];
+      let verbosityX = verbosityStartX;
+      for (const option of verbosityOptions) {
+        const isSelected = option.key === this._verbosity;
+        const style = isSelected
+          ? { ...VALUE_STYLE, color: (HEADING_STYLE.color as string) ?? '#f0c040' }
+          : VALUE_STYLE;
+        const txt = scene.add.text(
+          verbosityX,
+          verbosityY,
+          option.label,
+          style as Phaser.Types.GameObjects.Text.TextStyle,
+        );
+        txt.setOrigin(0, 0.5);
+        txt.setDepth(DEPTH_PANEL_CONTENT + 1);
+        txt.setInteractive({ useHandCursor: true });
+        (txt as any).tceVerbosityKey = option.key;
+        txt.on('pointerdown', () => this.handleVerbositySelect(option.key));
+        this._scrollContent.add(txt);
+        this.verbosityTextObjects.push(txt);
+        verbosityX += txt.width + verbosityGap;
+      }
+
+      endTurnY = verbosityY + 46;
+    }
+
     // ── End Turn keybind control ──────────────────────────
-    const endTurnY = cardDesignY + 46;
     const endTurnLabel = scene.add.text(PADDING, endTurnY, 'End Turn Key', LABEL_STYLE);
     endTurnLabel.setOrigin(0, 0.5);
     endTurnLabel.setDepth(DEPTH_PANEL_CONTENT);
@@ -1145,6 +1206,11 @@ export class SettingsPanel {
     return this._reducedMotion;
   }
 
+  /** The current Full/Concise verbosity preference. */
+  get verbosity(): Verbosity {
+    return this._verbosity;
+  }
+
   /** Currently selected difficulty (if the panel was configured with difficultyNames). */
   get selectedDifficulty(): string | undefined {
     return this._selectedDifficulty;
@@ -1171,6 +1237,7 @@ export class SettingsPanel {
     // A game-supplied preference may have changed while the panel was closed
     // (e.g. from a game dialog), so re-read them on every open.
     this.refreshExtraToggles();
+    this.refreshVerbosity();
     this.createInputBlocker();
 
     // Ensure settings panel sits at top of overlay root ordering when opened.
@@ -1513,6 +1580,59 @@ export class SettingsPanel {
     if (typeof window === 'undefined' || !window.localStorage) return;
     try {
       setCardDesign(designKey, window.localStorage);
+    } catch {
+      // ignore storage failures
+    }
+  }
+
+  // ── Verbosity selector helpers ─────────────────────────
+
+  /** Handle a verbosity option click, persist it, and repaint the selection. */
+  private handleVerbositySelect(value: Verbosity): void {
+    if (this.destroyed) return;
+    this._verbosity = value;
+    this.saveVerbosityPreference(value);
+    this.updateVerbosityVisuals();
+  }
+
+  /** Repaint the Full/Concise option colours to match the stored preference. */
+  private updateVerbosityVisuals(): void {
+    for (const txt of this.verbosityTextObjects) {
+      const txtKey = (txt as any).tceVerbosityKey as Verbosity | undefined;
+      if (!txtKey) continue;
+      if (txtKey === this._verbosity) {
+        txt.setColor((HEADING_STYLE.color as string) ?? '#f0c040');
+      } else {
+        txt.setColor(VALUE_STYLE.color as string);
+      }
+    }
+  }
+
+  /**
+   * Re-read the persisted verbosity and repaint the control.
+   *
+   * Call this when the preference changed outside the panel so it never shows
+   * a stale selection. No-op unless `hasVerbosity` is set or after destroy.
+   */
+  refreshVerbosity(): void {
+    if (this.destroyed || !this.config.hasVerbosity) return;
+    this._verbosity = this.loadVerbosityPreference();
+    this.updateVerbosityVisuals();
+  }
+
+  /** Load persisted verbosity from localStorage. */
+  private loadVerbosityPreference(): Verbosity {
+    if (typeof window === 'undefined' || !window.localStorage) {
+      return getVerbosity(null);
+    }
+    return getVerbosity(window.localStorage);
+  }
+
+  /** Save verbosity preference to localStorage. */
+  private saveVerbosityPreference(value: Verbosity): void {
+    if (typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      setVerbosity(value, window.localStorage);
     } catch {
       // ignore storage failures
     }

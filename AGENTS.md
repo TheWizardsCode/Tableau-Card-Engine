@@ -432,7 +432,7 @@ Use `Grid`, `neighbors()`, `shortestPath()`, and `pathExists()` from `@core-engi
 Use `HelpPanel`, `SettingsPanel`, `HelpButton`, and `SettingsButton` from `@ui` for standard HUD chrome. These provide consistent open/close lifecycle, depth management, and content integration.
 
 - **Gym scene:** `GymHudComponentsScene` — `example-games/gym/scenes/GymHudComponentsScene.ts`
-- **Key APIs:** `HelpPanel`, `SettingsPanel`, `HelpButton`, `SettingsButton`
+- **Key APIs:** `HelpPanel`, `SettingsPanel`, `HelpButton`, `SettingsButton`; shared Display preferences read/written via `getTooltips()`/`setTooltips()`, `getVerbosity()`/`setVerbosity()` (`'full' | 'concise'`, `tce-verbosity`) from `SettingsStore`
 - **When to use:** Every game scene should use these components for its help and settings UI rather than building custom panels. The base class `GymSceneBase` provides `initHelp()` which integrates the `HelpPanel` lifecycle.
 
 ### 14. Token Pile System for Non-Card Counters

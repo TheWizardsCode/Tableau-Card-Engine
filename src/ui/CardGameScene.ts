@@ -305,6 +305,9 @@ export abstract class CardGameScene extends Phaser.Scene {
    *                     panel below the built-in toggles. Keep engine concepts
    *                     out of it: each entry carries its own label and
    *                     `get`/`set` pair. Default: none.
+   * @param hasVerbosity  Whether the game supports a shared Full/Concise
+   *                     verbosity preference (renders a selector in the
+   *                     Display section). Default `false` (opt-in).
    */
   protected initSettingsPanel(
     difficultyNames?: readonly string[],
@@ -314,6 +317,7 @@ export abstract class CardGameScene extends Phaser.Scene {
     debugTools?: DebugToolsEntry[],
     settingsToggleVeto?: () => boolean,
     extraToggles?: readonly ExtraToggleConfig[],
+    hasVerbosity?: boolean,
   ): void {
     if (!this.soundManager) return;
     // Provide default debug tools when none are explicitly specified.
@@ -340,6 +344,7 @@ export abstract class CardGameScene extends Phaser.Scene {
       difficultyNames,
       defaultDifficulty,
       hasTooltips: hasTooltips ?? true,
+      hasVerbosity: hasVerbosity ?? false,
       skillRating,
       debugTools: resolvedDebugTools,
       canToggle: settingsToggleVeto,

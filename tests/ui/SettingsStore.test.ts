@@ -10,10 +10,13 @@ import {
   getReducedMotion,
   getSelectedDifficulty,
   getTooltips,
+  getVerbosity,
   setEventLogPalette,
   setReducedMotion,
   setSelectedDifficulty,
   setTooltips,
+  setVerbosity,
+  VERBOSITY_DEFAULT,
 } from '../../src/ui/SettingsStore';
 import type { StorageLike } from '../../src/core-engine/SoundManager';
 
@@ -88,6 +91,38 @@ describe('SettingsStore persistence', () => {
     (storage as any).setItem('tce-show-tooltips', 'not-a-boolean');
     expect(getTooltips(storage)).toBe(false);
   });
+
+  // ── Verbosity preference ────────────────────────────────
+
+  it('returns the full default when storage is null', () => {
+    expect(getVerbosity(null)).toBe(VERBOSITY_DEFAULT);
+    expect(getVerbosity(null)).toBe('full');
+  });
+
+  it('returns the full default when nothing is stored', () => {
+    const storage = createMockStorage();
+    expect(getVerbosity(storage)).toBe('full');
+  });
+
+  it('persists and restores a concise preference under tce-verbosity', () => {
+    const storage = createMockStorage();
+    setVerbosity('concise', storage);
+    expect(storage.setItem).toHaveBeenCalledWith('tce-verbosity', 'concise');
+    expect(getVerbosity(storage)).toBe('concise');
+  });
+
+  it('round-trips back to full', () => {
+    const storage = createMockStorage();
+    setVerbosity('concise', storage);
+    setVerbosity('full', storage);
+    expect(getVerbosity(storage)).toBe('full');
+  });
+
+  it.each(['', 'verbose', 'FULL', 'Concise', 'true'])('resolves the invalid stored value %j to full', (raw) => {
+    const storage = createMockStorage();
+    (storage as any).setItem('tce-verbosity', raw);
+    expect(getVerbosity(storage)).toBe('full');
+  });
 });
 
 // ── Configuration validation edge cases ──────────────────────
@@ -149,6 +184,18 @@ describe('SettingsStore configuration validation', () => {
     expect(() => setReducedMotion(true, throwingStorage)).not.toThrow();
     expect(() => setTooltips(false, throwingStorage)).not.toThrow();
     expect(() => setSelectedDifficulty('Hard', throwingStorage)).not.toThrow();
+    expect(() => setVerbosity('concise', throwingStorage)).not.toThrow();
+  });
+
+  it('a thrown storage access falls back to the full verbosity default', () => {
+    const throwingStorage: StorageLike = {
+      getItem: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      setItem: vi.fn(),
+    };
+
+    expect(getVerbosity(throwingStorage)).toBe('full');
   });
 });
 

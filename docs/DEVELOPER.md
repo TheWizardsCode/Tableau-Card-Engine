@@ -5246,6 +5246,7 @@ The `SettingsPanel` class provides a slide-in right sidebar with controls for:
 - Reduced motion toggle
 - Configurable End Turn keybind
 - Difficulty selector (when `difficultyNames` provided)
+- Full / Concise verbosity selector (when `hasVerbosity` provided)
 - Game-supplied toggles (when `extraToggles` provided)
 
 ```typescript
@@ -5291,7 +5292,44 @@ const settingsPanel = new SettingsPanel(this, {
   the panel may be showing.
 - **Optional.** Omit `extraToggles` and the panel renders exactly the built-in
   controls, so existing callers are unaffected. `CardGameScene.initSettingsPanel`
-  forwards it as its last parameter.
+  forwards it as its second-to-last parameter (before `hasVerbosity`).
+
+#### Shared verbosity preference (`hasVerbosity`)
+
+Narration-bearing games share a **Full / Concise** reading preference that
+persists across games and sessions, exactly like tooltips and reduced motion.
+The engine owns the storage and the panel control; what `Concise` suppresses is
+**game-owned** behaviour (auxiliary feedback lines, an inline journal ticker —
+never authored prose).
+
+```typescript
+import { SettingsPanel } from '@ui';
+import { getVerbosity, setVerbosity, type Verbosity } from '@ui/SettingsStore';
+
+const settingsPanel = new SettingsPanel(this, {
+  soundManager: this.soundManager,
+  hasVerbosity: true, // opt-in: narration-free games omit this
+});
+
+// Consumers read the preference at render time (no live event):
+const verbosity: Verbosity = getVerbosity(); // 'full' | 'concise'
+```
+
+- **`getVerbosity(storage?)`** returns `'full' | 'concise'`, defaulting to
+  `'full'` when nothing is stored, storage is unavailable, or the stored value
+  is not a known level (`VERBOSITY_DEFAULT`).
+- **`setVerbosity(value, storage?)`** persists under `tce-verbosity` (the
+  `getTooltips`/`setTooltips` shape: omitting `storage` uses
+  `globalThis.localStorage`, passing `null` disables access).
+- **Panel control:** when `hasVerbosity: true`, a two-option **Full** /
+  **Concise** selector renders in the Display section (the Card Design
+  text-option pattern). It reads the stored value on build and re-reads it on
+  every `open()` / `refreshVerbosity()`, and persists each change through
+  `setVerbosity`.
+- **Opt-in (default `false`):** a game without narration has nothing for the
+  setting to affect, so the control is hidden unless the game asks for it.
+  `CardGameScene.initSettingsPanel` forwards `hasVerbosity` as its last
+  parameter.
 
 **Depth conventions:** Same as HelpPanel (blocker 900, background 901, etc.). Settings button at depth 1102.
 

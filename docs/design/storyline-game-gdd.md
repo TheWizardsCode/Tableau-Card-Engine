@@ -2317,16 +2317,18 @@ settings toggle and the hover-intent delays).
 | Tooltips | on / off | on | `getTooltips()` / `setTooltips()` (`tce-show-tooltips`), rendered in `SettingsPanel` when `hasTooltips` | **Available** |
 | Reduced motion | on / off | system preference | `getReducedMotion()` / `setReducedMotion()` (`tce-ui-reduced-motion`) | **Available** |
 | Mute and volume | on/off, 0–1 | unmuted, engine default | `SoundManager` (`tce-sound-muted`, `tce-sound-volume`) | **Available** |
-| Verbosity | Full / Concise | Full | game-owned key via a SettingsPanel `extraToggles` entry | **Partly available** — the toggle seam exists; shared persistence is gap B8 |
+| Verbosity | Full / Concise | Full | `getVerbosity()` / `setVerbosity()` (`tce-verbosity`), rendered in `SettingsPanel` when `hasVerbosity` | **Available** |
 
 **Verbosity.** `Full` (default) shows the animated narration reveal, the
 one-line feedback after every choice, and one-line journal rows. `Concise` applies
 the outcome prose instantly and suppresses the *auxiliary* feedback line and the
 inline journal ticker (the journal overlay still holds every row). **Verbosity
 never hides authored prose** — context, outcome prose and the epilogue are shown
-at every level; it only controls the auxiliary chrome around them. The toggle is
-rendered through `SettingsPanel`'s `extraToggles`, so it sits with the engine's
-own toggles and needs no new panel code.
+at every level; it only controls the auxiliary chrome around them. The
+preference is shared engine state: `getVerbosity()` / `setVerbosity()` persist
+it under `tce-verbosity`, and `SettingsPanel` renders the Full/Concise selector
+when the game sets `hasVerbosity`, so it follows the player across games and
+sessions like tooltips and reduced motion.
 
 **Tooltips.** `TooltipManager` renders in DOM or Phaser mode; the game enables
 hover intent (`delayMs: 350`) and press-and-hold (`touchDelayMs: 600`), so a
@@ -2493,7 +2495,7 @@ No gap is described as though it already works.
 | B4 Affordability presentation | showing an unaffordable option with its shortfall instead of removing it | **engine half delivered** — the requirement object ships (`optionAffordability`, `OptionAffordability` on `StorylineOption.affordability`, opt-in `'surface'` policy) and resolution refuses it; the disabled-option visual and shortfall wording remain the presentation surface's work ([§3.6](#36-named-presentation-gaps)) | small | task | [G7](#g7) — **engine delivered** by `CG-0MWR0BI3S008K9Y6`; presentation remains |
 | B5 Act/scene transition presentation | the `sceneBanner` and act transition motion | the camera transition ships (`runSceneTransition` in `src/ui/sceneTransition.ts`); no banner surface or outcome→route sequence exists, and the spike has no scene boundary (`example-games/gym/layouts/gym-long-erasure.layout.json`) | small–medium | feature | [G9](#g9) — filed (`CG-0MWR0BJBU005TDTT`) |
 | B7 Keyboard choice navigation and overlay focus | the keyboard path in [§3.4.4](#344-keyboard-and-touch-input-paths) | **engine delivered** — `attachChoiceNavigation()` and `attachOverlayFocus()` ship in `src/ui/keyboard-navigation.ts`, with a stack-aware Escape that closes only the topmost modal; the panels keep their own toggle keys (`?` for Help, Escape for Settings) | small | task | [G11](#g11) — **engine delivered** by `CG-0MWR0BKIT0084ZID` |
-| B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | `SettingsStore` has tooltips and reduced motion but no verbosity key; `SettingsPanel.extraToggles` gives a game-local toggle without shared persistence | extra-small | task | [G12](#g12) — filed (`CG-0MWR0BL4Q000OYG6`) |
+| B8 Shared verbosity preference | the Full/Concise toggle in [§3.4.2](#342-verbosity-and-tooltips) | delivered: `getVerbosity()`/`setVerbosity()` persist under `tce-verbosity`, and `SettingsPanel` renders the selector when `hasVerbosity` is set | extra-small | task | [G12](#g12) — delivered (`CG-0MWR0BL4Q000OYG6`) |
 | B9 Deterministic replay adapter | the replay guarantees in [§3.5.4](#354-replay) | the replay tool is engine code but a game's adapter is a build-epic deliverable; no adapter exists for this game | small | task | [G13](#g13) — deferred to the build epic |
 
 Deliberately **not** gaps: SLL zones (a per-game layout document admits any
@@ -2919,7 +2921,7 @@ invisible.
 | [G9](#g9) | Act/scene transition presentation: scene-exit banner and a sequenced act transition with a reduced-motion path | [§2.3 step D](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names), [§3.6](#36-named-presentation-gaps) B5 | `src/ui/sceneTransition.ts` animates the camera only; no banner surface, no outcome→route sequence and no rendered scene boundary | small–medium — `src/ui/sceneTransition.ts` + `src/ui/narration-reveal.ts` | feature | Filed — `CG-0MWR0BJBU005TDTT` |
 | [G10](#g10) | Retire the legacy `act` / `clockCost` CSV columns and add the migration check | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) ("the two retired columns"), [§2.4](#24-how-the-beat-sheet-composes-with-story-line) | **delivered** — `src/story-line/content/adapters.ts` declares neither column; `GymLongErasureGame` resolves act and pacing from `long-erasure-episode.json`, and the generated graph manifest carries no `fields.act` / `fields.clockCost` | small — the adapter column declaration + `missing-column` diagnostic | chore | **Delivered** — `CG-0MWR0BJXI007UINE` |
 | [G11](#g11) | Keyboard choice navigation and overlay focus order (`1`–`9` / arrows + Enter, Escape topmost-only) | [§3.4.4](#344-keyboard-and-touch-input-paths), [§3.6](#36-named-presentation-gaps) B7, [§3.8](#38-what-this-section-does-not-prove) | **delivered (engine)** — `attachChoiceNavigation()` (in-range digits, arrow wrap, Enter/Space activation, inert while a managed overlay is open) and `attachOverlayFocus()` (list-order Tab/Shift+Tab traversal, Enter/Space activation, stack-aware Escape, visible focus contract) ship in `src/ui/keyboard-navigation.ts` with a headless seam and a node-safe manifest entry; `HelpPanel` / `SettingsPanel` keep their own toggle keys | small — `HelpPanel`'s keydown lifecycle + `OverlayManager` | task | **Delivered** — `CG-0MWR0BKIT0084ZID` |
-| [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | `SettingsStore` persists tooltips and the end-turn keybind, `ReducedMotion` persists reduced motion; no verbosity key exists, and `extraToggles` is game-local | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Filed — `CG-0MWR0BL4Q000OYG6` |
+| [G12](#g12) | Shared verbosity preference (Full / Concise) in `SettingsStore` and `SettingsPanel` | [§3.4.2](#342-verbosity-and-tooltips), [§3.6](#36-named-presentation-gaps) B8 | delivered: `getVerbosity()`/`setVerbosity()` persist under `tce-verbosity`, and `SettingsPanel` renders the selector when `hasVerbosity` is set | extra-small — the tooltips toggle in `SettingsStore` + `SettingsPanel` | task | Delivered — `CG-0MWR0BL4Q000OYG6` |
 | [G13](#g13) | Deterministic replay adapter + fixture for this game | [§3.5.4](#354-replay), [§3.6](#36-named-presentation-gaps) B9, [§5.2](#52-verification-the-build-epic-must-add-named-gaps) | the engine seam is present (`scripts/replay.ts` + `scripts/adapters/ReplayAdapter.ts`); no adapter or fixture for this game exists | small — the Golf replay adapter as the reference implementation | task | **Deferred to the build epic** (game-owned deliverable, not engine work) |
 | [G14](#g14) | CSV authoring ergonomics for writers (the spike's five frictions) | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | delivered: `add-option`, `add-linked-card`, `add-card --after`, `--context` / `--epilogue` and the per-file `#resources:` declaration close all five frictions on the CLI | small — `src/story-line/content/author.ts` + `src/story-line/content/mutate.ts` | chore | **Delivered** — `CG-0MWQYDC7D003G4ON` |
 
@@ -3344,8 +3346,9 @@ game-local with no shared persistence.
 in `SettingsStore` plus the `extraToggles` wiring in `SettingsPanel`. One storage
 key, one getter/setter pair, one panel toggle.
 
-**Disposition.** **Filed** — `CG-0MWR0BL4Q000OYG6` (`task`, low, effort `XS`).
-Blocked by the GDD epic.
+**Disposition.** **Delivered** — `CG-0MWR0BL4Q000OYG6` (`task`, low, effort `XS`).
+`getVerbosity()`/`setVerbosity()` persist under `tce-verbosity`, and
+`SettingsPanel` renders the Full/Concise selector when `hasVerbosity` is set.
 
 #### <a id="g13"></a>G13 — Deterministic replay adapter and fixture
 
@@ -3446,7 +3449,7 @@ backlog honest: a reviewer can see the claim was checked, not avoided.
 | G9 | `CG-0MWR0BJBU005TDTT` | feature | medium | M | GDD epic | blocked, scheduled past the GDD close |
 | G10 | `CG-0MWR0BJXI007UINE` | chore | low | S | GDD epic, G2 | **Delivered** — the adapter declares neither retired column; `long-erasure.csv` + fixtures migrated; act/pacing resolve from `long-erasure-episode.json`; `clock-cost-mismatch` retained as a documented no-op |
 | G11 | `CG-0MWR0BKIT0084ZID` | task | low | S | GDD epic | **Delivered** — shared keyboard helpers in `src/ui/keyboard-navigation.ts` (`attachChoiceNavigation`, `attachOverlayFocus`) with unit + browser coverage |
-| G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | blocked, scheduled past the GDD close |
+| G12 | `CG-0MWR0BL4Q000OYG6` | task | low | XS | GDD epic | **Delivered** — `getVerbosity()`/`setVerbosity()` (`tce-verbosity`) + `SettingsPanel` Full/Concise selector behind `hasVerbosity` |
 | G13 | — | task | — | — | — | **Deferred** — game-owned replay adapter |
 | G14 | `CG-0MWQYDC7D003G4ON` | chore | — | — | — | **Delivered** — authoring CLI ergonomics |
 
@@ -3712,7 +3715,7 @@ is an unfiled gap or one of the deferred entries `G6` / `G13`.
 | Scene-exit banner and sequenced act transition (with reduced motion) | [§2.3](#23-how-a-scene-outcome-selects-the-next-beat), [§3.1](#31-presentation-surfaces-and-sll-zone-names) | [G9](#g9) | small–medium | `CG-0MWR0BJBU005TDTT` |
 | Retire the legacy `act` / `clockCost` CSV columns | [§2.1](#21-composition-contract-who-owns-what), [§2.9](#29-writer-content-pipeline-csv-authoring-and-the-review-gate) | [G10](#g10) | small | `CG-0MWR0BJXI007UINE` (delivered) |
 | Keyboard choice navigation and overlay focus order | [§3.4.4](#344-keyboard-and-touch-input-paths) | [G11](#g11) | small | `CG-0MWR0BKIT0084ZID` (delivered) |
-| Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` |
+| Shared verbosity preference (Full / Concise) | [§3.4.2](#342-verbosity-and-tooltips) | [G12](#g12) | extra-small | `CG-0MWR0BL4Q000OYG6` — delivered |
 | Writer authoring ergonomics for the v1 volume | [§2.9.7](#297-the-spikes-five-authoring-frictions-resolved-or-known-limits) | [G14](#g14) | small | `CG-0MWQYDC7D003G4ON` (delivered) |
 
 **The disposition check.** Every row names a live Worklog item that already
