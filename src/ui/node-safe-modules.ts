@@ -61,6 +61,10 @@ export const uiNodeSafeModules = [
   'prose-pagination',
   // Shared keyboard choice/overlay-focus navigation; injected seams, type-only Phaser.
   'keyboard-navigation',
+  // Act/scene exit planner + SFX resolver + banner; Phaser appears only as an
+  // elided type and positions arrive from injected SLL anchors
+  // (CG-0MWZCPQJG000UT5R).
+  'scene-exit-presentation',
 ] as const;
 
 /** Union of the `src/ui` module basenames promised by {@link uiNodeSafeModules}. */

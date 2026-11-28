@@ -38,8 +38,11 @@
  *   order, the reduced-motion collapse and the dwell times assertable in a
  *   Node unit test. The rendered {@link presentSceneExit} references Phaser
  *   through `import type` only (positions arrive from an injected SLL anchor
- *   callback), so the module can be considered for the node-safe manifest —
- *   that decision belongs to the exports/node-safety slice.
+ *   callback), so the **whole module** is listed in the node-safe manifest
+ *   (`src/ui/node-safe-modules.ts`, CG-0MWZCPQJG000UT5R): Node suites import
+ *   this deep path without evaluating Phaser. Keep it that way — a value
+ *   import of `phaser` (or of a Phaser-bearing `@ui` module) fails
+ *   `npm run check:ui-node-surface` and the runtime guard.
  * - **Audio is one shared key per stage, and never blocks text.**
  *   {@link resolveSceneExitSfxKey} is a separate pure function that returns a
  *   `COMMON_SFX_KEYS` value — `ROUND_END` when the act closes, `TURN_CHANGE`

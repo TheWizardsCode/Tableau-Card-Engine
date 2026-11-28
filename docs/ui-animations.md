@@ -770,6 +770,14 @@ order, with a shared `COMMON_SFX_KEYS` sound
 and Phaser-free, so the schedule is unit-testable without a scene; the rendered
 helper drives a real scene through Phaser **types only**.
 
+`@ui/scene-exit-presentation` is listed in the node-safe manifest
+(`src/ui/node-safe-modules.ts`, `CG-0MWZCPQJG000UT5R`): Phaser is referenced
+only through `import type` and every position arrives from an injected SLL
+anchor callback, so a unit suite can import the planner — and the rendered
+helper's module — in a plain Node environment (no `window`). The static
+`check:ui-node-surface` gate and the runtime throwing-mock guard
+(`tests/ui/phaser-free-imports.test.ts`) enforce that promise.
+
 ### Import
 
 ```ts
