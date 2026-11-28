@@ -287,6 +287,88 @@ describe('GymLongErasureScene browser test', () => {
     expect(texts[1]).toBe('Morale 5 / 8');
   });
 
+  it('presents the act boundary through the scene-exit banner (AC3, AC5)', async () => {
+    const scene = await bootScene();
+    scene.setReducedMotionProperty(false);
+    // No banner until an act is actually crossed.
+    expect(scene.getSceneExitBanner()).toBeNull();
+
+    playRoute(scene, [
+      'Log the erasure',
+      'Transmit the warning',
+      'Shelter in the dead zone',
+    ]);
+
+    // Act I → Act II: the banner opens on the act that closed, and the plan
+    // sequences the outcome word and the route ahead after it.
+    const banner = scene.getSceneExitBanner();
+    expect(banner).not.toBeNull();
+    expect(banner!.plan.instant).toBe(false);
+    expect(banner!.plan.steps.map((step) => step.key)).toEqual([
+      'title',
+      'outcome',
+      'route',
+    ]);
+    expect(scene.getSceneExitBannerTexts()).toEqual(['Act I']);
+
+    // The banner, not the feedback line, carries the act news.
+    expect(scene.getFeedbackText()).toBe(
+      'You chose "Shelter in the dead zone".',
+    );
+    expect(scene.getPlayedSfxKeys()).toContain(COMMON_SFX_KEYS.ROUND_END);
+    expect(scene.getPlayedSfxKeys()).not.toContain(
+      COMMON_SFX_KEYS.TURN_CHANGE,
+    );
+
+    // A click/key press reveals every field at once (no further animation) and
+    // the spike has no scene titles, so the slot stays empty.
+    scene.skipSceneExitBanner();
+    expect(scene.getSceneExitBannerTexts()).toEqual([
+      'Act I',
+      'success',
+      'Act II — The Dead Zone',
+    ]);
+  });
+
+  it('shows the whole act banner instantly under reduced motion (AC5)', async () => {
+    const scene = await bootScene();
+    scene.setReducedMotionProperty(true);
+
+    playRoute(scene, [
+      'Log the erasure',
+      'Transmit the warning',
+      'Shelter in the dead zone',
+    ]);
+
+    // Reduced motion removes the sequencing, never the information: every
+    // field is on screen immediately and no SFX is played.
+    const banner = scene.getSceneExitBanner();
+    expect(banner?.plan.instant).toBe(true);
+    expect(scene.getSceneExitBannerTexts()).toEqual([
+      'Act I',
+      'success',
+      'Act II — The Dead Zone',
+    ]);
+    expect(scene.getPlayedSfxKeys()).toEqual([]);
+  });
+
+  it('clears the act banner when the next beat takes over (AC5)', async () => {
+    const scene = await bootScene();
+    scene.setReducedMotionProperty(true);
+    playRoute(scene, [
+      'Log the erasure',
+      'Transmit the warning',
+      'Shelter in the dead zone',
+    ]);
+    expect(scene.getSceneExitBanner()).not.toBeNull();
+
+    // The next playable beat replaces the boundary announcement: no orphaned
+    // banner text, no handle left behind.
+    scene.chooseByLabel('Ration the stores');
+    expect(scene.getSceneExitBanner()).toBeNull();
+    expect(scene.getSceneExitBannerTexts()).toEqual([]);
+  });
+
   it('plays Act I → Act II → Act III → scored reset epilogue (AC7)', async () => {
     const scene = await bootScene();
 

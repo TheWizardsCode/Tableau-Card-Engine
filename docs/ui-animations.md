@@ -881,12 +881,22 @@ and the textual channel is unconditional.
 
 ### Gym precedent
 
-*The Long Erasure* spike (`GymLongErasureScene`) is the planned rendered
-precedent: its act turn presents the act title, the act's closing outcome and
-the route through this helper, using a `sceneBanner` zone in
-`example-games/gym/layouts/gym-long-erasure.layout.json`. Because the spike has
-acts but no scenes, it passes no `sceneTitle` — the slot fills once a game has
-scene-exit data.
+*The Long Erasure* spike (`GymLongErasureScene`) is the rendered precedent
+(CG-0MWZCPERA004FQZ6): its act turn presents the act boundary through this
+helper — the closing act (`Act I`), the act's closing outcome word and the
+route ahead (`Act II — The Dead Zone`) — from the `sceneBanner` zone in
+`example-games/gym/layouts/gym-long-erasure.layout.json`, whose anchors are the
+GDD contract fixture's. It replaces the old `TURN_CHANGE` + feedback-line pair,
+so the act close is sounded with `ROUND_END` (the helper's `actClosed: true`
+key) and the feedback line keeps the choice's own sentence.
+
+Because the spike has acts but no scenes, it passes **no** `sceneTitle`: the
+slot fills once a game has scene-exit data (the episode runner's
+`SceneExitRecord`, which is game-side work). The outcome word is `success` on
+this path by construction — an act turns only when the run *advanced* past it,
+while a clock failure expires and an abandoned voyage closes, and neither turns
+an act. Real per-scene outcomes become available with the scene-exit-record
+data and are not invented by the spike.
 
 ## Game-Specific Usage: Coloretto
 

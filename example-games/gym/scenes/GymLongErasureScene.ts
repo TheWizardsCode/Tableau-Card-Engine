@@ -31,9 +31,13 @@
  *   (the outcome framing line) byte-for-byte.
  * - A resolved choice rewrites the act/clock/resource/beat panels, appends the
  *   journal row (the authored outcome prose, truncated to one display line by
- *   the shared helper) and writes a "you chose …" feedback line, plays
- *   `COMMON_SFX_KEYS.CARD_SWAP` and (when the act turns over)
- *   `COMMON_SFX_KEYS.TURN_CHANGE`.
+ *   the shared helper) and writes a "you chose …" feedback line, and plays
+ *   `COMMON_SFX_KEYS.CARD_SWAP`. When the act turns over it presents the act
+ *   boundary through the shared `presentSceneExit()` banner — the closing act,
+ *   the act's closing outcome word and the route ahead, sequenced title →
+ *   outcome → route from the layout's `sceneBanner` anchors and sounded with
+ *   `COMMON_SFX_KEYS.ROUND_END` — instead of the old `TURN_CHANGE` + feedback
+ *   line pair.
  * - Reaching an ending reveals the scored epilogue, plays
  *   `COMMON_SFX_KEYS.ROUND_END` + `COMMON_SFX_KEYS.SCORE_REVEAL` and pops the
  *   score above the ending title.
@@ -44,9 +48,10 @@
  *
  * Reduced motion is honoured throughout: SFX are suppressed (the project-wide
  * reduced-motion contract), the score pop is instant, the narration reveal is
- * applied synchronously and no tween is created. The textual channel is never
- * suppressed, so nothing is feedback-free — and with audio muted the prose is
- * still on screen.
+ * applied synchronously, the act-exit banner presents every field at once (the
+ * information is never omitted, only the sequencing is) and no tween is
+ * created. The textual channel is never suppressed, so nothing is feedback-free
+ * — and with audio muted the prose is still on screen.
  *
  * ## IP
  *
@@ -76,11 +81,16 @@ import { shakeIllegalMove } from '../../../src/ui/shakeIllegalMove';
 import { popTextOrIcon } from '../../../src/ui/popTextOrIcon';
 import {
   paginateProse,
+  presentSceneExit,
   revealNarration,
   DEFAULT_PROSE_PAGE_CHARS,
   ResourceHud,
+  SCENE_EXIT_PRESENTATION_DEPTH,
   formatResourceLabel,
   type NarrationRevealHandle,
+  type SceneExitOutcome,
+  type SceneExitPresentationHandle,
+  type SceneExitSoundPlayer,
 } from '../../../src/ui';
 import { COMMON_SFX_KEYS, SoundManager } from '../../../src/core-engine';
 import type { CommonSfxKey, SoundPlayer } from '../../../src/core-engine';
@@ -97,6 +107,7 @@ import {
   longErasureContentFromCsv,
   runJournal,
   LONG_ERASURE_ACTS,
+  type LongErasureAct,
   type LongErasureContent,
   type LongErasureEpilogue,
   type LongErasureOutcome,
@@ -113,11 +124,23 @@ export const OPTION_ANCHORS = ['option1', 'option2', 'option3', 'option4'] as co
 export const LONG_ERASURE_SFX_KEYS: readonly CommonSfxKey[] = [
   COMMON_SFX_KEYS.UI_CLICK,
   COMMON_SFX_KEYS.CARD_SWAP,
-  COMMON_SFX_KEYS.TURN_CHANGE,
   COMMON_SFX_KEYS.ILLEGAL_MOVE,
   COMMON_SFX_KEYS.ROUND_END,
   COMMON_SFX_KEYS.SCORE_REVEAL,
 ];
+
+/**
+ * The closing outcome word an act presents on this spike.
+ *
+ * A banner is presented only when the run **advanced** past an act, so the
+ * act's objective (reaching the next act) was met: `success`. The other two
+ * words are unreachable on this path and are not invented here — a run that
+ * fails the clock expires and one the player abandons closes, and neither
+ * turns an act. They become real once a playable scene consumes the
+ * episode-runner's `SceneExitRecord.outcome` (out of scope for the
+ * presentation slice; see `docs/ui-animations.md` → Gym precedent).
+ */
+export const ACT_EXIT_OUTCOME: SceneExitOutcome = 'success';
 
 /** Journal rows shown while playing, and on the closing screen. */
 const JOURNAL_PLAY_ROWS = 5;
@@ -249,6 +272,25 @@ export class GymLongErasureScene extends GymSceneBase {
   /** Audio backend wrapper (null in a headless environment with no sound). */
   private soundManager: SoundManager | null = null;
 
+  /** The live act-exit banner, or `null` when no act boundary is on screen. */
+  private sceneExitBanner: SceneExitPresentationHandle | null = null;
+
+  /**
+   * The banner's audio seam: the scene's own SFX channel.
+   *
+   * `presentSceneExit()` plays its key through this, so an act close goes
+   * through `playSfx()` — recorded for tests and suppressed under reduced
+   * motion — instead of a second, unobservable audio path. The helper only
+   * calls it on its sequenced path, so the reduced-motion instant path never
+   * plays (and never records) a key.
+   */
+  private readonly sceneExitSound: SceneExitSoundPlayer = {
+    play: (key: string) => {
+      this.playSfx(key as CommonSfxKey);
+      return true;
+    },
+  };
+
   /** SFX keys the scene has played, oldest first (observable for tests). */
   private readonly playedSfxKeys: string[] = [];
 
@@ -305,7 +347,7 @@ export class GymLongErasureScene extends GymSceneBase {
     this.initHelp([
       {
         heading: 'Features',
-        body: 'A complete three-act branching narrative played through the generic @story-line engine. Every rule — the pressure clock, act gating, affordability filtering, successor drawing, the journal and the journey score — lives in the Phaser-free GymLongErasureGame module; this scene only renders that state and forwards your choice back to it. The narrative panel above the options shows the beat’s authored context paragraph; the consequence of your choice is narrated into that panel (a shared reveal helper with a common sound, instant under reduced motion), and the closing screen carries the ending’s authored epilogue. The journey score credits an act only when the voyage records a choice made in it, so abandoning the voyage from Act II ends with the arc it actually played rather than the full arc. Prose longer than the panel is never cut silently: a [ more… ] control reveals the remainder.',
+        body: 'A complete three-act branching narrative played through the generic @story-line engine. Every rule — the pressure clock, act gating, affordability filtering, successor drawing, the journal and the journey score — lives in the Phaser-free GymLongErasureGame module; this scene only renders that state and forwards your choice back to it. An act boundary is presented, not swapped: the closing act, its closing outcome and the route ahead appear through the shared act-exit banner (the same information is shown at once under reduced motion). The narrative panel above the options shows the beat’s authored context paragraph; the consequence of your choice is narrated into that panel (a shared reveal helper with a common sound, instant under reduced motion), and the closing screen carries the ending’s authored epilogue. The journey score credits an act only when the voyage records a choice made in it, so abandoning the voyage from Act II ends with the arc it actually played rather than the full arc. Prose longer than the panel is never cut silently: a [ more… ] control reveals the remainder.',
       },
       {
         heading: 'The story',
@@ -333,9 +375,12 @@ export class GymLongErasureScene extends GymSceneBase {
     this.buildChrome();
     this.startRun();
 
-    // A reveal in flight owns a timer and input listeners; release both when
-    // the scene shuts down so nothing writes into a destroyed scene.
-    this.events.once('shutdown', () => this.destroyReveal());
+    // A reveal or a banner in flight owns a timer and input listeners; release
+    // both when the scene shuts down so nothing writes into a destroyed scene.
+    this.events.once('shutdown', () => {
+      this.destroyReveal();
+      this.destroySceneExitBanner();
+    });
   }
 
   // ── Public testing helpers ───────────────────────────────────
@@ -409,6 +454,35 @@ export class GymLongErasureScene extends GymSceneBase {
   /** Take a choice exactly as clicking its label would. @internal */
   chooseByLabel(label: string): void {
     this.applyChoice(label);
+  }
+
+  /** The live act-exit banner handle, or `null` when none is presented. @internal */
+  getSceneExitBanner(): SceneExitPresentationHandle | null {
+    return this.sceneExitBanner;
+  }
+
+  /**
+   * The banner fields currently **visible** on screen, in creation order.
+   *
+   * Reads the rendered text objects at the banner's depth, so a test observes
+   * what the player sees (the sequenced steps) rather than only the plan.
+   * @internal
+   */
+  getSceneExitBannerTexts(): string[] {
+    const children = (this.children?.list ?? []) as Phaser.GameObjects.Text[];
+    return children
+      .filter(
+        (child) =>
+          child.type === 'Text' &&
+          child.depth === SCENE_EXIT_PRESENTATION_DEPTH &&
+          child.visible === true,
+      )
+      .map((child) => child.text);
+  }
+
+  /** Dismiss the live banner now, exactly as a click or key press would. @internal */
+  skipSceneExitBanner(): void {
+    this.sceneExitBanner?.skip();
   }
 
   /** Restart the run, exactly as clicking [ Begin a new survey ] would. @internal */
@@ -567,6 +641,7 @@ export class GymLongErasureScene extends GymSceneBase {
   /** Start a fresh deterministic run and render it. */
   private startRun(): void {
     this.destroyReveal();
+    this.destroySceneExitBanner();
     this.pendingOutcomeProse = null;
     this.run = createLongErasureRun(LONG_ERASURE_SCENE_SEED, longErasureSceneContent());
     this.feedbackText.setColor('#ffff99');
@@ -590,6 +665,8 @@ export class GymLongErasureScene extends GymSceneBase {
     try {
       const next = chooseOption(before, label);
       this.run = next;
+      // The banner presented at the previous act boundary has served its beat.
+      this.destroySceneExitBanner();
       this.playSfx(COMMON_SFX_KEYS.CARD_SWAP);
 
       // The consequence, as authored for the option the player took. It is
@@ -603,8 +680,11 @@ export class GymLongErasureScene extends GymSceneBase {
 
       const actTurned = next.act !== before.act;
       if (actTurned && next.act !== 'Ending') {
-        this.playSfx(COMMON_SFX_KEYS.TURN_CHANGE);
-        this.announce(`Act ${next.act} begins — you chose "${label}".`, '#88ddff');
+        // Present the boundary, don't just announce it: the shared helper
+        // sequences the act that closed, the closing outcome word and the
+        // route ahead, and sounds the act close (`ROUND_END`) itself.
+        this.presentActExit(before.act, next);
+        this.announce(`You chose "${label}".`, '#ffff99');
       } else if (isComplete(next) && next.outcome === 'expired') {
         this.announce('The clock runs out — the beat could not be played.', '#ffaa66');
       } else {
@@ -621,6 +701,42 @@ export class GymLongErasureScene extends GymSceneBase {
           : 'That choice is no longer available.',
       );
     }
+  }
+
+  /**
+   * Present the act boundary the player's choice just crossed.
+   *
+   * The shared `presentSceneExit()` helper owns the banner: the act that just
+   * closed, the act's closing outcome word and the route ahead (the act and
+   * beat that now open), sequenced title → outcome → route from the layout's
+   * `sceneBanner` anchors. This replaces the old `TURN_CHANGE` + `announce()`
+   * pair; the helper sounds the act close (`ROUND_END`) and the feedback line
+   * keeps the choice's own line. The spike has acts but no scenes, so
+   * `sceneTitle` is omitted — the slot fills once a game has scene-exit data
+   * (`docs/ui-animations.md`).
+   */
+  private presentActExit(
+    closedAct: LongErasureAct,
+    next: LongErasureState,
+  ): void {
+    this.destroySceneExitBanner();
+    this.sceneExitBanner = presentSceneExit(this, {
+      actTitle: `Act ${closedAct}`,
+      outcome: ACT_EXIT_OUTCOME,
+      route: `Act ${next.act} — ${next.currentCard.name}`,
+      // No pixel here: the helper resolves each field from the layout's
+      // `sceneBanner` zone, so a re-tuned layout moves the banner with it.
+      resolveAnchor: (name) => resolveAnchor('sceneBanner', name),
+      reducedMotion: this.reducedMotion,
+      soundManager: this.sceneExitSound,
+      actClosed: true,
+    });
+  }
+
+  /** Tear down the live act-exit banner (idempotent; a no-op when none is up). */
+  private destroySceneExitBanner(): void {
+    this.sceneExitBanner?.destroy();
+    this.sceneExitBanner = null;
   }
 
   /** Show a refused choice: textual reason + reason toast + illegal SFX. */

@@ -16,6 +16,7 @@ import {
   validateScreenLayoutDocument,
 } from '../../src/ui/screen-layout-schema';
 import longErasureLayoutJson from '../../example-games/gym/layouts/gym-long-erasure.layout.json';
+import gddPresentationLayoutJson from '../fixtures/story-line/gdd-presentation-layout.json';
 
 /** The layout's base viewport (the Gym's design resolution). */
 const VIEWPORT = { width: 1280, height: 720 };
@@ -32,6 +33,7 @@ const OPTION_ANCHORS = ['option1', 'option2', 'option3', 'option4'] as const;
 /** Zones the scene addresses by name. */
 const ZONES = [
   'statusBar',
+  'sceneBanner',
   'narrative',
   'options',
   'feedback',
@@ -67,6 +69,61 @@ describe('GymLongErasureScene SLL layout', () => {
     expect(parsed.layout.requiredZones).toEqual([...ZONES]);
     for (const zone of ZONES) {
       expect(parsed.layout.zones[zone]).toBeDefined();
+    }
+  });
+
+  it('declares the sceneBanner zone with the GDD contract anchors', () => {
+    const parsed = parseScreenLayoutDocument(longErasureLayoutJson);
+    expect(parsed.valid).toBe(true);
+    if (!parsed.valid) return;
+
+    const zone = parsed.layout.zones.sceneBanner;
+    expect(zone).toBeDefined();
+    expect(parsed.layout.requiredZones).toContain('sceneBanner');
+
+    // The four anchors are the ones `presentSceneExit()` reads, and their
+    // geometry is the GDD §3.1 contract fixture's — never invented here.
+    const anchors = zone.anchors ?? {};
+    for (const name of ['actTitle', 'sceneTitle', 'outcome', 'route']) {
+      expect(anchors[name], `sceneBanner.${name}`).toBeDefined();
+    }
+    expect(anchors).toEqual(
+      gddPresentationLayoutJson.zones.sceneBanner.anchors,
+    );
+    expect(zone.rect).toEqual(gddPresentationLayoutJson.zones.sceneBanner.rect);
+  });
+
+  it('reserves the banner band between the status bar and the narrative', () => {
+    const parsed = parseScreenLayoutDocument(longErasureLayoutJson);
+    expect(parsed.valid).toBe(true);
+    if (!parsed.valid) return;
+
+    const act = anchorPoint(parsed.layout, 'statusBar', 'act', VIEWPORT, 1);
+    const actTitle = anchorPoint(parsed.layout, 'sceneBanner', 'actTitle', VIEWPORT, 1);
+    const sceneTitle = anchorPoint(parsed.layout, 'sceneBanner', 'sceneTitle', VIEWPORT, 1);
+    const outcome = anchorPoint(parsed.layout, 'sceneBanner', 'outcome', VIEWPORT, 1);
+    const route = anchorPoint(parsed.layout, 'sceneBanner', 'route', VIEWPORT, 1);
+    const beat = anchorPoint(parsed.layout, 'narrative', 'beat', VIEWPORT, 1);
+
+    // The banner is a band of its own: below the status bar and above the
+    // narrative panel, with enough room for the 22 px/16 px banner text and
+    // the 15 px/14 px neighbours (the re-tuning this zone forced).
+    expect(actTitle.y - act.y).toBeGreaterThanOrEqual(24);
+    expect(beat.y - sceneTitle.y).toBeGreaterThanOrEqual(20);
+
+    // Title slots sit on the left of the band, outcome/route on the right.
+    expect(actTitle.x).toBeLessThan(VIEWPORT.width / 2);
+    expect(sceneTitle.x).toBeCloseTo(actTitle.x, 6);
+    expect(outcome.x).toBeGreaterThan(VIEWPORT.width / 2);
+    expect(route.x).toBeCloseTo(outcome.x, 6);
+    expect(outcome.y).toBeCloseTo(actTitle.y, 6);
+    expect(route.y).toBeCloseTo(sceneTitle.y, 6);
+
+    for (const point of [actTitle, sceneTitle, outcome, route]) {
+      expect(point.x).toBeGreaterThan(0);
+      expect(point.x).toBeLessThan(VIEWPORT.width);
+      expect(point.y).toBeGreaterThan(0);
+      expect(point.y).toBeLessThan(VIEWPORT.height);
     }
   });
 
