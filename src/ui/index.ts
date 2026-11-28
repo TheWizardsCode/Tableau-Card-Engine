@@ -160,6 +160,40 @@ export type { ProsePagination } from './prose-pagination';
 export { runSceneTransition } from './sceneTransition';
 export type { SceneTransitionOptions, SceneTransitionMode, SceneTransitionType } from './sceneTransition';
 
+// Act/scene exit presentation (banner + outcome + route, CG-0MWR0BJBU005TDTT)
+// See docs/ui-animations.md → presentSceneExit
+export {
+  presentSceneExit,
+  planSceneExitPresentation,
+  resolveSceneExitSfxKey,
+  playSceneExitSfx,
+  SCENE_EXIT_STEP_MS,
+  SCENE_EXIT_AUTO_ADVANCE_MS,
+  SCENE_EXIT_TEXT_SEPARATOR,
+  SCENE_EXIT_ACT_CLOSED_SFX,
+  SCENE_EXIT_SCENE_CLOSED_SFX,
+  SCENE_EXIT_PRESENTATION_DEPTH,
+  SCENE_EXIT_OUTCOME_COLOURS,
+} from './scene-exit-presentation';
+export type {
+  PresentSceneExitOptions,
+  SceneExitAnchors,
+  SceneExitAnchorName,
+  SceneExitAnchorPoint,
+  SceneExitAnchorResolver,
+  SceneExitOutcome,
+  SceneExitPlan,
+  SceneExitPlanOptions,
+  SceneExitPresentationHandle,
+  SceneExitPresentationScheduler,
+  SceneExitPresentationTimer,
+  SceneExitSfxOptions,
+  SceneExitSfxSelection,
+  SceneExitSoundPlayer,
+  SceneExitStep,
+  SceneExitStepKey,
+} from './scene-exit-presentation';
+
 // Card layout helpers
 export { layoutCardPositions } from './layoutCardPositions';
 export type {

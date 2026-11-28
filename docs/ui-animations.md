@@ -15,6 +15,7 @@ The Tableau Card Engine provides reusable animation helpers in `src/ui/` for com
 | `createDragDropManager` | Reusable drag-and-drop lifecycle (dragstart/drag/dragend/drop, snap-back, drop-zone hit-testing) | n/a |
 | `HandView` reorder | Opt-in drag-to-reorder inside the hand row: animated re-layout + `sfx-card-swap` | 240ms |
 | `revealNarration` | Progressive prose reveal (story beat) with a shared SFX | prose length × 28ms (400–9000ms) |
+| `presentSceneExit` | Act/scene exit banner: title → outcome → route, from SLL anchors, with a shared SFX | 3 × 1200ms + 3000ms dwell |
 | `paginateProse` | Word-boundary prose pagination for a fixed display budget (no silent clipping) | n/a (pure) |
 
 ## dealCard
@@ -756,6 +757,116 @@ import { runSceneTransition } from '@ui/sceneTransition';
 | `type` | `'fade' | 'slide'` | 'fade' | Transition type |
 | `duration` | `number` | 300 | Duration in ms |
 | `reducedMotion` | `boolean` | undefined | When true, transition completes instantly |
+
+## presentSceneExit (act/scene exit banner)
+
+Presents a scene's close as a **consequence**: the act/scene that just finished,
+what the objective came to, and where the story opens next — sequenced in that
+order, with a shared `COMMON_SFX_KEYS` sound
+(CG-0MWR0BJBU005TDTT / CG-0MWZCM6I0005DYZ6).
+
+**Signature.** `presentSceneExit(scene, options: PresentSceneExitOptions): SceneExitPresentationHandle`
+(`src/ui/scene-exit-presentation.ts`) — the planner and SFX resolver are pure
+and Phaser-free, so the schedule is unit-testable without a scene; the rendered
+helper drives a real scene through Phaser **types only**.
+
+### Import
+
+```ts
+import { presentSceneExit, anchorPoint, type ScreenLayoutDocument } from '@ui';
+import { COMMON_SFX_KEYS } from '@core-engine/SoundManager';
+```
+
+### Usage
+
+```ts
+const banner = presentSceneExit(this, {
+  actTitle: 'Act I',
+  sceneTitle: 'The Arrival',   // optional: an act-only game omits it
+  outcome: 'success',          // 'success' | 'partial' | 'failure'
+  route: 'The road south',     // where the story opens next
+  // Every position comes from the layout's `sceneBanner` zone — never a pixel.
+  resolveAnchor: (name) => anchorPoint(layout, 'sceneBanner', name, viewport),
+  soundManager: this.soundManager,
+});
+
+await banner.promise;   // resolves once, on auto-advance, skip or destroy
+banner.destroy();       // remove the text when the next beat is ready
+```
+
+### Options (`PresentSceneExitOptions`)
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `actTitle` | `string` | required | The act that is closing (non-blank) |
+| `sceneTitle` | `string` | undefined | The scene that is closing; omitted for an act-only game |
+| `outcome` | `'success' \| 'partial' \| 'failure'` | required | The outcome **word** — the primary channel |
+| `route` | `string` | required | Where the story opens next (non-blank) |
+| `resolveAnchor` | `(name) => { x, y } \| null` | required\* | Resolves `actTitle` / `sceneTitle` / `outcome` / `route` from the SLL `sceneBanner` zone; a missing anchor skips that field |
+| `anchors` | `Partial<Record<name, { x, y }>>` | undefined | Pre-resolved anchors, alternative to `resolveAnchor` |
+| `reducedMotion` | `boolean` | `getEffectiveReducedMotion()` | Present everything synchronously: no timer, no listeners, no SFX |
+| `soundManager` | `{ play(key): boolean \| void }` | undefined | Injected audio backend (typically `SoundManager`) |
+| `sfx` | `CommonSfxKey \| null \| string` | stage key | Shared SFX override; `null` silences; an unknown/game-scoped string falls back to the stage key |
+| `actClosed` | `boolean` | `false` | `true` selects `ROUND_END` (act closes), otherwise `TURN_CHANGE` |
+| `stepMs` | `number` | `SCENE_EXIT_STEP_MS` (1200) | Dwell per step |
+| `autoAdvanceMs` | `number` | `SCENE_EXIT_AUTO_ADVANCE_MS` (3000) | Dwell after the last step before auto-advancing |
+| `skipOnInput` | `boolean` | `true` | First pointer/key press reveals every field and dismisses |
+| `tintOutcome` | `boolean` | `true` | Shared outcome colour as a **secondary** cue only |
+| `scheduler` | `SceneExitPresentationScheduler` | Phaser time plugin | Timer seam — tests inject a fake |
+| `onComplete` | `function` | undefined | Called at most once when dismissed/destroyed |
+
+\* `resolveAnchor` or `anchors` is required: the helper throws rather than
+placing an element at a pixel literal, keeping the project's SLL rule.
+
+### Handle (`SceneExitPresentationHandle`)
+
+| Member | Description |
+|--------|-------------|
+| `plan` | The deterministic schedule (`steps`, `totalMs`, `instant`, `stepMs`, `autoAdvanceMs`) |
+| `done` | `true` once the presentation is dismissed (the promise has settled) |
+| `destroyed` | `true` once `destroy()` has run |
+| `promise` | Resolves **exactly once** — on auto-advance, skip-on-input or `destroy()` — so the caller can sequence its own transition |
+| `skip()` | Show every field instantly and dismiss with no further animation. Idempotent |
+| `destroy()` | Cancel the timer, detach every listener and destroy every created text object. Idempotent; also wired to the scene `shutdown` event |
+
+### Pacing and sequencing
+
+`planSceneExitPresentation()` (pure, exported) produces the schedule:
+title → outcome → route, then `autoAdvanceMs`. The rendered helper reveals one
+anchor pair per step (`actTitle`+`sceneTitle`, then `outcome`, then `route`) and
+leaves earlier steps readable, so the player reads the close as a sentence
+rather than a swap. Reduced motion collapses the plan to one instant step.
+
+### Camera ownership (do not double-play motion)
+
+The helper **never moves the camera**. `runSceneTransition()` (or the game) owns
+the camera fade/slide; this presentation only draws in-layout text pinned to the
+screen (`setScrollFactor(0)`), so a game may layer the banner over a camera
+transition without two competing animations. The banner renders at depth
+`SCENE_EXIT_PRESENTATION_DEPTH` (900): above the game board, below HUD panels.
+
+### Outcome and colour
+
+The outcome is always printed as a **word**; the shared tint
+(`SCENE_EXIT_OUTCOME_COLOURS`) only reinforces it, never replaces it
+(GDD §3.4.3). `tintOutcome: false` proves the word carries the outcome alone.
+
+### Reduced motion and SFX contract
+
+With reduced motion every field is shown synchronously, the promise settles
+immediately, and no timer, input listener or SFX is created — the shared
+accessibility rule (motion is removed, information is never omitted). Audio is
+best-effort: `playSceneExitSfx()` swallows a missing/unplayable/throwing backend,
+and the textual channel is unconditional.
+
+### Gym precedent
+
+*The Long Erasure* spike (`GymLongErasureScene`) is the planned rendered
+precedent: its act turn presents the act title, the act's closing outcome and
+the route through this helper, using a `sceneBanner` zone in
+`example-games/gym/layouts/gym-long-erasure.layout.json`. Because the spike has
+acts but no scenes, it passes no `sceneTitle` — the slot fills once a game has
+scene-exit data.
 
 ## Game-Specific Usage: Coloretto
 

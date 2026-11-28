@@ -4,11 +4,15 @@
  *
  * A scene's close should read as a *consequence*: the act/scene that just
  * finished, what the objective came to, and which way the story opens next —
- * in that order, not as a single text swap. This module owns the presentation's
- * **schedule**: {@link planSceneExitPresentation} is a pure, Phaser-free
- * function that turns the four presentation fields into an ordered, timed step
- * sequence. The Phaser rendering layer (a later slice) consumes the plan and
- * only has to play it.
+ * in that order, not as a single text swap. This module owns both halves of
+ * that presentation:
+ *
+ * - {@link planSceneExitPresentation} is the **schedule**: a pure, Phaser-free
+ *   function that turns the four presentation fields into an ordered, timed
+ *   step sequence (plus {@link resolveSceneExitSfxKey} for the audio cue);
+ * - {@link presentSceneExit} is the **rendered layer**: it draws the four
+ *   fields as text objects positioned from injected SLL anchors and plays the
+ *   plan, resolving a promise when the banner is dismissed.
  *
  * ## Contract
  *
@@ -29,12 +33,13 @@
  *   defaults to {@link SCENE_EXIT_AUTO_ADVANCE_MS}. A non-finite or
  *   non-positive timing override falls back to the default rather than
  *   producing a zero-length or `NaN` schedule.
- * - **Plain data only.** Inputs and outputs are plain objects: no Phaser
- *   reference, no scene, no timer. That is what makes the step order, the
- *   reduced-motion collapse and the dwell times assertable in a Node unit test
- *   (and why this module is a candidate for the node-safe manifest once the
- *   Phaser rendering layer is adjacent — that decision belongs to the
- *   exports/node-safety slice, not here).
+ * - **Plain data only.** Inputs and outputs of the planner are plain objects:
+ *   no Phaser reference, no scene, no timer. That is what makes the step
+ *   order, the reduced-motion collapse and the dwell times assertable in a
+ *   Node unit test. The rendered {@link presentSceneExit} references Phaser
+ *   through `import type` only (positions arrive from an injected SLL anchor
+ *   callback), so the module can be considered for the node-safe manifest —
+ *   that decision belongs to the exports/node-safety slice.
  * - **Audio is one shared key per stage, and never blocks text.**
  *   {@link resolveSceneExitSfxKey} is a separate pure function that returns a
  *   `COMMON_SFX_KEYS` value — `ROUND_END` when the act closes, `TURN_CHANGE`
@@ -49,10 +54,14 @@
  * @module ui/scene-exit-presentation
  */
 
+import type Phaser from 'phaser';
+
 import {
   COMMON_SFX_KEYS,
   type CommonSfxKey,
 } from '../core-engine/SoundManager';
+import { FONT_FAMILY } from './constants';
+import { getEffectiveReducedMotion } from './ReducedMotion';
 
 // ── Pacing constants ────────────────────────────────────────
 
@@ -373,4 +382,581 @@ export function playSceneExitSfx(
   } catch {
     return false;
   }
+}
+
+// ── Rendered presentation (Phaser layer) ────────────────────
+
+/**
+ * Display depth of the banner.
+ *
+ * In-layout, not an overlay (GDD §3.2): above the game board (0–999) so the
+ * board cannot draw over it, and **below** the HUD panel depth (1000) so help
+ * and settings chrome still sit on top of it.
+ */
+export const SCENE_EXIT_PRESENTATION_DEPTH = 900;
+
+/**
+ * Secondary colour cue per outcome.
+ *
+ * Colour is **never** the primary channel (GDD §3.4.3): the banner always
+ * prints the outcome word, and the tint only reinforces it.
+ */
+export const SCENE_EXIT_OUTCOME_COLOURS: Readonly<
+  Record<SceneExitOutcome, string>
+> = {
+  success: '#8fe388',
+  partial: '#ffd166',
+  failure: '#ff8c8c',
+};
+
+/**
+ * The four SLL anchor names the banner reads.
+ *
+ * They match the `sceneBanner` zone in the GDD contract fixture
+ * (`tests/fixtures/story-line/gdd-presentation-layout.json`), so a game passes
+ * a `resolveAnchor` callback backed by `anchorPoint()` and never a pixel.
+ */
+export type SceneExitAnchorName = 'actTitle' | 'sceneTitle' | 'outcome' | 'route';
+
+/** A resolved SLL anchor, in screen pixels. */
+export interface SceneExitAnchorPoint {
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Callback that resolves one banner anchor to a screen point.
+ *
+ * The helper never computes a position itself: every element is placed from
+ * this callback (normally `(name) => anchorPoint(layout, 'sceneBanner', name,
+ * viewport)`), which is what keeps absolute pixel coordinates out of the
+ * presentation (AC1). Returning `null`/`undefined` for an anchor skips that
+ * element rather than falling back to a guessed position.
+ */
+export type SceneExitAnchorResolver = (
+  anchor: SceneExitAnchorName,
+) => SceneExitAnchorPoint | null | undefined;
+
+/** Pre-resolved anchor map, for callers that already hold the points. */
+export type SceneExitAnchors = Partial<
+  Record<SceneExitAnchorName, SceneExitAnchorPoint>
+>;
+
+/** A scheduled timer that can be cancelled. */
+export interface SceneExitPresentationTimer {
+  cancel(): void;
+}
+
+/**
+ * Timer seam used to sequence the presentation.
+ *
+ * The default implementation wraps Phaser's time plugin; tests inject a manual
+ * scheduler so the full sequence runs without waiting on wall-clock time.
+ */
+export interface SceneExitPresentationScheduler {
+  /** Run `callback` once after `delayMs` milliseconds. */
+  after(delayMs: number, callback: () => void): SceneExitPresentationTimer;
+}
+
+/** Options accepted by {@link presentSceneExit}. */
+export interface PresentSceneExitOptions {
+  /** The act that is closing. Required and non-blank. */
+  readonly actTitle: string;
+  /**
+   * The scene that is closing. Optional: a game with acts but no scenes (the
+   * Gym Long Erasure spike) presents the act alone.
+   */
+  readonly sceneTitle?: string;
+  /** The objective's outcome word — the presentation's primary channel. */
+  readonly outcome: SceneExitOutcome;
+  /** Where the story opens next. Required and non-blank. */
+  readonly route: string;
+  /**
+   * Resolve one `sceneBanner` SLL anchor. Required unless `anchors` is given —
+   * positions must come from the layout, never from absolute pixels.
+   */
+  readonly resolveAnchor?: SceneExitAnchorResolver;
+  /** Pre-resolved `sceneBanner` anchors (alternative to `resolveAnchor`). */
+  readonly anchors?: SceneExitAnchors;
+  /** Explicit reduced-motion override; defaults to the effective preference. */
+  readonly reducedMotion?: boolean;
+  /** Injected audio backend (typically the scene's `SoundManager`). */
+  readonly soundManager?: SceneExitSoundPlayer | null;
+  /** SFX override; `null` silences, an unknown string falls back to the stage key. */
+  readonly sfx?: SceneExitSfxSelection | string;
+  /** `true` when the act itself closes (selects `ROUND_END` over `TURN_CHANGE`). */
+  readonly actClosed?: boolean;
+  /** Dwell per step, in milliseconds. Defaults to {@link SCENE_EXIT_STEP_MS}. */
+  readonly stepMs?: number;
+  /**
+   * Dwell after the last step before auto-advancing, in milliseconds.
+   * Defaults to {@link SCENE_EXIT_AUTO_ADVANCE_MS}.
+   */
+  readonly autoAdvanceMs?: number;
+  /**
+   * When `true` (default), the first pointer/key press reveals every field and
+   * dismisses the presentation immediately (no further animation).
+   * @default true
+   */
+  readonly skipOnInput?: boolean;
+  /**
+   * When `true` (default), the outcome keeps its shared colour as a secondary
+   * cue. Set `false` to prove the printed word carries the outcome alone.
+   * @default true
+   */
+  readonly tintOutcome?: boolean;
+  /** Timer seam override (tests inject a manual scheduler). */
+  readonly scheduler?: SceneExitPresentationScheduler;
+  /** Called at most once when the presentation is dismissed or destroyed. */
+  readonly onComplete?: () => void;
+}
+
+/**
+ * Handle to a live scene-exit presentation, returned by
+ * {@link presentSceneExit}.
+ *
+ * `skip()` and `destroy()` are safe to call at any time, in any order, and more
+ * than once.
+ */
+export interface SceneExitPresentationHandle {
+  /** The deterministic schedule the presentation is playing. */
+  readonly plan: SceneExitPlan;
+  /** `true` once the presentation is dismissed (the promise has settled). */
+  readonly done: boolean;
+  /** `true` once {@link SceneExitPresentationHandle.destroy} has run. */
+  readonly destroyed: boolean;
+  /**
+   * Resolves exactly once — on auto-advance, skip-on-input or `destroy()` — so
+   * a caller can sequence its own transition without polling.
+   */
+  readonly promise: Promise<void>;
+  /** Show every field instantly and dismiss with no further animation. */
+  skip(): void;
+  /** Cancel timers, detach listeners and destroy every created text object. */
+  destroy(): void;
+}
+
+interface EmitterLike {
+  on?: (event: string, handler: () => void) => unknown;
+  off?: (event: string, handler: () => void) => unknown;
+}
+
+interface BannerTextObjectLike {
+  setVisible?: (visible: boolean) => unknown;
+  setDepth?: (depth: number) => unknown;
+  setOrigin?: (x: number, y: number) => unknown;
+  setColor?: (color: string) => unknown;
+  setScrollFactor?: (x: number, y?: number) => unknown;
+  setText?: (text: string) => unknown;
+  destroy?: () => void;
+}
+
+interface SceneWithBannerHost {
+  add?: {
+    text?: (
+      x: number,
+      y: number,
+      text: string,
+      style?: Phaser.Types.GameObjects.Text.TextStyle,
+    ) => BannerTextObjectLike | null | undefined;
+  };
+  time?: {
+    delayedCall?: (
+      delayMs: number,
+      callback: () => void,
+    ) => { remove?: (dispatchCallback?: boolean) => unknown } | undefined;
+  };
+  input?: EmitterLike & { keyboard?: EmitterLike | null };
+  events?: EmitterLike;
+}
+
+interface ListenerBinding {
+  emitter: EmitterLike;
+  event: string;
+  handler: () => void;
+}
+
+interface BannerFieldStyle {
+  readonly fontSize: string;
+  readonly fontStyle?: string;
+  readonly color: string;
+  /** Horizontal origin: `0` for left-anchored labels, `1` for right-anchored. */
+  readonly originX: number;
+}
+
+/**
+ * Build the resolver the presentation uses, preferring the injected callback
+ * and falling back to a pre-resolved anchor map.
+ */
+function createAnchorResolver(
+  options: PresentSceneExitOptions,
+): SceneExitAnchorResolver {
+  if (typeof options.resolveAnchor === 'function') {
+    return options.resolveAnchor;
+  }
+  const anchors = options.anchors;
+  if (anchors && typeof anchors === 'object') {
+    return (anchor) => anchors[anchor] ?? null;
+  }
+  throw new TypeError(
+    'presentSceneExit: `resolveAnchor` (or `anchors`) is required — every ' +
+      'banner element must be positioned from an SLL anchor, never an absolute ' +
+      'pixel coordinate.',
+  );
+}
+
+/** Resolve an anchor to a finite point, or `null` when it is missing/invalid. */
+function resolveAnchorPoint(
+  resolver: SceneExitAnchorResolver,
+  anchor: SceneExitAnchorName,
+): SceneExitAnchorPoint | null {
+  let point: SceneExitAnchorPoint | null | undefined;
+  try {
+    point = resolver(anchor);
+  } catch {
+    return null;
+  }
+  if (!point || typeof point !== 'object') return null;
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  return point;
+}
+
+/** Build the default scheduler over a scene's Phaser time plugin. */
+function createSceneScheduler(
+  scene: Phaser.Scene,
+): SceneExitPresentationScheduler | null {
+  const time = (scene as unknown as SceneWithBannerHost | null)?.time;
+  if (!time || typeof time.delayedCall !== 'function') return null;
+  return {
+    after(delayMs, callback) {
+      const event = time.delayedCall!(delayMs, callback);
+      return {
+        cancel() {
+          try {
+            event?.remove?.(false);
+          } catch {
+            // ignore: the timer may already be gone (scene shutdown)
+          }
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Present an act/scene exit banner.
+ *
+ * Renders the four presentation fields as **separate** text objects, each
+ * positioned from an injected SLL anchor (`actTitle` and `sceneTitle` on the
+ * left, `outcome` and `route` on the right — the GDD `sceneBanner` zone
+ * geometry) and sequences them in plan order: title → outcome → route. The
+ * outcome is printed as a word; colour is only a secondary cue.
+ *
+ * The returned promise resolves exactly once, on auto-advance, skip-on-input or
+ * `destroy()`, so a caller can layer its own scene transition after the banner.
+ *
+ * ## Camera ownership
+ *
+ * The helper **never moves the camera**. `runSceneTransition()` (or the game)
+ * owns the fade/slide; this presentation only draws in-layout text. That keeps
+ * the two layers from double-playing motion (parent AC6).
+ *
+ * ## Reduced motion
+ *
+ * With reduced motion (`reducedMotion: true` or the effective preference) every
+ * field is shown synchronously in one step: no timer, no input listener and no
+ * SFX, and the promise settles immediately. The information is never omitted.
+ *
+ * ## Teardown
+ *
+ * Dismissal (auto-advance/skip) resolves the promise and leaves the text on
+ * screen for the caller to read during its own transition; `destroy()` — also
+ * wired to the scene's `shutdown` event — removes every listener, timer and
+ * created object. Both are idempotent.
+ */
+export function presentSceneExit(
+  scene: Phaser.Scene,
+  options: PresentSceneExitOptions,
+): SceneExitPresentationHandle {
+  if (!options || typeof options !== 'object') {
+    throw new TypeError(
+      'presentSceneExit: options must be an object with `actTitle`, ' +
+        '`outcome`, `route` and an anchor source.',
+    );
+  }
+
+  const resolveAnchor = createAnchorResolver(options);
+  const shouldReduce = options.reducedMotion ?? getEffectiveReducedMotion();
+  const plan = planSceneExitPresentation({
+    actTitle: options.actTitle,
+    sceneTitle: options.sceneTitle,
+    outcome: options.outcome,
+    route: options.route,
+    reducedMotion: shouldReduce,
+    stepMs: options.stepMs,
+    autoAdvanceMs: options.autoAdvanceMs,
+  });
+
+  const trimmedField = (value: unknown): string =>
+    typeof value === 'string' ? value.trim() : '';
+  const fieldTexts: Record<SceneExitAnchorName, string | null> = {
+    actTitle: trimmedField(options.actTitle),
+    sceneTitle: trimmedField(options.sceneTitle) || null,
+    outcome: options.outcome,
+    route: trimmedField(options.route),
+  };
+
+  const styles: Record<SceneExitAnchorName, BannerFieldStyle> = {
+    actTitle: { fontSize: '22px', fontStyle: 'bold', color: '#ffffff', originX: 0 },
+    sceneTitle: { fontSize: '16px', color: '#c9d4e5', originX: 0 },
+    outcome: {
+      fontSize: '22px',
+      fontStyle: 'bold',
+      color:
+        options.tintOutcome === false
+          ? '#ffffff'
+          : SCENE_EXIT_OUTCOME_COLOURS[options.outcome],
+      originX: 1,
+    },
+    route: { fontSize: '16px', color: '#a9c8ff', originX: 1 },
+  };
+
+  const created: Array<{
+    field: SceneExitAnchorName;
+    object: BannerTextObjectLike;
+  }> = [];
+  const host = scene as unknown as SceneWithBannerHost | null;
+  const add = host?.add;
+
+  let settled = false;
+  let destroyed = false;
+  let completionFired = false;
+  let timer: SceneExitPresentationTimer | null = null;
+  const bindings: ListenerBinding[] = [];
+
+  let resolvePromise: () => void = () => {};
+  const promise = new Promise<void>((resolve) => {
+    resolvePromise = resolve;
+  });
+
+  const stopTimer = (): void => {
+    const pending = timer;
+    timer = null;
+    if (!pending) return;
+    try {
+      pending.cancel();
+    } catch {
+      // ignore: the timer may already be gone
+    }
+  };
+
+  const detach = (binding: ListenerBinding): void => {
+    const index = bindings.indexOf(binding);
+    if (index >= 0) bindings.splice(index, 1);
+    try {
+      binding.emitter.off?.(binding.event, binding.handler);
+    } catch {
+      // ignore: the emitter may already be torn down
+    }
+  };
+
+  const detachAll = (): void => {
+    for (const binding of bindings.slice()) detach(binding);
+  };
+
+  const fireComplete = (): void => {
+    if (completionFired) return;
+    completionFired = true;
+    if (!options.onComplete) return;
+    try {
+      options.onComplete();
+    } catch {
+      // A caller callback must not leave the presentation half-released.
+    }
+  };
+
+  const settle = (): void => {
+    if (settled) return;
+    settled = true;
+    stopTimer();
+    detachAll();
+    resolvePromise();
+    fireComplete();
+  };
+
+  const showFields = (fields: readonly SceneExitAnchorName[]): void => {
+    for (const entry of created) {
+      if (!fields.includes(entry.field)) continue;
+      try {
+        entry.object.setVisible?.(true);
+      } catch {
+        // A renderer that rejects a visibility change must not abort the step.
+      }
+    }
+  };
+
+  const showAll = (): void => {
+    showFields(created.map((entry) => entry.field));
+  };
+
+  // Create every field up front (hidden), so nothing is added after the first
+  // frame and a skipped presentation can reveal all of it in one pass.
+  if (add && typeof add.text === 'function') {
+    for (const field of [
+      'actTitle',
+      'sceneTitle',
+      'outcome',
+      'route',
+    ] as const) {
+      const text = fieldTexts[field];
+      if (text === null) continue;
+      const point = resolveAnchorPoint(resolveAnchor, field);
+      if (!point) continue;
+      const style = styles[field];
+      let object: BannerTextObjectLike | null | undefined;
+      try {
+        object = add.text(point.x, point.y, text, {
+          fontFamily: FONT_FAMILY,
+          fontSize: style.fontSize,
+          fontStyle: style.fontStyle,
+          color: style.color,
+        });
+      } catch {
+        object = null;
+      }
+      if (!object) continue;
+      try {
+        object.setOrigin?.(style.originX, 0.5);
+        object.setDepth?.(SCENE_EXIT_PRESENTATION_DEPTH);
+        // SLL anchors are screen-space: pin the banner so a camera slide does
+        // not carry it out of the layout band.
+        object.setScrollFactor?.(0);
+        object.setVisible?.(false);
+      } catch {
+        // ignore: a partial text object still renders where it was added
+      }
+      created.push({ field, object });
+    }
+  }
+
+  const bindInput = (
+    emitter: EmitterLike | null | undefined,
+    event: string,
+    handler: () => void,
+  ): void => {
+    if (!emitter || typeof emitter.on !== 'function') return;
+    const binding: ListenerBinding = { emitter, event, handler };
+    try {
+      emitter.on(event, binding.handler);
+      bindings.push(binding);
+    } catch {
+      // ignore: an emitter without working listeners cannot be wired
+    }
+  };
+
+  const skip = (): void => {
+    if (destroyed || settled) return;
+    showAll();
+    settle();
+  };
+
+  const destroyNow = (): void => {
+    if (destroyed) return;
+    destroyed = true;
+    stopTimer();
+    detachAll();
+    for (const entry of created.splice(0)) {
+      try {
+        entry.object.destroy?.();
+      } catch {
+        // ignore: the object may already be destroyed with the scene
+      }
+    }
+    // A caller awaiting the promise must never hang on an abort.
+    if (!settled) {
+      settled = true;
+      resolvePromise();
+    }
+  };
+
+  // Reduced motion (or a scene without a renderer/timer): present everything
+  // now, with no timer, no listener and no SFX.
+  if (plan.instant) {
+    showAll();
+    settle();
+  } else {
+    const key = resolveSceneExitSfxKey({
+      actClosed: options.actClosed,
+      sfx: options.sfx,
+    });
+    playSceneExitSfx(options.soundManager, key);
+
+    if (options.skipOnInput !== false) {
+      bindInput(host?.input, 'pointerdown', skip);
+      bindInput(host?.input?.keyboard, 'keydown', skip);
+    }
+    // Scene shutdown removes the banner even if the caller never destroys it.
+    bindInput(host?.events, 'shutdown', destroyNow);
+
+    const scheduler = options.scheduler ?? (scene ? createSceneScheduler(scene) : null);
+    let stepIndex = 0;
+
+    const advance = (): void => {
+      if (destroyed || settled) return;
+      const step = plan.steps[stepIndex];
+      if (!step) {
+        settle();
+        return;
+      }
+      showFields(
+        step.key === 'title'
+          ? ['actTitle', 'sceneTitle']
+          : step.key === 'outcome'
+            ? ['outcome']
+            : ['route'],
+      );
+      const isLast = stepIndex === plan.steps.length - 1;
+      const delay = step.ms + (isLast ? plan.autoAdvanceMs : 0);
+      stepIndex += 1;
+      if (!scheduler) {
+        // No timer available (headless scene): the text is unconditional, so
+        // reveal the rest and dismiss immediately.
+        showAll();
+        settle();
+        return;
+      }
+      try {
+        timer = scheduler.after(delay, () => {
+          timer = null;
+          if (destroyed || settled) return;
+          if (stepIndex >= plan.steps.length) {
+            settle();
+          } else {
+            advance();
+          }
+        });
+      } catch {
+        // A throwing scheduler must never block the textual channel.
+        showAll();
+        settle();
+      }
+    };
+
+    advance();
+  }
+
+  return {
+    get plan() {
+      return plan;
+    },
+    get done() {
+      return settled;
+    },
+    get destroyed() {
+      return destroyed;
+    },
+    promise,
+    skip,
+    destroy: destroyNow,
+  };
 }
