@@ -530,9 +530,16 @@ export interface SceneExitPresentationHandle {
    * a caller can sequence its own transition without polling.
    */
   readonly promise: Promise<void>;
-  /** Show every field instantly and dismiss with no further animation. */
+  /**
+   * Show every field instantly and dismiss with no further animation.
+   * Idempotent, and a no-op once the presentation is dismissed or destroyed.
+   */
   skip(): void;
-  /** Cancel timers, detach listeners and destroy every created text object. */
+  /**
+   * Cancel the pending timer, detach every listener (input and scene
+   * `shutdown`) and destroy every created text object. Idempotent; a destroy
+   * before dismissal also settles the promise and fires `onComplete` once.
+   */
   destroy(): void;
 }
 
@@ -574,6 +581,12 @@ interface ListenerBinding {
   emitter: EmitterLike;
   event: string;
   handler: () => void;
+  /**
+   * `input` bindings (pointer/key skip) belong to the presentation's live
+   * phase and are released on dismissal; the `shutdown` binding is the
+   * last-resort teardown hook and stays attached until `destroy()`.
+   */
+  readonly kind: 'input' | 'shutdown';
 }
 
 interface BannerFieldStyle {
@@ -670,9 +683,15 @@ function createSceneScheduler(
  * ## Teardown
  *
  * Dismissal (auto-advance/skip) resolves the promise and leaves the text on
- * screen for the caller to read during its own transition; `destroy()` — also
- * wired to the scene's `shutdown` event — removes every listener, timer and
- * created object. Both are idempotent.
+ * screen for the caller to read during its own transition; only the
+ * skip-on-input listeners are released. `destroy()` — also wired to the
+ * scene's `shutdown` event, and kept wired after dismissal so a late scene
+ * teardown is still total — cancels the pending timer, detaches every listener
+ * and destroys every created object. Both are idempotent, `skip()` after
+ * `destroy()` is a no-op, and `destroy()` settles the promise (the caller never
+ * hangs) exactly once. The reveal is visibility-based, not tween-based, so the
+ * helper creates no tweens and teardown cannot strand one; the browser suite
+ * asserts both no orphaned objects and no tween residue.
  */
 export function presentSceneExit(
   scene: Phaser.Scene,
@@ -764,6 +783,13 @@ export function presentSceneExit(
     for (const binding of bindings.slice()) detach(binding);
   };
 
+  /** Release the skip-on-input listeners, keeping the shutdown hook alive. */
+  const detachInputBindings = (): void => {
+    for (const binding of bindings.slice()) {
+      if (binding.kind === 'input') detach(binding);
+    }
+  };
+
   const fireComplete = (): void => {
     if (completionFired) return;
     completionFired = true;
@@ -779,7 +805,10 @@ export function presentSceneExit(
     if (settled) return;
     settled = true;
     stopTimer();
-    detachAll();
+    // The banner stays readable until the caller's own transition ends, so
+    // only the skip listeners go; the shutdown hook remains until destroy()
+    // so a scene torn down after dismissal still reaches full teardown.
+    detachInputBindings();
     resolvePromise();
     fireComplete();
   };
@@ -843,9 +872,10 @@ export function presentSceneExit(
     emitter: EmitterLike | null | undefined,
     event: string,
     handler: () => void,
+    kind: ListenerBinding['kind'] = 'input',
   ): void => {
     if (!emitter || typeof emitter.on !== 'function') return;
-    const binding: ListenerBinding = { emitter, event, handler };
+    const binding: ListenerBinding = { emitter, event, handler, kind };
     try {
       emitter.on(event, binding.handler);
       bindings.push(binding);
@@ -877,10 +907,19 @@ export function presentSceneExit(
       settled = true;
       resolvePromise();
     }
+    // A destroy before dismissal is also a dismissal: fire the completion
+    // callback exactly once (idempotent when a skip/auto-advance got there
+    // first).
+    fireComplete();
   };
 
+  // Scene shutdown removes the banner even if the caller never destroys it.
+  // Bound on every path — including reduced motion, which creates no timer or
+  // input listeners — and kept alive after dismissal (see `settle`).
+  bindInput(host?.events, 'shutdown', destroyNow, 'shutdown');
+
   // Reduced motion (or a scene without a renderer/timer): present everything
-  // now, with no timer, no listener and no SFX.
+  // now, with no timer, no input listener and no SFX.
   if (plan.instant) {
     showAll();
     settle();
@@ -895,8 +934,6 @@ export function presentSceneExit(
       bindInput(host?.input, 'pointerdown', skip);
       bindInput(host?.input?.keyboard, 'keydown', skip);
     }
-    // Scene shutdown removes the banner even if the caller never destroys it.
-    bindInput(host?.events, 'shutdown', destroyNow);
 
     const scheduler = options.scheduler ?? (scene ? createSceneScheduler(scene) : null);
     let stepIndex = 0;

@@ -826,8 +826,28 @@ placing an element at a pixel literal, keeping the project's SLL rule.
 | `done` | `true` once the presentation is dismissed (the promise has settled) |
 | `destroyed` | `true` once `destroy()` has run |
 | `promise` | Resolves **exactly once** — on auto-advance, skip-on-input or `destroy()` — so the caller can sequence its own transition |
-| `skip()` | Show every field instantly and dismiss with no further animation. Idempotent |
-| `destroy()` | Cancel the timer, detach every listener and destroy every created text object. Idempotent; also wired to the scene `shutdown` event |
+| `skip()` | Show every field instantly and dismiss with no further animation. Idempotent; a **no-op** once the presentation is dismissed or destroyed |
+| `destroy()` | Cancel the pending timer, detach every listener (pointer, key and scene `shutdown`) and destroy every created text object. Idempotent; a destroy **before** dismissal also settles the promise and fires `onComplete` exactly once, so an awaiting caller never hangs |
+
+### Teardown and lifecycle
+
+Presenting a banner is a full lifecycle, not just a draw
+(CG-0MWZCOL3O005A2B9). Two phases, both total and idempotent:
+
+- **Dismissal** — auto-advance or skip-on-input settles `promise` once, fires
+  `onComplete` once and releases the pointer/key listeners. The text stays on
+  screen so the caller can read it during its own scene transition.
+- **Teardown** — `destroy()` (or the scene's `shutdown` event, which stays
+  wired **even after dismissal**) cancels the pending timer, detaches the
+  remaining listeners and destroys every created text object. Calling
+  `destroy()` repeatedly, or `skip()` after `destroy()`, is a no-op; neither
+  throws nor resurrects an object. `destroyed` reports the teardown state and
+  `done` reports that the promise has settled.
+
+The reveal is visibility-based, not tween-based: the helper creates **no**
+tweens, so teardown cannot strand one. The browser suite asserts the timer and
+listener counts return to their pre-presentation values, the scene's display
+list is empty afterwards, and no tween remains.
 
 ### Pacing and sequencing
 

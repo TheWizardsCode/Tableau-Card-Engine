@@ -20,7 +20,12 @@
  *     `reducedMotion` flag, or the effective preference
  *     (`getEffectiveReducedMotion()` — the SettingsStore toggle, then the CSS
  *     `prefers-reduced-motion: reduce` fallback);
- *  6. `destroy()` is idempotent and leaves no text object behind.
+ *  6. `destroy()` is idempotent and leaves no text object behind, and the
+ *     lifecycle is total (CG-0MWZCOL3O005A2B9): `destroyed`/`done` reflect the
+ *     state, `destroy()` settles the promise and fires `onComplete` once,
+ *     `skip()` after `destroy()` is a no-op, every timer/listener is released,
+ *     and a scene `shutdown` tears an active **or already dismissed** banner
+ *     down with no orphaned object or tween left in the scene.
  *
  * @module tests/ui/scene-exit-presentation.browser.test.ts
  */
@@ -115,6 +120,11 @@ class ManualScheduler implements SceneExitPresentationScheduler {
     call.callback();
     return call.delayMs;
   }
+}
+
+/** Run a manual schedule through every step and its auto-advance dwell. */
+function runToCompletion(scheduler: ManualScheduler): void {
+  while (scheduler.pending.length > 0) scheduler.fireNext();
 }
 
 class BannerHarnessScene extends Phaser.Scene {
@@ -539,5 +549,162 @@ describe('presentSceneExit browser behaviour', () => {
     // Idempotent: a second destroy changes nothing and never throws.
     expect(() => handle!.destroy()).not.toThrow();
     expect(bannerTexts(scene)).toHaveLength(0);
+  });
+
+  it('reflects lifecycle state and settles the promise on destroy', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const onComplete = vi.fn();
+
+    handle = presentSceneExit(
+      scene,
+      baseOptions({
+        stepMs: 5_000,
+        autoAdvanceMs: 5_000,
+        scheduler,
+        onComplete,
+      }),
+    );
+
+    expect(handle.destroyed).toBe(false);
+    expect(handle.done).toBe(false);
+
+    handle.destroy();
+
+    // AC4/AC5: `destroyed` reflects the lifecycle and the awaiting caller is
+    // released, so an aborted presentation can never hang a scene transition.
+    expect(handle.destroyed).toBe(true);
+    expect(handle.done).toBe(true);
+    await handle.promise;
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats skip() after destroy() as a no-op', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const onComplete = vi.fn();
+
+    handle = presentSceneExit(
+      scene,
+      baseOptions({
+        stepMs: 5_000,
+        autoAdvanceMs: 5_000,
+        scheduler,
+        onComplete,
+      }),
+    );
+
+    handle.destroy();
+
+    // AC3: skipping a torn-down presentation neither throws nor resurrects an
+    // object, and it cannot re-dismiss (or re-notify) the presentation.
+    expect(() => handle!.skip()).not.toThrow();
+    expect(handle.destroyed).toBe(true);
+    expect(handle.done).toBe(true);
+    expect(bannerTexts(scene)).toHaveLength(0);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels the pending timer and detaches every listener on destroy', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const input = scene.input;
+    const keyboard = input.keyboard!;
+
+    // Phaser registers its own shutdown listeners at boot; compare deltas so
+    // the assertion is about the helper's listeners, not Phaser's.
+    const pointerBaseline = input.listenerCount('pointerdown');
+    const keyBaseline = keyboard.listenerCount('keydown');
+    const shutdownBaseline = scene.events.listenerCount('shutdown');
+
+    handle = presentSceneExit(
+      scene,
+      baseOptions({
+        stepMs: 5_000,
+        autoAdvanceMs: 5_000,
+        scheduler,
+      }),
+    );
+
+    expect(input.listenerCount('pointerdown')).toBe(pointerBaseline + 1);
+    expect(keyboard.listenerCount('keydown')).toBe(keyBaseline + 1);
+    expect(scene.events.listenerCount('shutdown')).toBe(shutdownBaseline + 1);
+    expect(scheduler.pending).toHaveLength(1);
+
+    handle.destroy();
+
+    // AC1: no timer, pointer listener, key listener or shutdown hook survives.
+    expect(scheduler.pending).toHaveLength(0);
+    expect(input.listenerCount('pointerdown')).toBe(pointerBaseline);
+    expect(keyboard.listenerCount('keydown')).toBe(keyBaseline);
+    expect(scene.events.listenerCount('shutdown')).toBe(shutdownBaseline);
+  });
+
+  it('tears down on scene shutdown, leaving no orphaned objects or tweens', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const onComplete = vi.fn();
+
+    handle = presentSceneExit(
+      scene,
+      baseOptions({
+        stepMs: 5_000,
+        autoAdvanceMs: 5_000,
+        scheduler,
+        onComplete,
+      }),
+    );
+
+    expect(bannerTexts(scene)).toHaveLength(4);
+
+    // Phaser emits this same event when a scene shuts down; the helper's
+    // lifecycle hook must run without the caller remembering to destroy.
+    scene.events.emit('shutdown');
+
+    expect(handle.destroyed).toBe(true);
+    expect(handle.done).toBe(true);
+    await handle.promise;
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(bannerTexts(scene)).toHaveLength(0);
+    expect(scene.children.list).toHaveLength(0);
+    expect(scheduler.pending).toHaveLength(0);
+    // AC6: the reveal is visibility-based, so teardown cannot strand a tween.
+    expect(scene.tweens.getTweens()).toHaveLength(0);
+  });
+
+  it('keeps the shutdown hook until destroy, so a late scene teardown clears a dismissed banner', async () => {
+    game = await bootGame();
+    const scene = getHarness(game);
+    const scheduler = new ManualScheduler();
+    const onComplete = vi.fn();
+
+    handle = presentSceneExit(
+      scene,
+      baseOptions({
+        stepMs: 120,
+        autoAdvanceMs: 450,
+        scheduler,
+        onComplete,
+      }),
+    );
+
+    runToCompletion(scheduler);
+
+    // Dismissed, so the banner stays readable during the caller's transition —
+    // but still wired to the scene's teardown.
+    expect(handle.done).toBe(true);
+    expect(handle.destroyed).toBe(false);
+    expect(bannerTexts(scene)).toHaveLength(4);
+
+    scene.events.emit('shutdown');
+
+    expect(handle.destroyed).toBe(true);
+    expect(bannerTexts(scene)).toHaveLength(0);
+    expect(scene.children.list).toHaveLength(0);
+    expect(onComplete).toHaveBeenCalledTimes(1);
   });
 });
